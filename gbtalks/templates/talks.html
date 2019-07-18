@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+
+<form method=post enctype=multipart/form-data>
+	<label for=file>File</label>
+	<input name=file type=file id=file accept=".csv">
+	<button>Submit</button>
+</form>
+
+<table>
+<tr>
+	<th>Talk ID</th>
+	<th>Title</th>
+	<th>Speaker(s)</th>
+	<th>Description</th>
+
+</tr>
+{% for talk in talks %}
+<tr>
+	<td>{{ talk.id }}</td>
+	<td>{{ talk.title }}</td>
+        <td>{{ talk.speaker }}</td>
+        <td>{{ talk.description }}</td>	
+</tr>
+
+
+{% endfor %}
+</table>
+
+
+{% endblock %}
+
+
