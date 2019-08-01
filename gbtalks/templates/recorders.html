@@ -19,7 +19,14 @@
 <tr>
 	<td>{{ recorder.name }}</td>
 	<td>{{ recorder.max_shifts_per_day }}</td>
-        <td>{{ recorder.talks }}</td>
+        <td>
+{% for talk in recorder.talks %}
+<table>
+	<th>
+	</th>
+</table>
+{% endfor %}	    
+		</td>
 </tr>
 
 

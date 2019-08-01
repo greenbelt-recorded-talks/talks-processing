@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<table>
+	<tr>
+	<th> Venue </th>
+{% for talk_time in times %}
+
+	<th>{{ talk_time }}</th>
+
+{% endfor %}
+	</tr>
+
+{% for talk_venue in venues %}
+
+	<tr>
+		<td> {{ talk_venue }} </td>
+{% for talk_time in times %}
+
+		<td> 
+		{% for talk in talks %}
+		{% if talk["start_time"] == talk_time and talk["venue"] == talk_venue %}
+			{{ talk["title"] }}
+			{{ talk["venue"] }}
+			{{ talk["recorder_name"] }}
+		{% endif %}
+
+		{% endfor %}
+		</td>
+
+{% endfor %}
+	</tr>
+
+{% endfor %}
+
+</table>
+
+
+<table>
+<tr>
+	<th>Talk ID</th>
+	<th>Title</th>
+	<th>Speaker(s)</th>
+        <th>Recorded By</th>
+	<th>Start Time</th>
+        <th>End Time</th>
+</tr>
+{% for talk in talks %}
+<tr>
+	<td>{{ talk.id }}</td>
+	<td>{{ talk.title }}</td>
+        <td>{{ talk.speaker }}</td>
+	<td>{{ talk.recorder_name }}</td>
+        <td>{{ talk.start_time }}</td>
+        <td>{{ talk.end_time }}</td>
+</tr>
+
+
+{% endfor %}
+</table>
+
+
+{% endblock %}
+
+
