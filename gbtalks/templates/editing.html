@@ -6,21 +6,20 @@
 <form method=post enctype=multipart/form-data>
 	<label for=file>File</label>
 	<input name=file type=file id=file accept=".csv">
+	<input name=form_name type=hidden value=upload_editors_list accept=".csv">
 	<button>Submit</button>
 </form>
 
 <table>
 <tr>
-	<th>Recorder</th>
-	<th>Max Shifts Per Day</th>
-        <th>Talks Recorded</th>
+	<th>Editor</th>
+        <th>Talks Assigned</th>
 </tr>
-{% for recorder in recorders %}
+{% for editor in editors %}
 <tr>
-	<td>{{ recorder.name }}</td>
-	<td>{{ recorder.max_shifts_per_day }}</td>
+	<td>{{ editor.name }}</td>
         <td>
-{% for talk in recorder.talks %}
+{% for talk in editor.talks %}
 <table>
 <tr>
 	<th>Talk ID</th>
@@ -43,6 +42,12 @@
 
 {% endfor %}
 </table>
+
+<div>
+{% for talk in talks_to_edit %}
+{{ talk }}
+{% endfor %}
+</div>
 
 
 {% endblock %}

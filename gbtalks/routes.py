@@ -2,7 +2,7 @@ import csv
 from flask import request, redirect, url_for, render_template, make_response
 from datetime import datetime, date, time, timedelta
 from flask import current_app as app
-from .models import db, Talk, Recorder
+from .models import db, Talk, Recorder, Editor
 from werkzeug.utils import secure_filename
 import os
 import random 
@@ -27,43 +27,56 @@ def start_time_of_talk(day, time):
 
 @app.route('/talks', methods=['GET','POST'])
 def talks():
-    """View or add talks to the database"""
+    """View or add talks to the database, upload the files"""
 
     if request.method == 'POST':
+        if request.form['form_name'] == "upload_talks_list":
+            if 'file' not in request.files:
+                flash('No file part')
+                return redirect(request.url)
 
-        if 'file' not in request.files:
-            flash('No file part')
-            return redirect(request.url)
+            file = request.files['file']
 
-        file = request.files['file']
+            if file:
+                filename = secure_filename(file.filename)
+                file.save(os.path.join(app.config['UPLOAD_DIR'], filename))
 
-        if file:
-            filename = secure_filename(file.filename)
-            file.save(os.path.join(app.config['UPLOAD_DIR'], filename))
+                Talk.query.delete()
 
-            Talk.query.delete()
+                with open(os.path.join(app.config['UPLOAD_DIR'], filename), newline='') as csvfile:
+                    talksreader = csv.reader(csvfile)
+                    for talk_line in talksreader:
+                        start_time = start_time_of_talk(talk_line[6], talk_line[5])
+                        end_time = start_time + timedelta(hours=1)
+                        talk = Talk(id=talk_line[0], 
+                                title=talk_line[7], 
+                                description=talk_line[9], 
+                                speaker=talk_line[8],
+                                venue=talk_line[4],
+                                start_time=start_time,
+                                end_time=end_time)
+                        db.session.add(talk)
 
-            with open(os.path.join(app.config['UPLOAD_DIR'], filename), newline='') as csvfile:
-                talksreader = csv.reader(csvfile)
-                for talk_line in talksreader:
-                    start_time = start_time_of_talk(talk_line[6], talk_line[5])
-                    end_time = start_time + timedelta(hours=1)
-                    talk = Talk(id=talk_line[0], 
-                            title=talk_line[7], 
-                            description=talk_line[9], 
-                            speaker=talk_line[8],
-                            venue=talk_line[4],
-                            start_time=start_time,
-                            end_time=end_time)
-                    db.session.add(talk)
-
-
-            db.session.commit()
-            return redirect(url_for('talks',
+                db.session.commit()
+                return redirect(url_for('talks',
                                     filename=filename))
 
+        elif request.form['form_name'] == "upload_raw_talk":
+            if 'file' not in request.files:
+                flash('No file part')
+                return redirect(request.url)
+
+            talk_id = request.form['talk_id']
+            file = request.files['file']
+
+            if file:
+                filename = talk_id + "_RAW.mp3"
+                file.save(os.path.join(app.config['RAW_UPLOAD_DIR'], filename))
+
     talks = Talk.query.all()
-    return render_template("talks.html", talks=talks)
+    uploaded_files = [x.name for x in os.scandir(app.config['RAW_UPLOAD_DIR'])]
+
+    return render_template("talks.html", talks=talks, uploaded_files=uploaded_files)
 
 @app.route('/recorders', methods=['GET','POST'])
 def recorders():
@@ -107,20 +120,21 @@ def recorders():
     return render_template("recorders.html", recorders=recorders)
                 
 
-@app.route('/rota', methods=['GET'])
+@app.route('/rota', methods=['GET','POST'])
 def rota():
     """Define a rota"""
             
     talks = Talk.query.order_by(Talk.start_time).all()
     recorders = Recorder.query.all()
 
-    # Before making this into production, stop deleting everything!
-    for talk in talks:
-        talk.recorder_name = None
-        db.session.add(talk)
+    if request.method == 'POST':
+        # If we've been asked to make a new rota, clear out the old one
+        for talk in talks:
+            talk.recorder_name = None
+            db.session.add(talk)
 
-    db.session.commit()
-    db.session.flush()
+        db.session.commit()
+        db.session.flush()
 
     import pprint
 
@@ -148,7 +162,6 @@ def rota():
             candidate_recorders.append(candidate_recorder)
 
             # Move on if the talk is in the Red Tent but the recorder can't record there
-
             if talk.venue == "Red Tent" and candidate_recorder.can_record_in_red_tent == False:
                 continue
 
@@ -213,3 +226,67 @@ def rota():
      
     return render_template("rota.html", talks=talks, times=times, venues=venues)
 
+
+
+@app.route('/editing', methods=['GET','POST'])
+def editing():
+    """ Where editors obtain and upload files """
+
+    # This page needs to have:
+    # - A way for someone to upload a list of editors
+
+    if request.method == 'POST':
+        if request.form['form_name'] == "upload_editors_list":
+            if 'file' not in request.files:
+                flash('No file part')
+                return redirect(request.url)
+
+            file = request.files['file']
+
+            if file:
+                filename = secure_filename(file.filename)
+                file.save(os.path.join(app.config['UPLOAD_DIR'], filename))
+
+                Editor.query.delete()
+
+                with open(os.path.join(app.config['UPLOAD_DIR'], filename), newline='') as csvfile:
+                    editorsreader = csv.reader(csvfile)
+    
+                    for editor_line in editorsreader:
+                        editor = Editor(
+                            name = editor_line[0],
+                        )
+                        db.session.add(editor)
+
+        elif request.form['form_name'] == "assign_talk":
+            editor = Editor.query.filter(name = request.form['editor_to_assign']).first()
+            talk = Talk.query.filter(id=request.form['talk_id']).first()
+            
+            editor.talks.append(talk)
+            
+            db.session.add(editor)
+            db.session.add(talk)
+
+            return redirect(url_for('editing') + "?download_talk=" + talk.id)
+
+        elif request.form['form_name'] == "upload_edited_talk":
+           pass 
+
+        db.session.commit()
+        return redirect(url_for('editing'))
+
+    else:
+        if request.args.get("download_raw_talk"):
+            return send_from_directory(app.config["RAW_UPLOAD_DIR"], filename=request.args["download_raw_talk"] + "_RAW.mp3" , as_attachment=True)
+
+    # - Talks that need editing
+    raw_talks_available = [x.name.split("_")[0] for x in os.scandir(app.config['RAW_UPLOAD_DIR']) if x.name.endswith("_RAW.mp3")] 
+    talks_to_edit = Talk.query.filter(Talk.editor_name==None).filter(Talk.id.in_(raw_talks_available))
+    
+
+
+    # - A way for someone to download raw files, assign a talk to an editor, upload the edited files
+    editors = Editor.query.all()
+    return render_template("editing.html", editors=editors, talks_to_edit=talks_to_edit)
+
+    

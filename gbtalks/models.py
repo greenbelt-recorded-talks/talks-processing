@@ -14,6 +14,7 @@ class Talk(db.Model):
     venue = db.Column(db.String)
 
     recorder_name = db.Column(db.String, db.ForeignKey('recorders.name'))
+    editor_name = db.Column(db.String, db.ForeignKey('editors.name'))
 
     def __repr__(self):
         return "<Talk(id='%d', title='%s', description='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s')>" % (self.id, self.title, self.description, self.start_time, self.end_time, self.venue, self.recorder_name)
@@ -29,4 +30,8 @@ class Recorder(db.Model):
     talks = db.relationship("Talk", backref="recorded_by", order_by="Talk.start_time")
 
 
+class Editor(db.Model):
+    __tablename__ = 'editors'
 
+    name = db.Column(db.String, primary_key=True)
+    talks = db.relationship("Talk", backref="edited_by", order_by="Talk.start_time")
