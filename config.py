@@ -17,6 +17,8 @@ class Config:
     UPLOAD_DIR = "/tmp"
     RAW_UPLOAD_DIR = "/tmp"
     EDITED_UPLOAD_DIR = "/tmp"
+    PROCESSED_DIR = "/tmp"
+    SNIP_DIR = "/tmp"
 
     # Greenbelt
     GB_FRIDAY = "2019-08-23"

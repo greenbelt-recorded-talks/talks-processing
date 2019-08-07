@@ -2,13 +2,15 @@
 
 {% block content %}
 
-
+<h1>Upload New Editor File</h1>
 <form method=post enctype=multipart/form-data>
 	<label for=file>File</label>
 	<input name=file type=file id=file accept=".csv">
-	<input name=form_name type=hidden value=upload_editors_list accept=".csv">
+	<input name=form_name type=hidden value=upload_editors_list>
 	<button>Submit</button>
 </form>
+
+<h1> Editors </h1>
 
 <table>
 <tr>
@@ -43,11 +45,47 @@
 {% endfor %}
 </table>
 
-<div>
+<h1> Talks To Edit </h1>
+<table>
+<tr>
+	<th>Talk ID</th>
+	<th>Time</th>
+        <th>Venue</th>
+        <th>Speaker</th>
+        <th>Title</th>
+	<th>RAW file</th>
+	<th>Edited file</th>
+	<th>Snip File</th>
+	<th>Processed File</th>
+</tr>
 {% for talk in talks_to_edit %}
-{{ talk }}
+<tr>
+	<td>{{ talk.id }}</td>
+        <td>{{ talk.start_time }}</td>
+        <td>{{ talk.venue }}</td>
+        <td>{{ talk.speaker }}</td>
+        <td>{{ talk.title }}</td>
+	{% for file_type in 'raw','edited','snip','processed' %}
+
+	<td><form method=post action="uploadtalk" enctype=multipart/form-data>
+		<table>
+			<tr><td>{% if talk.id | string in raw_talks_available %} 
+					<a href="{{ url_for('getfile', talk_id=talk.id, file_type='{{ file_type }}') }}">{{ file_type.title() }} File</a> {% endif %}</td></tr>
+			<tr><td>
+					<input type=hidden name=file_type value="{{ file_type }}">
+				<input type=hidden name=talk_id value="{{ talk.id }}">
+				<input type=file name=file>
+			</td></tr>
+			<tr><td>
+				<input type=submit>
+				
+			</td></tr>
+		</table></form>
+	</td>
+	{% endfor %}
+</tr>
 {% endfor %}
-</div>
+</table>
 
 
 {% endblock %}

@@ -1,5 +1,5 @@
 import csv
-from flask import request, redirect, url_for, render_template, make_response
+from flask import request, redirect, url_for, render_template, make_response, send_from_directory
 from datetime import datetime, date, time, timedelta
 from flask import current_app as app
 from .models import db, Talk, Recorder, Editor
@@ -8,6 +8,7 @@ import os
 import random 
 import sys
 import pprint
+
 
 def start_time_of_talk(day, time):
     fri_of_gb = datetime.strptime(app.config['GB_FRIDAY'], '%Y-%m-%d').date()
@@ -77,6 +78,7 @@ def talks():
     uploaded_files = [x.name for x in os.scandir(app.config['RAW_UPLOAD_DIR'])]
 
     return render_template("talks.html", talks=talks, uploaded_files=uploaded_files)
+
 
 @app.route('/recorders', methods=['GET','POST'])
 def recorders():
@@ -154,11 +156,6 @@ def rota():
             # Pick a random recorder, consider them a candidate
 
             candidate_recorder = random.choice(recorders)
-            #pprint.pprint("Considering Recorder:")
-            #pprint.pprint(candidate_recorder)
-            #pprint.pprint("Recorder's Talks:")
-            #pprint.pprint(candidate_recorder.talks)
-
             candidate_recorders.append(candidate_recorder)
 
             # Move on if the talk is in the Red Tent but the recorder can't record there
@@ -169,9 +166,6 @@ def rota():
             if candidate_recorder.talks:
                 candidate_recorders_last_talk = candidate_recorder.talks[-1]
     
-                #pprint.pprint("Recorder's last talk:")
-                #pprint.pprint(candidate_recorders_last_talk)
-
                 # Move on if the recorder is current recording
                 for existing_talk in candidate_recorder.talks:
                     if existing_talk.start_time < talk.start_time < existing_talk.end_time:
@@ -227,7 +221,6 @@ def rota():
     return render_template("rota.html", talks=talks, times=times, venues=venues)
 
 
-
 @app.route('/editing', methods=['GET','POST'])
 def editing():
     """ Where editors obtain and upload files """
@@ -267,7 +260,7 @@ def editing():
             db.session.add(editor)
             db.session.add(talk)
 
-            return redirect(url_for('editing') + "?download_talk=" + talk.id)
+            return redirect(url_for('editing'))
 
         elif request.form['form_name'] == "upload_edited_talk":
            pass 
@@ -279,14 +272,63 @@ def editing():
         if request.args.get("download_raw_talk"):
             return send_from_directory(app.config["RAW_UPLOAD_DIR"], filename=request.args["download_raw_talk"] + "_RAW.mp3" , as_attachment=True)
 
-    # - Talks that need editing
+    # Data on the current state of the talks files
     raw_talks_available = [x.name.split("_")[0] for x in os.scandir(app.config['RAW_UPLOAD_DIR']) if x.name.endswith("_RAW.mp3")] 
+    edited_talks_available = [x.name.split("_")[0] for x in os.scandir(app.config['EDITED_UPLOAD_DIR']) if x.name.endswith("_EDITED.mp3")]
+    processed_talks_available = [x.name.split("_")[0] for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith("_PROCESSED.mp3")]
+    snips_available = [x.name.split("_")[0] for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith("_SNIP.mp3")]
+    
+    # Talks that need editing
     talks_to_edit = Talk.query.filter(Talk.editor_name==None).filter(Talk.id.in_(raw_talks_available))
     
 
-
     # - A way for someone to download raw files, assign a talk to an editor, upload the edited files
     editors = Editor.query.all()
-    return render_template("editing.html", editors=editors, talks_to_edit=talks_to_edit)
+    return render_template("editing.html", editors=editors, talks_to_edit=talks_to_edit, raw_talks_available=raw_talks_available, edited_talks_available=edited_talks_available, processed_talks_available=processed_talks_available, snips_available=snips_available)
 
+
+@app.route('/getfile', methods=['GET'])
+def getfile():
+    """ Download a talk file """
+
+    file_type = request.args.get("file_type")
+    talk_id = request.args.get("talk_id")
+
+    directories = {
+        "raw": "RAW_UPLOAD_DIR",
+        "edited": "EDITED_UPLOAD_DIR",
+        "processed": "PROCESSED_DIR",
+        "snip": "SNIP_DIR"
+    }
+
+    return send_from_directory(directory=app.config[directories[file_type]], filename=talk_id + "_" + file_type.upper() + ".mp3")
+
+
+@app.route('/uploadtalk', methods=['POST'])
+def uploadtalk():
+    """ Upload a talk file, then redirect back to where you came from """
+
+    file_type = request.form.get("file_type")
+    talk_id = request.form.get("talk_id")
     
+    source_path = request.referrer.split("/")[-1]
+
+    directories = {
+        "raw": "RAW_UPLOAD_DIR",
+        "edited": "EDITED_UPLOAD_DIR",
+        "processed": "PROCESSED_DIR",
+        "snip": "SNIP_DIR"
+    }
+
+    if 'file' not in request.files:
+        flash('No file part')
+        return redirect(request.url)
+
+    file = request.files['file']
+        
+    if file:
+        filename = talk_id + "_" + file_type.upper() + ".mp3"
+        file.save(os.path.join(app.config[directories[file_type]], filename))
+
+    return redirect(url_for(source_path))
+
