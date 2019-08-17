@@ -13,11 +13,13 @@ class Talk(db.Model):
 
     venue = db.Column(db.String)
 
+    is_priority = db.Column(db.Boolean)
+
     recorder_name = db.Column(db.String, db.ForeignKey('recorders.name'))
     editor_name = db.Column(db.String, db.ForeignKey('editors.name'))
 
     def __repr__(self):
-        return "<Talk(id='%d', title='%s', description='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s')>" % (self.id, self.title, self.description, self.start_time, self.end_time, self.venue, self.recorder_name)
+        return "<Talk(id='%d', title='%s', description='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s', priority='%s')>" % (self.id, self.title, self.description, self.start_time, self.end_time, self.venue, self.recorder_name, self.is_priority)
 
 
 class Recorder(db.Model):

@@ -6,7 +6,7 @@
 	<button>New Rota</button>
 </form>
 <h1>Rota by venue</h1>
-<table>
+<table class="pure-table pure-table-bordered">
 	<tr>
 	<th> Venue </th>
 {% for talk_time in times %}
@@ -22,17 +22,18 @@
 		<td> {{ talk_venue }} </td>
 {% for talk_time in times %}
 
-		<td> 
+<td>
 		{% for talk in talks %}
 		{% if talk["start_time"] == talk_time and talk["venue"] == talk_venue %}
-			{{ talk["title"] }}
-			{{ talk["venue"] }}
-			{{ talk["recorder_name"] }}
+		<div {% if talk["is_priority"] %} class="priority_talk" {% endif %}>
+			<p>{{ talk["title"] }}</p>
+			<p>{{ talk["speaker"] }}</p>
+			<p>{{ talk["recorder_name"] }}</p>
+		</div>
 		{% endif %}
-
 		{% endfor %}
-		</td>
-
+		
+</td>
 {% endfor %}
 	</tr>
 
@@ -43,7 +44,7 @@
 
 <h1> Rota by Time </h1>
 
-<table>
+<table class="pure-table pure-table-bordered">
 <tr>
 	<th>Talk ID</th>
 	<th>Title</th>
@@ -53,7 +54,7 @@
         <th>End Time</th>
 </tr>
 {% for talk in talks %}
-<tr>
+<tr {% if talk["is_priority"] %} class="priority_talk" {% endif %}>
 	<td>{{ talk.id }}</td>
 	<td>{{ talk.title }}</td>
         <td>{{ talk.speaker }}</td>
