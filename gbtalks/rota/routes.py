@@ -7,13 +7,22 @@ from gbtalks.models import db, Talk, Recorder
 import random
 import pprint
 
+shift_length = 3
+break_between_shifts = 3
+
 def talk_would_clash(recorder, talk):
     # A talk clashes if it starts while the recorder is currently recording, or within 20 mins of another talk ending
 
     for existing_talk in recorder.talks:
-        if existing_talk.start_time <= talk.start_time <= (existing_talk.end_time + timedelta(minutes=20)):
+        pprint.pprint("Comparing")
+        pprint.pprint(talk)
+        pprint.pprint(existing_talk)
+        if (existing_talk.start_time <= talk.start_time <= (existing_talk.end_time + timedelta(minutes=20))
+            or existing_talk.start_time <= talk.end_time <= (existing_talk.end_time + timedelta(minutes=20))):
+            pprint.pprint("Clashes!")
             return True
-    
+
+    pprint.pprint("Does not clash")
     return False
 
 
@@ -43,8 +52,73 @@ def recorder_shifts_exceeded(recorder, candidate_talk):
         if talk.start_time.day() != day:
             continue
 
-        
+def talk_would_break_shift_pattern(recorder, candidate_talk):
+    # make sure that if this talk is assigned, we don't violate any of the shift rules
+    # - prepare the list of talks that would result if this talk were allocated
+    # - check that there are no more 3h groups containing talks than the candidate is allowed shifts
+    # - check that the 3h groups are more than 3h apart
 
+    # Make a list of what the candidate's day would look like if the talk was assigned
+    talks_on_this_day_if_talk_assigned = []
+    for talk in Talk.query.filter(Talk.recorded_by == recorder,\
+            Talk.start_time > datetime(candidate_talk.start_time.year,\
+                candidate_talk.start_time.month,\
+                candidate_talk.start_time.day, 0,0,0),\
+            Talk.start_time < datetime(candidate_talk.start_time.year,\
+                candidate_talk.start_time.month,\
+                candidate_talk.start_time.day, 23,59,59)):
+
+            talks_on_this_day_if_talk_assigned.append(talk)
+
+    talks_on_this_day_if_talk_assigned.append(candidate_talk)
+    talks_on_this_day_if_talk_assigned.sort(key=lambda x: x.start_time)
+
+
+    # The first shift is all talks that end in a period 0-3h after the start of the first talk
+    talks_in_first_shift = []
+    for talk in talks_on_this_day_if_talk_assigned:
+        if talk.end_time <= talks_on_this_day_if_talk_assigned[0].start_time + timedelta(hours=shift_length):
+            talks_in_first_shift.append(talk)
+
+    # The second shift is all talks that start in a period that starts a minimum of 3h after the end of the last talk of the first shift, and lasts for 3h.  
+    
+    talks_in_second_shift = []
+    if recorder.max_shifts_per_day == 2 and len(talks_on_this_day_if_talk_assigned) > len(talks_in_first_shift):
+        # Consider the second shift to start at the start of the first talk after the end of the first shift
+        # Note that len() deals with the zero-offset of the array index
+        second_shift_start_time = talks_on_this_day_if_talk_assigned[len(talks_in_first_shift)].start_time
+        
+        # If the second shift would start less than break_between_shifts hours after the end of the first shift, fail
+        if second_shift_start_time < talks_in_first_shift[-1].end_time + timedelta(hours=break_between_shifts):
+            return True
+
+        for talk in talks_on_this_day_if_talk_assigned:
+            if (second_shift_start_time <= talk.start_time <= second_shift_start_time + timedelta(hours=shift_length-1)):
+                talks_in_second_shift.append(talk)
+    
+    # If there are more talks in the list than were allowed by the shift rules, then the list violates the rules 
+    
+    if len(talks_on_this_day_if_talk_assigned) == len(talks_in_first_shift) + len(talks_in_second_shift):
+        return False
+    else:
+        return True
+
+def assign_talk_to_recorder(recorder, talk):
+    recorder.talks.append(talk)
+    recorder.talks.sort(key=lambda x: x.start_time)
+    
+    db.session.add(talk)
+    db.session.add(recorder)
+    db.session.commit()
+    db.session.flush()
+
+def clear_rota():
+    for talk in Talk.query.all():
+        talk.recorded_by = None
+        db.session.add(talk)
+
+    db.session.commit()
+    db.session.flush()
 
 @rota_blueprint.route('/rota', methods=['GET','POST'])
 def rota():
@@ -55,18 +129,11 @@ def rota():
 
     if request.method == 'POST':
         # If we've been asked to make a new rota, clear out the old one
-        for talk in Talk.query.all():
-            talk.recorder_name = None
-            db.session.add(talk)
-
-        db.session.commit()
-        db.session.flush()
+        clear_rota()
 
     import pprint
 
     for talk in priority_talks:
-        #pprint.pprint("Considering Talk:")
-        #pprint.pprint(talk)
 
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
@@ -91,38 +158,30 @@ def rota():
                     continue
 
                 # Move on if the talk starts less than 3h after the recorders' last talk ended
-                if talk.start_time < candidate_recorders_last_talk.end_time + timedelta(hours=3):
+                if talk.start_time < candidate_recorders_last_talk.end_time + timedelta(hours=break_between_shifts):
                     continue
 
                 # Move on if this talk would result in the recorder doing too many talks in one day
                 if recorder_is_maxed_out_for_day(candidate_recorder, talk):
                     continue
 
+                if talk_would_break_shift_pattern(candidate_recorder, talk):
+                    continue
+
             else:
                 candidate_recorder.talks = []
 
             # If we've got this far, we're ok to assign the talk to the candidate recorder
-            candidate_recorder.talks.append(talk)
-            candidate_recorder.talks.sort(key=lambda x: x.start_time)
-
+            assign_talk_to_recorder(candidate_recorder, talk)
+            
             # If there are any other talks in the same venue starting within 2h, assign them to the same recorder
-            for future_talk in Talk.query.order_by(Talk.start_time).all():
-                    if (future_talk.start_time < talk.start_time + timedelta(hours=2)
-                            and future_talk.start_time > talk.start_time
-                            and future_talk.venue == talk.venue):
-                        pprint.pprint("Assigning:")
-                        pprint.pprint(talk)
-                        pprint.pprint(recorder)
-                        candidate_recorder.talks.append(future_talk)
-                        db.session.add(future_talk)
-
-            recorder = candidate_recorder
-            db.session.add(recorder)
-            db.session.add(talk)
-
-        # If we run out of recorders, stop and error
-        # TODO ^^
-
+            for future_talk in Talk.query.filter(Talk.start_time > talk.end_time, 
+                    Talk.start_time <= talk.start_time + timedelta(hours=shift_length-1),
+                    Talk.venue == talk.venue, Talk.is_priority == True).order_by(Talk.start_time):
+                if (future_talk.start_time < talk.start_time + timedelta(hours=shift_length-1)
+                    and talk_would_break_shift_pattern(candidate_recorder, future_talk) is False
+                    and talk_would_clash(candidate_recorder, future_talk) is False):
+                    assign_talk_to_recorder(candidate_recorder, future_talk)
 
     non_priority_talks = Talk.query.filter(Talk.is_priority==False).order_by(Talk.start_time)
 
@@ -138,14 +197,12 @@ def rota():
         while recorder is None and len(candidate_recorders) <= len(recorders):
 
             # Pick a random recorder, consider them a candidate
-
             candidate_recorder = random.choice(recorders)
             candidate_recorders.append(candidate_recorder)
 
             # Do some checks that only make sense if the recorder already has some talks assigned
             if candidate_recorder.talks:
-                candidate_recorders_last_talk = candidate_recorder.talks[-1]
-
+                
                 # Move on if the recorder is current recording
                 if talk_would_clash(candidate_recorder, talk):
                     continue
@@ -153,55 +210,27 @@ def rota():
                 # Move on if this talk would result in the recorder doing too many talks in one day
                 if recorder_is_maxed_out_for_day(candidate_recorder, talk):
                     continue
-
-                # Move on if this talk would result in the recorder doing too many talks in one go (ie, over 3h straight)
-                adjacent_talks = Talk.query.filter(Talk.end_time >= talk.start_time - timedelta(hours=3), Talk.end_time <= talk.end_time + timedelta(hours=3)).\
-                        filter(Talk.recorded_by == candidate_recorder).\
-                        order_by(Talk.start_time)
-
-                if adjacent_talks.count() > 1:
+                
+                if talk_would_break_shift_pattern(candidate_recorder, talk):
                     continue
             
             else:
                 candidate_recorder.talks = []
 
             # If we've got this far, we're ok to assign the talk to the candidate recorder
-            candidate_recorder.talks.append(talk)
-            candidate_recorder.talks.sort(key=lambda x: x.start_time)
-
-            # If there are any other talks in the same venue starting within 2h, assign them to the same recorder
-            #for future_talk in Talk.query.order_by(Talk.start_time).all():
-            #        if (future_talk.start_time < talk.start_time + timedelta(hours=2)
-            #                and future_talk.start_time > talk.start_time
-            #                and future_talk.venue == talk.venue):
-            #            candidate_recorder.talks.append(future_talk)
-            #            db.session.add(future_talk)
-
-            recorder = candidate_recorder
-            db.session.add(recorder)
-            db.session.add(talk)
+            assign_talk_to_recorder(candidate_recorder, talk)
 
             # If there is an unallocated talk starting 20-60 minutes later anywhere on site, and assigning it wouldn't exceed shift limits, assign it
             
-            for future_talk in Talk.query.order_by(Talk.start_time).all():
-                adjacent_talks = Talk.query.filter(Talk.end_time >= talk.start_time - timedelta(hours=3), Talk.end_time <= talk.end_time + timedelta(hours=3)).\
-                        filter(Talk.recorded_by == candidate_recorder).\
-                        order_by(Talk.start_time)
-
-                if (future_talk.start_time > talk.start_time 
-                        and future_talk.start_time < talk.end_time + timedelta(hours=1) 
+            for future_talk in Talk.query.filter(Talk.start_time > talk.end_time, 
+                    Talk.start_time <= talk.end_time + timedelta(hours=1), 
+                    Talk.recorded_by == None).order_by(Talk.start_time).all():
+                
+                if (future_talk.start_time < talk.end_time + timedelta(hours=1) 
                         and future_talk.start_time > talk.end_time + timedelta(minutes=20)
-                        and future_talk.recorded_by is None
-                        and adjacent_talks.count() < 2):
-                    candidate_recorder.talks.append(future_talk)
-                    db.session.add(future_talk)
-                    recorder = candidate_recorder
-                    db.session.add(recorder)
-
-        # If we run out of recorders, stop and error
-        # TODO ^^
-
-        db.session.commit()
+                        and talk_would_break_shift_pattern(candidate_recorder, future_talk) is False
+                        and talk_would_clash(candidate_recorder, future_talk) is False):
+                    assign_talk_to_recorder(candidate_recorder, talk)
 
     # Set up everything we need for rendering the page
 

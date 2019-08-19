@@ -29,7 +29,7 @@
 	<th>Speaker</th>
 	<th>Title</th>
 </tr>
-<tr>
+<tr {% if talk["is_priority"] %} class="priority_talk" {% endif %}>
 	<td>{{ talk.id }}</td>
 	<td>{{ talk.start_time }}</td>
 	<td>{{ talk.venue }}</td>

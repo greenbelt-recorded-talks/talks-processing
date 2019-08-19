@@ -13,6 +13,10 @@ def register_blueprints(app):
 
     app.register_blueprint(rota_blueprint)
 
+def register_commands(app):
+    """Register Click commands."""
+    from gbtalks import commands
+    app.cli.add_command(commands.convert_talks)
 
 def create_app():
     """Construct the core application."""
@@ -27,6 +31,9 @@ def create_app():
 
     # Import blueprints
     register_blueprints(app)
+
+    # Register Commands
+    register_commands(app)
 
     with app.app_context():
         # Imports

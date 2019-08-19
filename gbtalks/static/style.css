@@ -1,3 +1,7 @@
 .priority_talk {
-	background-color: #FFAAAA
+	font-weight: bold
+}
+
+.is_recorded {
+	background-color: #AAFFAA
 }
