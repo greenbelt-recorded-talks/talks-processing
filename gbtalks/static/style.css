@@ -5,3 +5,7 @@
 .is_recorded {
 	background-color: #AAFFAA
 }
+
+td {
+	border: groove
+}

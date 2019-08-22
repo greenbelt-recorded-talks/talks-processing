@@ -29,7 +29,7 @@ def start_time_of_talk(day, time):
 
 @app.route('/talks', methods=['GET','POST'])
 def talks():
-    """View or add talks to the database, upload the files"""
+    """View talks in the database, replace the talks list, upload files for talks"""
 
     if request.method == 'POST':
         if request.form['form_name'] == "upload_talks_list":
@@ -65,22 +65,23 @@ def talks():
                 return redirect(url_for('talks',
                                     filename=filename))
 
-        elif request.form['form_name'] == "upload_raw_talk":
-            if 'file' not in request.files:
-                flash('No file part')
-                return redirect(request.url)
 
-            talk_id = request.form['talk_id']
-            file = request.files['file']
 
-            if file:
-                filename = talk_id + "_RAW.mp3"
-                file.save(os.path.join(app.config['RAW_UPLOAD_DIR'], filename))
+    show_additional_talks = True if request.args.get("show_additional_talks") == "true" else False
 
     talks = Talk.query.all()
-    uploaded_files = [x.name for x in os.scandir(app.config['RAW_UPLOAD_DIR'])]
+    raw_files = [x.name for x in os.scandir(app.config['RAW_UPLOAD_DIR'])]
+    edited_files = [x.name for x in os.scandir(app.config['EDITED_UPLOAD_DIR'])]
+    processed_files = [x.name for x in os.scandir(app.config['PROCESSED_DIR'])]
+    snip_files = [x.name for x in os.scandir(app.config['SNIP_DIR'])]
 
-    return render_template("talks.html", talks=talks, uploaded_files=uploaded_files)
+    return render_template("talks.html", 
+                            talks=talks,
+                            raw_files=raw_files,
+                            edited_files=edited_files,
+                            processed_files=processed_files,
+                            snip_files=snip_files,
+                            show_additional_talks=show_additional_talks)
 
 
 @app.route('/recorders', methods=['GET','POST'])
@@ -205,7 +206,7 @@ def getfile():
         "snip": "SNIP_DIR"
     }
 
-    return send_from_directory(directory=app.config[directories[file_type]], filename=talk_id + "_" + file_type.upper() + ".mp3")
+    return send_from_directory(directory=app.config[directories[file_type]], filename=talk_id + "_" + file_type.upper() + ".mp3", as_attachment=True)
 
 
 @app.route('/uploadtalk', methods=['POST'])
