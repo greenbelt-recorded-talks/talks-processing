@@ -14,11 +14,12 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = os.getenv("SQLALCHEMY_TRACK_MODIFICATIONS")
 
     # Files
-    UPLOAD_DIR = "/tmp"
-    RAW_UPLOAD_DIR = "/tmp"
-    EDITED_UPLOAD_DIR = "/tmp"
-    PROCESSED_DIR = "/tmp"
-    SNIP_DIR = "/tmp"
+    UPLOAD_DIR = "/storage/uploads"
+    RAW_UPLOAD_DIR = "/storage/uploads"
+    EDITED_UPLOAD_DIR = "/storage/uploads"
+    PROCESSED_DIR = "/storage/processed"
+    CD_DIR = "/storage/cds"
+    SNIP_DIR = "/storage/processed"
 
     # Greenbelt
     GB_FRIDAY = "2019-08-23"

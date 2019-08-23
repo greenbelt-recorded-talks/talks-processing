@@ -47,6 +47,7 @@
 <table class="pure-table pure-table-bordered">
 <tr>
 	<th>Talk ID</th>
+	<th>Venue</th>
 	<th>Title</th>
 	<th>Speaker(s)</th>
         <th>Recorded By</th>
@@ -56,6 +57,7 @@
 {% for talk in talks %}
 <tr class="{% if talk["is_priority"] %} priority_talk {% endif %} {% if talk["recorded_by"] is not none %} is_recorded {% endif %}">
 	<td>{{ talk.id }}</td>
+	<td>{{ talk.venue }}</td>
 	<td>{{ talk.title }}</td>
         <td>{{ talk.speaker }}</td>
 	<td>{{ talk.recorder_name }}</td>

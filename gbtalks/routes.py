@@ -19,7 +19,11 @@ def start_time_of_talk(day, time):
             "Monday": 3
     }
 
-    day_of_talk = fri_of_gb + timedelta(days=days.get(day))
+    try:
+        day_of_talk = fri_of_gb + timedelta(days=days.get(day))
+    except TypeError:
+        day_of_talk = datetime.strptime(day, '%d/%m/%y').date()
+        
     try:
         time_of_talk = datetime.strptime(time, '%I:%M %p').time()
     except ValueError:
@@ -51,7 +55,7 @@ def talks():
                         start_time = start_time_of_talk(talk_line[2], talk_line[3])
                         end_time = start_time + timedelta(hours=1)
                         is_priority = True if talk_line[10] == "Yes" else False
-                        talk = Talk(id=talk_line[0], 
+                        talk = Talk(id=talk_line[0].split('-')[1], 
                                 title=talk_line[5], 
                                 description=talk_line[6], 
                                 speaker=talk_line[7],
@@ -106,15 +110,10 @@ def recorders():
             recordersreader = csv.reader(csvfile)
 
             for recorder_line in recordersreader:
-                if recorder_line[2] == "red_tent":
-                    can_record_in_red_tent = True
-                else:
-                    can_record_in_red_tent = False
-
+                
                 recorder = Recorder(
                     name = recorder_line[0],
                     max_shifts_per_day = recorder_line[1],
-                    can_record_in_red_tent = can_record_in_red_tent
                 )
                 db.session.add(recorder)
 

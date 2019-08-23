@@ -124,7 +124,7 @@ def clear_rota():
 def rota():
     """Define a rota"""
 
-    priority_talks = Talk.query.filter(Talk.is_priority==True).order_by(Talk.start_time)
+    talks = Talk.query.filter(Talk.is_priority==True).order_by(Talk.start_time)
     recorders = Recorder.query.all()
 
     if request.method == 'POST':
@@ -133,12 +133,23 @@ def rota():
 
     import pprint
 
-    for talk in priority_talks:
+    for talk in talks:
 
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
             continue
+       
 
+        # Move on if the talk is in a venue that's externally rota-ed
+        if talk.venue == 'Treehouse':
+            continue
+
+        
+        pprint.pprint("Assessing")
+        pprint.pprint(talk.venue)
+        if talk.venue == 'Treehouse':
+            pprint.pprint("Prohibited")   
+        
         recorder = None
         candidate_recorders = []
 
@@ -183,12 +194,16 @@ def rota():
                     and talk_would_clash(candidate_recorder, future_talk) is False):
                     assign_talk_to_recorder(candidate_recorder, future_talk)
 
-    non_priority_talks = Talk.query.filter(Talk.is_priority==False).order_by(Talk.start_time)
+    additional_talks = Talk.query.filter(Talk.is_priority==False).order_by(Talk.start_time)
 
-    for talk in non_priority_talks:
+    for talk in additional_talks:
 
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
+            continue
+
+        # Move on if the talk is in a venue that's externally rota-ed
+        if talk.venue == "Treehouse":
             continue
 
         recorder = None
@@ -229,7 +244,8 @@ def rota():
                 if (future_talk.start_time < talk.end_time + timedelta(hours=1) 
                         and future_talk.start_time > talk.end_time + timedelta(minutes=20)
                         and talk_would_break_shift_pattern(candidate_recorder, future_talk) is False
-                        and talk_would_clash(candidate_recorder, future_talk) is False):
+                        and talk_would_clash(candidate_recorder, future_talk) is False
+                        and talk.venue != "Treehouse"):
                     assign_talk_to_recorder(candidate_recorder, talk)
 
     # Set up everything we need for rendering the page

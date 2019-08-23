@@ -1,4 +1,6 @@
+import threading
 import os
+
 from glob import glob
 from subprocess import call
 
@@ -14,9 +16,11 @@ from pydub import AudioSegment
 
 import pprint
 
-@click.command()
-def test():
-    print("hello world!")
+
+def run_command(cmd):
+    with semaphore:
+        os.system(cmd)
+
 
 @click.command()
 @with_appcontext
@@ -52,9 +56,15 @@ def convert_talks():
     for talk in talks_to_process:
         pprint.pprint(talk)
         talk_data = Talk.query.get(talk.id)
-        AudioSegment.from_file(
-                app.config['EDITED_UPLOAD_DIR'] + "/gb" + app.config['GB_FRIDAY'][2:4] + "-" +  str(talk.id).zfill(3) + 'EDITED.mp3').export(
-                        app.config['PROCESSD_DIR'] + "/gb" + app.config['GB_FRIDAY'][2:4] + "-"  + str(talk.id).zfill(3) + 'mp3.mp3', 
+
+        # Create a reduced-bitrate MP3 from the source MP3
+        hq_mp3 = AudioSegment.from_file(app.config['EDITED_UPLOAD_DIR'] + 
+                                            "/gb" + 
+                                            app.config['GB_FRIDAY'][2:4] + 
+                                            "-" +  
+                                            str(talk.id).zfill(3) + 'EDITED.mp3')
+        
+        hq_mp3.export(app.config['PROCESSED_DIR'] + "/gb" + app.config['GB_FRIDAY'][2:4] + "-"  + str(talk.id).zfill(3) + 'mp3.mp3', 
                             format='mp3', 
                             bitrate="96k",
                             tags={'artist': talk.speaker, 
@@ -64,5 +74,53 @@ def convert_talks():
                                 'track': talk.id }
                             )
 
+        # Create files for later CD burning
+
+        # Split the mp3 into 5min (300k ms) slices
+        for idx,cd_file in enumerate(hq_mp3[::300000]):
+            cd_file.export(app.config['CD_DIR'] + 
+                            '/gb' + 
+                            app.config['GB_FRIDAY'][2:4] + 
+                            "-"  + 
+                            str(talk.id).zfill(3) + 
+                            '/' + 
+                            idx +
+                            '.wav',
+                            format="wav")
+
+
+
+def get_cd_dir_for_talk(talk):
+    return app.config['CD_DIR'] + '/gb' + app.config['GB_FRIDAY'][2:4] + "-"  + str(talk).zfill(3) + '/'
+
+def burn_cd(talk, cd_index, cd_writer):
+    talk_cd_files = [x for x in list(os.scandir(get_cd_dir_for_talk)) if x.is_file()]
+    cd_files = talk_cd_files[::15][cd_index]
+    subprocess.run(['wodim', 'dev=/dev/sg' + cd_writer, '-dao' , '-pad', '-audio', '-eject', cd_files])
+
+
+@click.command()
+@with_appcontext
+@click.option('--talk')
+@click.option('--cds')
+def burn_cds(talk, cds):
+    import subprocess
+
+    # Work out how many CDs we need
+    # If there are more than 15 files (15 * 5min = 75, capacity of a CD is 79 minutes), we need 2 CDs
+
+    cd_dir = get_cd_dir_for_talk(talk)
+    try:
+        files = len([x for x in list(os.scandir(cd_dir)) if x.is_file()])
+
+        print("Talk length is " + files_count*5 + " minutes. Ish." )
+        
+        for cd in cds:
+            for idx,cd_files in enumerable(files[::15]):
+                print("Burning CD #" + idx)
+            
+
+    except:
+        print("Talk not ready yet")
 
 
