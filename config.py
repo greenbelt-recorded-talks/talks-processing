@@ -20,6 +20,31 @@ class Config:
     PROCESSED_DIR = "/storage/processed"
     CD_DIR = "/storage/cds"
     SNIP_DIR = "/storage/processed"
+    TOP_TAIL_DIR = "/home/gbtalks/top_tail"
+    IMG_DIR = "/home/gbtalks/images"
+
+    ROBTEST = "test"
+
+    TALKS_DIRS = {
+        "raw": {
+            "directory": "/storage/uploads",
+            "suffix": "_RAW"
+            },
+        "edited":{
+            "directory": "/storage/uploads",
+            "suffix": "_EDITED"
+            },
+        "processed": {
+            "directory": "/storage/processed",
+            "suffix": "mp3"
+            },
+        "snip": {
+            "directory": "/storage/processed",
+            "suffix": "_SNIP"
+            }
+    }
+
+    robtest = "test"
 
     # Greenbelt
     GB_FRIDAY = "2019-08-23"

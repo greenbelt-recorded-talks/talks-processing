@@ -1,9 +1,7 @@
 import threading
 import os
 
-from glob import glob
-from subprocess import call
-
+import subprocess
 import click
 from flask import current_app as app
 from flask.cli import with_appcontext
@@ -21,6 +19,18 @@ def run_command(cmd):
     with semaphore:
         os.system(cmd)
 
+def get_path_for_file(talk_id, file_type):
+    return (app.config["TALKS_DIRS"][file_type]["directory"] + 
+        "/gb" + 
+        app.config['GB_FRIDAY'][2:4] + 
+        "-"  + 
+        str(talk_id).zfill(3) + 
+        app.config["TALKS_DIRS"][file_type]["suffix"] + 
+        '.mp3')
+
+def get_cd_dir_for_talk(talk):
+    return app.config['CD_DIR'] + '/gb' + app.config['GB_FRIDAY'][2:4] + "-"  + str(talk).zfill(3) + '/'
+
 
 @click.command()
 @with_appcontext
@@ -33,10 +43,17 @@ def convert_talks():
     # Work out which files need to be converted by looking at the filesystem
     # If a talk has an edited file and a snip, but no converted file, convert it!
 
-    edited_files = set([x.name.replace('EDITED.mp3','') for x in os.scandir(app.config['EDITED_UPLOAD_DIR']) if x.name.endswith('EDITED.mp3')]) or set()
+    edited_files = set([x.name.replace('_EDITED.mp3','').replace('gb19-','') for x in os.scandir(app.config['EDITED_UPLOAD_DIR']) if x.name.endswith('EDITED.mp3')]) or set()
     pprint.pprint(edited_files)
-    processsed_files = set([x.name.replace('mp3.mp3','') for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith('mp3.mp3')]) or set()
-    snip_files = set([x.name.replace('snip.mp3','') for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith('snip.mp3')]) or set()
+    processed_files = set([x.name.replace('mp3.mp3','').replace('gb19-','') for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith('mp3.mp3')]) or set()
+    snip_files = set([x.name.replace('_SNIP.mp3','').replace('gb19-','') for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith('SNIP.mp3')]) or set()
+
+    pprint.pprint("Edited")
+    pprint.pprint(edited_files)
+    pprint.pprint("Processed")
+    pprint.pprint(processed_files)
+    pprint.pprint("Snip")
+    pprint.pprint(snip_files)
 
     # If there are any snips that don't have edited files, or edited files that don't have snips, skip over them and error
 
@@ -48,35 +65,56 @@ def convert_talks():
     if len(exclude_list) > 0:
         print("Exclude list:", exclude_list)
 
-    talks = edited_files|snip_files - exclude_list
+    talks = edited_files|snip_files - exclude_list - processed_files
+
     pprint.pprint("Talks")
     pprint.pprint(talks)
-    talks_to_process = [Talk.query.get(x[5:]) for x in list(talks)] or []
+    talks_to_process = [Talk.query.get(x) for x in list(talks)] or []
+
+    top = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'top.mp3')
+    tail = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'tail.mp3')
 
     for talk in talks_to_process:
         pprint.pprint(talk)
-        talk_data = Talk.query.get(talk.id)
+
+        # Add the top and tail, create a high-quality mp3
+        hq_mp3 = top + AudioSegment.from_file(get_path_for_file(talk.id, "edited")) + tail
 
         # Create a reduced-bitrate MP3 from the source MP3
-        hq_mp3 = AudioSegment.from_file(app.config['EDITED_UPLOAD_DIR'] + 
-                                            "/gb" + 
-                                            app.config['GB_FRIDAY'][2:4] + 
-                                            "-" +  
-                                            str(talk.id).zfill(3) + 'EDITED.mp3')
-        
-        hq_mp3.export(app.config['PROCESSED_DIR'] + "/gb" + app.config['GB_FRIDAY'][2:4] + "-"  + str(talk.id).zfill(3) + 'mp3.mp3', 
+        hq_mp3.export('/tmp/toptailed.wav',
+                            format='wav',
+                            parameters=["-f"])
+
+        # Normalise to a fixed level
+        subprocess.call(['ffmpeg-normalize', '/tmp/toptailed.wav', 
+                            '-o', '/tmp/normalized.wav',
+                            '--loudness-range-target', '3',
+                            '-t', '-13', '-f'])
+
+        hq_mp3 = AudioSegment.from_file('/tmp/normalized.wav')
+
+        # Create a reduced-bitrate MP3 from the normalized file
+        hq_mp3.export(get_path_for_file(talk.id, "processed"), 
                             format='mp3', 
-                            bitrate="96k",
-                            tags={'artist': talk.speaker, 
-                                'album': 'Greenbelt Festival Talks ' + app.config['GB_FRIDAY'][:-4], 
-                                'title': talk.title,
-                                'year': app.config['GB_FRIDAY'][:-4],
-                                'track': talk.id }
-                            )
+                            bitrate='128k')
+
+        # Put appropriate metadata on the resultant mp3
+        subprocess.call(['mid3v2',
+                        "--TALB", "Greenbelt Festival Talks " + app.config['GB_FRIDAY'][:-4],
+                        "--TCOP", app.config['GB_FRIDAY'][:-4] + " Greenbelt Festivals",
+                        "--TIT2", talk.title,
+                        "--TPE1", talk.speaker,
+                        "--TPE2", talk.speaker,
+                        "--TRCK", str(talk.id),
+                        "--TDRC", str(app.config['GB_FRIDAY'][:-4]),
+                        "--COMM", talk.description,
+                        "--TCMP", "1",
+                        "--picture", app.config["IMG_DIR"] + '/alltalksicon.png',
+                        get_path_for_file(talk.id, "processed")])
 
         # Create files for later CD burning
-
         # Split the mp3 into 5min (300k ms) slices
+        os.makedirs(get_cd_dir_for_talk(talk.id))
         for idx,cd_file in enumerate(hq_mp3[::300000]):
             cd_file.export(app.config['CD_DIR'] + 
                             '/gb' + 
@@ -84,19 +122,15 @@ def convert_talks():
                             "-"  + 
                             str(talk.id).zfill(3) + 
                             '/' + 
-                            idx +
+                            str(idx).zfill(2) +
                             '.wav',
                             format="wav")
 
 
-
-def get_cd_dir_for_talk(talk):
-    return app.config['CD_DIR'] + '/gb' + app.config['GB_FRIDAY'][2:4] + "-"  + str(talk).zfill(3) + '/'
-
-def burn_cd(talk, cd_index, cd_writer):
-    talk_cd_files = [x for x in list(os.scandir(get_cd_dir_for_talk)) if x.is_file()]
+def burn_cd(talk_id, cd_index, cd_writer):
+    talk_cd_files = [x for x in list(os.scandir(get_cd_dir_for_talk(talk_id))) if x.is_file()]
     cd_files = talk_cd_files[::15][cd_index]
-    subprocess.run(['wodim', 'dev=/dev/sg' + cd_writer, '-dao' , '-pad', '-audio', '-eject', cd_files])
+    subprocess.call(['wodim', 'dev=/dev/sg' + cd_writer, '-dao' , '-pad', '-audio', '-eject', cd_files])
 
 
 @click.command()

@@ -1,5 +1,5 @@
 import csv
-from flask import request, redirect, url_for, render_template, make_response, send_from_directory
+from flask import request, redirect, url_for, render_template, make_response, send_from_directory, send_file
 from datetime import datetime, date, time, timedelta
 from flask import current_app as app
 from .models import db, Talk, Recorder, Editor
@@ -9,6 +9,19 @@ import random
 import sys
 import pprint
 
+def get_path_for_file(talk_id, file_type):
+    path = app.config["TALKS_DIRS"][file_type]["directory"] + \
+        "/gb" + \
+        app.config['GB_FRIDAY'][2:4] + \
+        "-"  + \
+        str(talk_id).zfill(3) + \
+        app.config["TALKS_DIRS"][file_type]["suffix"] + \
+        '.mp3'
+
+    pprint.pprint("Path")
+    pprint.pprint(path)
+
+    return path
 
 def start_time_of_talk(day, time):
     fri_of_gb = datetime.strptime(app.config['GB_FRIDAY'], '%Y-%m-%d').date()
@@ -85,7 +98,8 @@ def talks():
                             edited_files=edited_files,
                             processed_files=processed_files,
                             snip_files=snip_files,
-                            show_additional_talks=show_additional_talks)
+                            show_additional_talks=show_additional_talks
+                            )
 
 
 @app.route('/recorders', methods=['GET','POST'])
@@ -198,14 +212,7 @@ def getfile():
     file_type = request.args.get("file_type")
     talk_id = request.args.get("talk_id")
 
-    directories = {
-        "raw": "RAW_UPLOAD_DIR",
-        "edited": "EDITED_UPLOAD_DIR",
-        "processed": "PROCESSED_DIR",
-        "snip": "SNIP_DIR"
-    }
-
-    return send_from_directory(directory=app.config[directories[file_type]], filename=talk_id + "_" + file_type.upper() + ".mp3", as_attachment=True)
+    return send_file(get_path_for_file(talk_id, file_type), as_attachment=True)
 
 
 @app.route('/uploadtalk', methods=['POST'])
@@ -217,13 +224,6 @@ def uploadtalk():
     
     source_path = request.referrer.split("/")[-1]
 
-    directories = {
-        "raw": "RAW_UPLOAD_DIR",
-        "edited": "EDITED_UPLOAD_DIR",
-        "processed": "PROCESSED_DIR",
-        "snip": "SNIP_DIR"
-    }
-
     if 'file' not in request.files:
         flash('No file part')
         return redirect(request.url)
@@ -231,8 +231,7 @@ def uploadtalk():
     file = request.files['file']
         
     if file:
-        filename = talk_id + "_" + file_type.upper() + ".mp3"
-        file.save(os.path.join(app.config[directories[file_type]], filename))
+        file.save(os.path.join(get_path_for_file(talk_id, file_type)))
 
     return redirect(url_for(source_path))
 

@@ -1,6 +1,88 @@
 {% extends 'base.html' %}
 
 {% block content %}
+
+
+<div>
+	<h1>Unedited Talks</h1>
+
+	<table>
+<tr>
+        <th>Talk ID</th>
+        <th>Raw File</th>
+        <th>Edited File</th>
+        <th>Processed File</th>
+        <th>Snip File</th>
+        <th>Title</th>
+        <th>Speaker(s)</th>
+        <th>Description</th>
+</tr>
+
+{% for talk in talks %}
+
+{% if ('gb19-' + talk.id|string+"_RAW.mp3" in raw_files and ( 'gb19-' + talk.id|string+"_EDITED.mp3" not in edited_files or 'gb19-' + talk.id|string+"_SNIP.mp3" not in snip_files )) or ('gb19-0' + talk.id|string+"_RAW.mp3" in raw_files and ( 'gb19-0' + talk.id|string+"_EDITED.mp3" not in edited_files or 'gb19-0' + talk.id|string+"_SNIP.mp3" not in snip_files ))  %}
+
+<tr>
+        <td>{{ talk.id }}</td>
+        <td>{% if 'gb19-' + talk.id|string+"_RAW.mp3" in raw_files or 'gb19-0' + talk.id|string+"_RAW.mp3" in raw_files %}
+        <p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
+        {% endif %}
+
+        <form method=post enctype=multipart/form-data name=upload_raw_talk action=uploadtalk>
+                <input name=file type=file id=file accept=".mp3">
+                <input name=file_type type=hidden value="raw">
+                <input name=talk_id type=hidden value="{{talk.id}}">
+                <button>Upload</button>
+        </form>
+
+        </td>
+        <td>{% if 'gb19-' + talk.id|string+"_EDITED.mp3" in edited_files or 'gb19-0' + talk.id|string+"_EDITED.mp3" in edited_files %}
+        <p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
+        {% endif %}
+
+        <form method=post enctype=multipart/form-data name=upload_edited_talk action=uploadtalk>
+                <input name=file type=file id=file accept=".mp3">
+                <input name=file_type type=hidden value="edited">
+                <input name=talk_id type=hidden value="{{talk.id}}">
+                <button>Upload</button>
+        </form>
+
+        </td>
+        <td>
+        {% if 'gb19-' + talk.id|string+"mp3.mp3" in processed_files  or 'gb19-0' + talk.id|string+"mp3.mp3" in processed_files %}
+        <p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
+        {% endif %}
+
+        </td>
+        <td>
+
+        {% if 'gb19-' + talk.id|string+"_SNIP.mp3" in snip_files  or 'gb19-0' + talk.id|string+"_SNIP.mp3" in snip_files %}
+        <p><a href="{{ url_for("getfile", file_type="snip", talk_id=talk.id) }}">Download</a></p>
+        {% endif %}
+
+        <form method=post enctype=multipart/form-data name=upload_snip action=uploadtalk>
+                <input name=file type=file id=file accept=".mp3">
+                <input name=file_type type=hidden value="snip">
+                <input name=talk_id type=hidden value="{{talk.id}}">
+                <button>Upload</button>
+        </form>
+
+        </td>
+        <td>{{ talk.title }}</td>
+        <td>{{ talk.speaker }}</td>
+        <td>{{ talk.description }}</td>
+</tr>
+
+{% endif %}
+
+{% endfor %}
+
+	</table>
+
+</div>
+
+
+
 <div>
 <h1>New Talks List</h1>
 
@@ -42,7 +124,7 @@
 
 	</td>
 	<td>{% if talk.id|string+"_EDITED.mp3" in edited_files %}
-   	<p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
+   	<p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
         <form method=post enctype=multipart/form-data name=upload_edited_talk action=uploadtalk>
@@ -54,15 +136,14 @@
 
         </td>
 	<td>
-	{% if talk.id|string+"_mp3.mp3" in processed_files %}
-        <p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
-        {% endif %}
-	
+        {% if 'gb19-' + talk.id|string+"mp3.mp3" in processed_files  or 'gb19-0' + talk.id|string+"mp3.mp3" in processed_files %}
+        <p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
+        {% endif %}	
 	</td>
 	<td>
 	
-	{% if talk.id|string+"_snip.mp3" in edited_files %}
-        <p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
+	{% if talk.id|string+"_SNIP.mp3" in snip_files %}
+        <p><a href="{{ url_for("getfile", file_type="snip", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
         <form method=post enctype=multipart/form-data name=upload_snip action=uploadtalk>
@@ -112,7 +193,7 @@
 
         </td>
         <td>{% if talk.id|string+"_EDITED.mp3" in edited_files %}
-        <p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
+        <p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
         <form method=post enctype=multipart/form-data name=upload_edited_talk action=uploadtalk>
@@ -124,16 +205,15 @@
 
         </td>
         <td>
-        {% if talk.id|string+"_mp3.mp3" in processed_files %}
-        <p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
+        {% if 'gb19-' + talk.id|string+"mp3.mp3" in processed_files  or 'gb19-0' + talk.id|string+"mp3.mp3" in processed_files %}
+        <p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
-
 
         </td>
         <td>
 
-        {% if talk.id|string+"_snip.mp3" in edited_files %}
-        <p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
+        {% if talk.id|string+"_SNIP.mp3" in snip_files %}
+        <p><a href="{{ url_for("getfile", file_type="snip", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
         <form method=post enctype=multipart/form-data name=upload_snip action=uploadtalk>
