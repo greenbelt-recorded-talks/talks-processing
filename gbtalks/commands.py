@@ -60,12 +60,14 @@ def convert_talks():
     edited_without_snip = set(edited_files.difference(snip_files))
     snip_without_edited = set(snip_files.difference(edited_files))
 
-    exclude_list = edited_without_snip|snip_without_edited
+    exclude_list = set(edited_without_snip|snip_without_edited)
 
     if len(exclude_list) > 0:
         print("Exclude list:", exclude_list)
 
-    talks = edited_files|snip_files - exclude_list - processed_files
+    talks = edited_files.union(snip_files) 
+    talks.difference_update(exclude_list)
+    talks.difference_update(processed_files)
 
     pprint.pprint("Talks")
     pprint.pprint(talks)
@@ -124,7 +126,8 @@ def convert_talks():
                             '/' + 
                             str(idx).zfill(2) +
                             '.wav',
-                            format="wav")
+                            format="wav",
+                            parameters=['-ar', '44100'])
 
 
 def burn_cd(talk_id, cd_index, cd_writer):

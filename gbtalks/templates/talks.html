@@ -20,11 +20,11 @@
 
 {% for talk in talks %}
 
-{% if ('gb19-' + talk.id|string+"_RAW.mp3" in raw_files and ( 'gb19-' + talk.id|string+"_EDITED.mp3" not in edited_files or 'gb19-' + talk.id|string+"_SNIP.mp3" not in snip_files )) or ('gb19-0' + talk.id|string+"_RAW.mp3" in raw_files and ( 'gb19-0' + talk.id|string+"_EDITED.mp3" not in edited_files or 'gb19-0' + talk.id|string+"_SNIP.mp3" not in snip_files ))  %}
+{% if ('gb19-' + ('%03d' % talk.id) |string+"_RAW.mp3" in raw_files and ( 'gb19-' + ('%03d' % talk.id)|string+"_EDITED.mp3" not in edited_files or 'gb19-' + ('%03d' % talk.id)|string+"_SNIP.mp3" not in snip_files )) %}
 
 <tr>
-        <td>{{ talk.id }}</td>
-        <td>{% if 'gb19-' + talk.id|string+"_RAW.mp3" in raw_files or 'gb19-0' + talk.id|string+"_RAW.mp3" in raw_files %}
+        <td>{{ '%03d' % talk.id }}</td>
+        <td>{% if 'gb19-' + ('%03d' % talk.id)|string+"_RAW.mp3" in raw_files %}
         <p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
@@ -36,7 +36,7 @@
         </form>
 
         </td>
-        <td>{% if 'gb19-' + talk.id|string+"_EDITED.mp3" in edited_files or 'gb19-0' + talk.id|string+"_EDITED.mp3" in edited_files %}
+        <td>{% if 'gb19-' + ('%03d' % talk.id)|string+"_EDITED.mp3" in edited_files %}
         <p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
@@ -49,14 +49,14 @@
 
         </td>
         <td>
-        {% if 'gb19-' + talk.id|string+"mp3.mp3" in processed_files  or 'gb19-0' + talk.id|string+"mp3.mp3" in processed_files %}
+        {% if 'gb19-' + ('%03d' % talk.id)|string+"mp3.mp3" in processed_files %}
         <p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
         </td>
         <td>
 
-        {% if 'gb19-' + talk.id|string+"_SNIP.mp3" in snip_files  or 'gb19-0' + talk.id|string+"_SNIP.mp3" in snip_files %}
+        {% if 'gb19-' + ('%03d' % talk.id)|string+"_SNIP.mp3" in snip_files %}
         <p><a href="{{ url_for("getfile", file_type="snip", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
@@ -110,8 +110,8 @@
 {% for talk in talks if talk["is_priority"]%}
 
 <tr>
-	<td>{{ talk.id }}</td>
-	<td>{% if talk.id|string+"_RAW.mp3" in raw_files %}
+	<td>{{ '%03d' % talk.id }}</td>
+	<td>{% if 'gb19-' + ('%03d' % talk.id)|string+"_RAW.mp3" in raw_files %}
 	<p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
 	{% endif %}
 
@@ -123,7 +123,7 @@
 	</form>
 
 	</td>
-	<td>{% if talk.id|string+"_EDITED.mp3" in edited_files %}
+	<td>{% if 'gb19-' + ('%03d' % talk.id)|string+"_EDITED.mp3" in edited_files %}
    	<p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
@@ -136,13 +136,13 @@
 
         </td>
 	<td>
-        {% if 'gb19-' + talk.id|string+"mp3.mp3" in processed_files  or 'gb19-0' + talk.id|string+"mp3.mp3" in processed_files %}
+        {% if 'gb19-' + ('%03d' % talk.id)|string+"mp3.mp3" in processed_files %}
         <p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
         {% endif %}	
 	</td>
 	<td>
 	
-	{% if talk.id|string+"_SNIP.mp3" in snip_files %}
+	{% if 'gb19-' + ('%03d' % talk.id)|string+"_SNIP.mp3" in snip_files %}
         <p><a href="{{ url_for("getfile", file_type="snip", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
@@ -179,8 +179,8 @@
 {% for talk in talks if not talk["is_priority"]%}
 
 <tr>
-        <td>{{ talk.id }}</td>
-        <td>{% if talk.id|string+"_RAW.mp3" in raw_files %}
+        <td>{{ '%03d' % talk.id }}</td>
+        <td>{% if 'gb19-' + ('%03d' % talk.id)|string+"_RAW.mp3" in raw_files %}
 		<p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
@@ -192,7 +192,7 @@
         </form>
 
         </td>
-        <td>{% if talk.id|string+"_EDITED.mp3" in edited_files %}
+        <td>{% if 'gb19-' + ('%03d' % talk.id)|string+"_EDITED.mp3" in edited_files %}
         <p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
@@ -205,14 +205,14 @@
 
         </td>
         <td>
-        {% if 'gb19-' + talk.id|string+"mp3.mp3" in processed_files  or 'gb19-0' + talk.id|string+"mp3.mp3" in processed_files %}
+        {% if 'gb19-' + ('%03d' % talk.id)|string+"mp3.mp3" in processed_files %}
         <p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
         </td>
         <td>
 
-        {% if talk.id|string+"_SNIP.mp3" in snip_files %}
+        {% if 'gb19-' + ('%03d' % talk.id)|string+"_SNIP.mp3" in snip_files %}
         <p><a href="{{ url_for("getfile", file_type="snip", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
