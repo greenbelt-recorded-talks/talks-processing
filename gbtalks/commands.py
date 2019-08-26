@@ -12,6 +12,8 @@ from .models import db, Talk, Recorder, Editor
 from tendo import singleton
 from pydub import AudioSegment
 
+from multiprocessing import Pool
+
 import pprint
 
 
@@ -30,6 +32,56 @@ def get_path_for_file(talk_id, file_type):
 
 def get_cd_dir_for_talk(talk):
     return app.config['CD_DIR'] + '/gb' + app.config['GB_FRIDAY'][2:4] + "-"  + str(talk).zfill(3) + '/'
+
+def process_talk(talk):
+
+    top = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'top.mp3')
+    tail = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'tail.mp3')
+
+    # Add the top and tail, create a high-quality mp3
+    hq_mp3 = top + AudioSegment.from_file(get_path_for_file(talk.id, "edited")) + tail
+
+    # Create a reduced-bitrate MP3 from the source MP3
+    hq_mp3.export('/tmp/toptailed' + str(talk.id) + '.wav',
+                    format='wav',
+                    parameters=["-f"])
+
+    # Normalise to a fixed level
+    subprocess.call(['ffmpeg-normalize', '/tmp/toptailed' + str(talk.id) + '.wav',
+                    '-o', '/tmp/normalized' + str(talk.id) + '.wav',
+                    '--loudness-range-target', '3',
+                    '-t', '-13', '-f', '-ar', '44100'])
+
+    hq_mp3 = AudioSegment.from_file('/tmp/normalized' + str(talk.id) + '.wav')
+
+    # Create a reduced-bitrate MP3 from the normalized file
+    hq_mp3.export(get_path_for_file(talk.id, "processed"),
+                    format='mp3',
+                    bitrate='128k')
+
+    # Put appropriate metadata on the resultant mp3
+    subprocess.call(['mid3v2',
+                    "--TALB", "Greenbelt Festival Talks " + app.config['GB_FRIDAY'][:-4],
+                    "--TCOP", app.config['GB_FRIDAY'][:-4] + " Greenbelt Festivals",
+                    "--TIT2", talk.title,
+                    "--TPE1", talk.speaker,
+                    "--TPE2", talk.speaker,
+                    "--TRCK", str(talk.id),
+                    "--TDRC", str(app.config['GB_FRIDAY'][:-4]),
+                    "--COMM", talk.description,
+                    "--TCMP", "1",
+                    "--picture", app.config["IMG_DIR"] + '/alltalksicon.png',
+                    get_path_for_file(talk.id, "processed")])
+
+    # Create files for later CD burning
+    # Split the mp3 into 5min (300k ms) slices
+    os.makedirs(get_cd_dir_for_talk(talk.id))
+    for idx,cd_file in enumerate(hq_mp3[::300000]):
+         cd_file.export(get_cd_dir_for_talk(talk.id) +
+                        '/' +
+                        str(idx).zfill(2) +
+                        '.wav',
+                        format="wav")
 
 
 @click.command()
@@ -76,58 +128,8 @@ def convert_talks():
     top = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'top.mp3')
     tail = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'tail.mp3')
 
-    for talk in talks_to_process:
-        pprint.pprint(talk)
-
-        # Add the top and tail, create a high-quality mp3
-        hq_mp3 = top + AudioSegment.from_file(get_path_for_file(talk.id, "edited")) + tail
-
-        # Create a reduced-bitrate MP3 from the source MP3
-        hq_mp3.export('/tmp/toptailed.wav',
-                            format='wav',
-                            parameters=["-f"])
-
-        # Normalise to a fixed level
-        subprocess.call(['ffmpeg-normalize', '/tmp/toptailed.wav', 
-                            '-o', '/tmp/normalized.wav',
-                            '--loudness-range-target', '3',
-                            '-t', '-13', '-f'])
-
-        hq_mp3 = AudioSegment.from_file('/tmp/normalized.wav')
-
-        # Create a reduced-bitrate MP3 from the normalized file
-        hq_mp3.export(get_path_for_file(talk.id, "processed"), 
-                            format='mp3', 
-                            bitrate='128k')
-
-        # Put appropriate metadata on the resultant mp3
-        subprocess.call(['mid3v2',
-                        "--TALB", "Greenbelt Festival Talks " + app.config['GB_FRIDAY'][:-4],
-                        "--TCOP", app.config['GB_FRIDAY'][:-4] + " Greenbelt Festivals",
-                        "--TIT2", talk.title,
-                        "--TPE1", talk.speaker,
-                        "--TPE2", talk.speaker,
-                        "--TRCK", str(talk.id),
-                        "--TDRC", str(app.config['GB_FRIDAY'][:-4]),
-                        "--COMM", talk.description,
-                        "--TCMP", "1",
-                        "--picture", app.config["IMG_DIR"] + '/alltalksicon.png',
-                        get_path_for_file(talk.id, "processed")])
-
-        # Create files for later CD burning
-        # Split the mp3 into 5min (300k ms) slices
-        os.makedirs(get_cd_dir_for_talk(talk.id))
-        for idx,cd_file in enumerate(hq_mp3[::300000]):
-            cd_file.export(app.config['CD_DIR'] + 
-                            '/gb' + 
-                            app.config['GB_FRIDAY'][2:4] + 
-                            "-"  + 
-                            str(talk.id).zfill(3) + 
-                            '/' + 
-                            str(idx).zfill(2) +
-                            '.wav',
-                            format="wav",
-                            parameters=['-ar', '44100'])
+    with Pool(3) as p:
+        p.map(process_talk, talks_to_process)
 
 
 def burn_cd(talk_id, cd_index, cd_writer):

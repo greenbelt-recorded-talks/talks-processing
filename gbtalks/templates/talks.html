@@ -20,7 +20,7 @@
 
 {% for talk in talks %}
 
-{% if ('gb19-' + ('%03d' % talk.id) |string+"_RAW.mp3" in raw_files and ( 'gb19-' + ('%03d' % talk.id)|string+"_EDITED.mp3" not in edited_files or 'gb19-' + ('%03d' % talk.id)|string+"_SNIP.mp3" not in snip_files )) %}
+{% if talk.id < 100 and ('gb19-' + ('%03d' % talk.id) |string+"_RAW.mp3" in raw_files and ( 'gb19-' + ('%03d' % talk.id)|string+"_EDITED.mp3" not in edited_files or 'gb19-' + ('%03d' % talk.id)|string+"_SNIP.mp3" not in snip_files )) %}
 
 <tr>
         <td>{{ '%03d' % talk.id }}</td>
