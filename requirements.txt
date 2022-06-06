@@ -1,8 +1,10 @@
+blkinfo
 ffmpeg-normalize
 Flask
 Flask-SQLAlchemy
 Flask-Login
 flake8
+mutagen
 pydub
 tendo
 uwsgi

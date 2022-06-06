@@ -1,6 +1,6 @@
 import threading
 import os
-
+import json
 import subprocess
 import click
 from flask import current_app as app
@@ -8,12 +8,12 @@ from flask.cli import with_appcontext
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 
 from .models import db, Talk, Recorder, Editor
-
+import sys
 from tendo import singleton
 from pydub import AudioSegment
 
 from multiprocessing import Pool
-
+from mutagen.id3 import ID3, TALB, TCOP, TIT2, TPE1, TPE2, TRCK, TDRC, COMM, TCMP, APIC
 import pprint
 
 
@@ -60,19 +60,26 @@ def process_talk(talk):
                     bitrate='128k')
 
     # Put appropriate metadata on the resultant mp3
-    subprocess.call(['mid3v2',
-                    "--TALB", "Greenbelt Festival Talks " + app.config['GB_FRIDAY'][:-4],
-                    "--TCOP", app.config['GB_FRIDAY'][:-4] + " Greenbelt Festivals",
-                    "--TIT2", talk.title,
-                    "--TPE1", talk.speaker,
-                    "--TPE2", talk.speaker,
-                    "--TRCK", str(talk.id),
-                    "--TDRC", str(app.config['GB_FRIDAY'][:-4]),
-                    "--COMM", talk.description,
-                    "--TCMP", "1",
-                    "--picture", app.config["IMG_DIR"] + '/alltalksicon.png',
-                    get_path_for_file(talk.id, "processed")])
+    mp3 = ID3(get_path_for_file(talk.id, "processed"))
 
+    mp3['TALB'] = TALB(text = "Greenbelt Festival Talks " + app.config['GB_FRIDAY'][:-4])
+    mp3['TCOP'] = TCOP(text = app.config['GB_FRIDAY'][:-4] + " Greenbelt Festivals")
+    mp3['TIT2'] = TIT2(text = talk.title)
+    mp3['TPE1'] = TPE1(text = talk.speaker)
+    mp3['TPE2'] = TPE2(text = talk.speaker)
+    mp3['TRCK'] = TRCK(text = str(talk.id))
+    mp3['TDRC'] = TDRC(text = str(app.config['GB_FRIDAY'][:-4]))
+    mp3['COMM'] = COMM(text = talk.description)
+    mp3['TCMP'] = TCMP(text = '1')
+
+    with open(app.config["IMG_DIR"] + '/alltalksicon.png', 'rb') as albumart:
+        mp3['APIC'] = APIC(
+                          mime='image/png',
+                          type=3, desc='Front cover',
+                          data=albumart.read()
+                        )
+    mp3.save()
+    
     # Create files for later CD burning
     # Split the mp3 into 5min (300k ms) slices
     os.makedirs(get_cd_dir_for_talk(talk.id))
@@ -161,5 +168,77 @@ def burn_cds(talk, cds):
 
     except:
         print("Talk not ready yet")
+
+
+def copy_all_talks(usb_label):
+    # rsync the master copy to the labelled USB
+
+    subprocess.run(['rsync', '--delete', '--archive', '/usb_master/', '/usbs/' + str(usb_label)])
+
+@click.command()
+@with_appcontext
+def all_talks():
+    """Make all talks USBs"""
+
+    # Make sure we only run one of these at a time
+    only_once_preventer = singleton.SingleInstance(flavor_id='all_talks')
+
+    completed_all_talks = set()
+    usb_label = 1
+    command = ''
+
+    # Initialise by scanning all USB ports and starting update runs for all connected drives with labels
+
+    ## Look at all the USBs that are currently plugged in
+    lsblk = subprocess.check_output(['lsblk', '-JO'], text=True)
+    all_disks = json.loads(lsblk)
+
+    p = Pool(24)
+
+    for usb in [x for x in all_disks['blockdevices'] if x['tran'] == 'usb']:
+        try:
+            with open(usb['children'][0]['mountpoint'] + '/label', 'r') as content_file:
+                usb_label = content_file.read()
+            p.apply_async(copy_all_talks(usb_label))
+        except (FileNotFoundError, TypeError):
+            print("Unlabelled USB found - please remove!")
+            sys.exit()
+
+    # Start a continuous loop, which waits for input at the end
+    while(command != 'quit'):
+        
+        lsblk = subprocess.check_output(['lsblk', '-JO'], text=True)
+        all_disks = json.loads(lsblk)
+
+        usb_label = command
+        
+        for usb in [x for x in all_disks['blockdevices'] if x['tran'] == 'usb']:
+            try:
+                with open(usb['children'][0]['mountpoint'] + '/label', 'r') as content_file:
+                    usb_label = content_file.read()
+                p.apply_async(copy_all_talks(usb_label))
+            except (FileNotFoundError, TypeError):
+                # If there isn't a label, then set up the disk and make one
+                if click.confirm('Please insert USB with label ' + usb_label):
+                    subprocess.run(['sudo', 'mount', '/dev/' + usb['kname'] + '1', '/usbs/' + str(usb_label)])
+                    subprocess.run(['sudo', 'chown', '-R', 'gbtalks:', '/usbs/' + str(usb_label), '-o', 'uid=1000,gid=1000,utf8,dmask=027,fmask=137'])
+                    file = open('/usbs/' + usb_label + '/label', 'w')
+                    file.write(str(usb_label))
+                    file.close()
+
+
+        ### For each one that has a label file, check the list of talks and filesizes against the proof list. Copy any files that are missing or the wrong size. Remove any files that shouldn't be there.
+        ### Check the list against the list of all talks that we know of. If the stick is complete, add it to the set of completed all talks stick
+
+        ### If there is one that doesn't have a label file, add one and then copy all the files that we have to the disk
+
+        ### If there is more than one without a label file, ask the user to take one out!
+
+
+
+        ## Ask for the ID of the next USB to be plugged in (default to most recent input +1), then end the loop iteration
+        print("Plug in a USB, enter its ID, then press Enter")
+        command = click.prompt("ID")
+
 
 

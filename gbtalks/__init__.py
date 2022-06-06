@@ -17,6 +17,7 @@ def register_commands(app):
     """Register Click commands."""
     from gbtalks import commands
     app.cli.add_command(commands.convert_talks)
+    app.cli.add_command(commands.all_talks)
 
 def create_app():
     """Construct the core application."""
