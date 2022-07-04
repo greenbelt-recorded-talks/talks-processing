@@ -2,99 +2,137 @@
 
 {% block content %}
 
+<h1 class="uk-heading-line uk-text-center"><span>Talks</span></h1>
 
-<div>
-	<h1>Unedited Talks</h1>
+<div uk-filter="target: .js-filter">
 
-	<table>
-<tr>
-        <th>Talk ID</th>
-        <th>Raw File</th>
-        <th>Edited File</th>
-        <th>Processed File</th>
-        <th>Snip File</th>
-        <th>Title</th>
-        <th>Speaker(s)</th>
-        <th>Description</th>
-</tr>
+    <div class="uk-grid-small uk-grid-divider uk-child-width-auto" uk-grid>
+        <div>
+            <ul class="uk-subnav uk-subnav-pill" uk-margin>
+                <li class="uk-active" uk-filter-control><a href="#">All</a></li>
+            </ul>
+        </div>
+        <div>
+            <ul class="uk-subnav uk-subnav-pill" uk-margin>
+		<li>RAW</li>
+                <li uk-filter-control="filter: [data-has-raw='false']; group: raw"><a href="#">No</a></li>
+		<li uk-filter-control="filter: [data-has-raw='true']; group: raw"><a href="#">Yes</a></li>
+	    </ul>
+	</div>
+	<div>
+            <ul class="uk-subnav uk-subnav-pill" uk-margin>
+                <li>Edited</li>
+                <li uk-filter-control="filter: [data-has-edited='false']; group: edited"><a href="#">No</a></li>
+                <li uk-filter-control="filter: [data-has-edited='true']; group: edited"><a href="#">Yes</a></li>
+            </ul>
+        </div>
+	<div>
+            <ul class="uk-subnav uk-subnav-pill" uk-margin>
+                <li>Snip</li>
+                <li uk-filter-control="filter: [data-has-snip='false']; group: snip"><a href="#">No</a></li>
+                <li uk-filter-control="filter: [data-has-snip='true']; group: snip"><a href="#">Yes</a></li>
+            </ul>
+        </div>
+	<div>
+            <ul class="uk-subnav uk-subnav-pill" uk-margin>
+		<li>Processed</li>
+                <li uk-filter-control="filter: [data-has-processed='false']; group: processed"><a href="#">No</a></li>
+                <li uk-filter-control="filter: [data-has-processed='true']; group: processed"><a href="#">Yes</a></li>
+            </ul>
+        </div>
+	<div>
+            <ul class="uk-subnav uk-subnav-pill" uk-margin>
+                <li>Priority</li>
+                <li uk-filter-control="filter: [data-has-processed='false']; group: priority"><a href="#">Additional</a></li>
+                <li uk-filter-control="filter: [data-has-processed='true']; group: priority"><a href="#">Priority</a></li>
+            </ul>
+        </div>
+    </div>
+
+<ul class="js-filter" uk-grid>
 
 {% for talk in talks %}
 
-{% if talk.id < 100 and ('gb' + gb_year + '-' + ('%03d' % talk.id) |string+"_RAW.mp3" in raw_files and ( 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_EDITED.mp3" not in edited_files or 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_SNIP.mp3" not in snip_files )) %}
+{% set has_raw = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+ "_RAW.mp3" in raw_files else "false" %}
+{% set has_edited = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_EDITED.mp3" in edited_files else "false" %}
+{% set has_snip = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_SNIP.mp3" in snip_files else "false" %}
+{% set has_processed = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"mp3.mp3" in processed_files else "false" %}
+{% set is_priority = "true" if talk["is_priority"] else "false" %} 
 
-<tr>
-        <td>{{ '%03d' % talk.id }}</td>
-        <td>{% if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_RAW.mp3" in raw_files %}
-        <p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
-        {% endif %}
 
-        <form method=post enctype=multipart/form-data name=upload_raw_talk action=uploadtalk>
-                <input name=file type=file id=file accept=".mp3">
-                <input name=file_type type=hidden value="raw">
-                <input name=talk_id type=hidden value="{{talk.id}}">
-                <button>Upload</button>
-        </form>
+<li class="uk-card uk-card-body uk-card-default" data-has-raw="{{ has_raw }}" data-has-edited="{{ has_edited }}" data-has-snip="{{ has_snip }}" data-has-processed="{{ has_processed }}" data-priority="{{ is_priority }}" >
+	<div class="uk-width-1-1">
+		<h3 class="uk-card-title">{{ 'gb' + gb_year + '-' + ('%03d' % talk.id) }}: {{ talk.title }}</h3>
+		<span class="uk-text-default uk-text-bold">{{ talk.speaker }}:</span>
+		<span class="uk-text-default">{{ talk.description }}</span>
 
-        </td>
-        <td>{% if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_EDITED.mp3" in edited_files %}
-        <p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
-        {% endif %}
+		<hr>
 
-        <form method=post enctype=multipart/form-data name=upload_edited_talk action=uploadtalk>
-                <input name=file type=file id=file accept=".mp3">
-                <input name=file_type type=hidden value="edited">
-                <input name=talk_id type=hidden value="{{talk.id}}">
-                <button>Upload</button>
-        </form>
+		<div class="uk-child-width-expand@s uk-text-center" uk-grid>
 
-        </td>
-        <td>
-        {% if 'gb' + gb_talk + '-' + ('%03d' % talk.id)|string+"mp3.mp3" in processed_files %}
-        <p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
-        {% endif %}
+    			<div>
+        			<div class="uk-card uk-card-default uk-card-body">
+				<span>RAW</span>
+					{% if has_raw == "true"  %}
+        				<p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
+					{% endif %}
 
-        </td>
-        <td>
+				<form method=post enctype=multipart/form-data name=upload__talk action=uploadtalk>
+                			<input name=file type=file id=file accept=".mp3">
+                			<input name=file_type type=hidden value="raw">
+                			<input name=talk_id type=hidden value="{{talk.id}}">
+                			<button>Upload</button>
+        			</form>
+			</div>
+    		</div>
+    		<div>
+        		<div class="uk-card uk-card-default uk-card-body">
+				<span>Edited</span>
+				{% if has_edited == "true" %}
+        			<p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
+        			{% endif %}
 
-        {% if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_SNIP.mp3" in snip_files %}
-        <p><a href="{{ url_for("getfile", file_type="snip", talk_id=talk.id) }}">Download</a></p>
-        {% endif %}
+       				 <form method=post enctype=multipart/form-data name=upload_edited_talk action=uploadtalk>
+                			<input name=file type=file id=file accept=".mp3">
+                			<input name=file_type type=hidden value="edited">
+                			<input name=talk_id type=hidden value="{{talk.id}}">
+                			<button>Upload</button>
+        			</form>
+			</div>
+    		</div>
+    		<div>
+        		<div class="uk-card uk-card-default uk-card-body">
+				<span>Snip</span>
+				{% if has_snip == "true" %}
+        			<p><a href="{{ url_for("getfile", file_type="snip", talk_id=talk.id) }}">Download</a></p>
+        			{% endif %}
 
-        <form method=post enctype=multipart/form-data name=upload_snip action=uploadtalk>
-                <input name=file type=file id=file accept=".mp3">
-                <input name=file_type type=hidden value="snip">
-                <input name=talk_id type=hidden value="{{talk.id}}">
-                <button>Upload</button>
-        </form>
-
-        </td>
-        <td>{{ talk.title }}</td>
-        <td>{{ talk.speaker }}</td>
-        <td>{{ talk.description }}</td>
-</tr>
-
-{% endif %}
+        			<form method=post enctype=multipart/form-data name=upload_snip action=uploadtalk>
+                			<input name=file type=file id=file accept=".mp3">
+        	        		<input name=file_type type=hidden value="snip">
+                			<input name=talk_id type=hidden value="{{talk.id}}">
+     	        			<button>Upload</button>
+        			</form>
+			</div>
+    		</div>
+    		<div>
+        		<div class="uk-card uk-card-default uk-card-body">
+				<span>Processed</span>
+				{% if has_processed == "true" %}
+        			<p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
+        			{% endif %}
+			</div>
+    		</div>
+	</div>
+</div>
+</li>
 
 {% endfor %}
 
-	</table>
+</ul>
 
 </div>
-
-
-
-<div>
-<h1>New Talks List</h1>
-
-<form method=post enctype=multipart/form-data>
-	<label for=file>File</label>
-	<input name=file type=file id=file accept=".csv">
-	<input name=form_name type=hidden value="upload_talks_list">
-	<button>Submit</button>
-</form>
 </div>
-
-<h1>Talks</h1>
 
 <table>
 <tr>
@@ -176,7 +214,7 @@
         <th>Speaker(s)</th>
         <th>Description</th>
 </tr>
-{% for talk in talks if not talk["is_priority"]%}
+{% for talk in talks if not talk["is_priority"] %}
 
 <tr>
         <td>{{ '%03d' % talk.id }}</td>
@@ -205,7 +243,7 @@
 
         </td>
         <td>
-        {% if 'gb' + gb_talk + '-' + ('%03d' % talk.id)|string+"mp3.mp3" in processed_files %}
+        {% if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"mp3.mp3" in processed_files %}
         <p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
         {% endif %}
 
@@ -232,6 +270,20 @@
 
 {% endfor %}
 </table>
+
+
+
+<hr class="uk-divider-icon">
+<div class="uk-card uk-card-body uk-card-default">
+<h1>New Talks List</h1>
+
+<form method=post enctype=multipart/form-data>
+        <label for=file>File</label>
+        <input name=file type=file id=file accept=".csv">
+        <input name=form_name type=hidden value="upload_talks_list">
+        <button>Submit</button>
+</form>
+</div>
 
 {% endblock %}
 

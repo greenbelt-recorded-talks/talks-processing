@@ -145,9 +145,6 @@ def recorders():
 def editing():
     """ Where editors obtain and upload files """
 
-    # This page needs to have:
-    # - A way for someone to upload a list of editors
-
     if request.method == 'POST':
         if request.form['form_name'] == "upload_editors_list":
             if 'file' not in request.files:

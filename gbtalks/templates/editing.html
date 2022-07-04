@@ -2,15 +2,13 @@
 
 {% block content %}
 
-<h1>Upload New Editor File</h1>
-<form method=post enctype=multipart/form-data>
-	<label for=file>File</label>
-	<input name=file type=file id=file accept=".csv">
-	<input name=form_name type=hidden value=upload_editors_list>
-	<button>Submit</button>
-</form>
+<h1 class="uk-heading-line uk-text-center"><span>Talks Editing</span></h1>
 
+
+<div class="uk-card uk-card-body uk-card-default">
 <h1> Editors </h1>
+
+Note that "Additional Talks" should be edited only when requested by the Team Leaders: they may not have been cleared for release
 
 <table>
 <tr>
@@ -44,6 +42,12 @@
 
 {% endfor %}
 </table>
+
+</div>
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-body uk-card-default">
 
 <h1> Talks To Edit </h1>
 <table>
@@ -87,6 +91,31 @@
 {% endfor %}
 </table>
 
+</div>
+<hr class="uk-divider-icon">
+<div class="uk-card uk-card-body uk-card-default">
+{% filter markdown %}
+## Upload New Editors File
+
+Upload a CSV file containing the names of the editors. Each line in the file should contain: Editor name.
+
+Example:
+
+
+        "Gandalf"
+        "Gloin"
+        "Elrond"
+
+When you upload the file, all previous editors and assignments will be deleted.
+{% endfilter %}
+
+<form method=post enctype=multipart/form-data>
+        <label for=file>File</label>
+        <input name=file type=file id=file accept=".csv">
+        <input name=form_name type=hidden value=upload_editors_list>
+        <button>Submit</button>
+</form>
+</div>
 
 {% endblock %}
 
