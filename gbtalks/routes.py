@@ -104,6 +104,14 @@ def talks():
                             )
 
 
+@app.route('/setup', methods=['GET'])
+def setup():
+    """Various setup functions"""
+
+    return render_template("setup.html")
+
+
+
 @app.route('/recorders', methods=['GET','POST'])
 def recorders():
     """View or add recorders to the database"""

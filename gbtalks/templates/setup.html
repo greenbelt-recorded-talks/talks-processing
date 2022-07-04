@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h1 class="uk-heading-line uk-text-center"><span>Setup</span></h1>
+
+
+<div class="uk-card uk-card-default uk-card-body">
+{% filter markdown %}
+
+### Setup
+
+This page provides a range of tools that set up the application. Use with care: this allows you to break things in interesting ways. 
+
+{% endfilter %}
+</div>
+
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
+### Replace Talks File
+
+The Talks File is the list of talks downloaded from Mercato. 
+
+Replacing the Talks File deletes all previous data: assignments, rotas, etc. Files on disk aren't deleted, so if any IDs change, the files will be the wrong ones. It's highly recommended not to update the Talks file when the festival is underway. 
+
+If there are any last-minute changes or additions, edit the database directly. Talk to Rob, because there's no automated way to do this yet. 
+
+The columns are pre-set in the code: edit the file if these don't match the columns you've got. Column numbers below start from 0:
+
+	Column 0: Talk ID, e.g. "gb99-001"
+	Column 1: Venue, e.g. "A Field"
+	Column 2: Day, e.g. "Friday"
+	Column 3: Time, e.g. "4:30 PM"
+	Column 5: Title, e.g. "My Great Talk"
+	Column 6: Description, e.g. "Blah Blah Blah"
+	Column 7: Speaker, e.g. "Dr Awesome"
+	Column 10: Priority, e.g. "Yes" or blank
+
+
+{% endfilter %}
+
+	<form action="talks" method=post enctype=multipart/form-data>
+        	<label for=file>File</label>
+        	<input name=file type=file id=file accept=".csv">
+        	<input name=form_name type=hidden value="upload_talks_list">
+        	<button>Submit</button>
+	</form>
+</div>
+
+{% endblock %}
