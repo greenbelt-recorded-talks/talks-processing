@@ -2,6 +2,25 @@
 
 {% block content %}
 
+<h1 class="uk-heading-line uk-text-center"><span>Recorders</span></h1>
+
+
+<div class="uk-card uk-card-body uk-card-default">
+{% filter markdown %}
+## Upload New Recorders File
+
+Upload a CSV file containing recorder information. Each line in the file should contain: Recorder name, max number of shifts per day.
+
+Example:
+
+
+	"Bilbo Baggins",2    
+	"Belladonna Took",1
+	"Thorin Oakenshield",2
+
+{% endfilter %}
+
+
 
 <form method=post enctype=multipart/form-data>
 	<label for=file>File</label>
@@ -9,7 +28,17 @@
 	<button>Submit</button>
 </form>
 
-<table class="pure-table pure-table-bordered">
+</div>
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-body uk-card-default">
+
+{% filter markdown %}
+## Recorders Schedule
+{% endfilter %}
+
+
+<table class="pure-table pure-table-bordered uk-table">
 <tr>
 	<th>Recorder</th>
 	<th>Max Shifts Per Day</th>
@@ -20,8 +49,8 @@
 	<td>{{ recorder.name }}</td>
 	<td>{{ recorder.max_shifts_per_day }}</td>
         <td>
+<table class="pure-table pure-table-striped">
 {% for talk in recorder.talks %}
-<table>
 <tr>
 	<th>Talk ID</th>
 	<th>Time</th>
@@ -35,15 +64,17 @@
 	<td>{{ talk.venue }}</td>
 	<td>{{ talk.speaker }}</td>
 	<td>{{ talk.title }}</td>
+</tr>
+{% endfor %}
 </table>
-{% endfor %}	    
-		</td>
+
+</td>
 </tr>
 
 
 {% endfor %}
 </table>
-
+</div>
 
 {% endblock %}
 

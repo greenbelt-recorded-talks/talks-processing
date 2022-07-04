@@ -24,6 +24,7 @@ def get_path_for_file(talk_id, file_type):
     return path
 
 def start_time_of_talk(day, time):
+    """Convert "Greenbelt Days" to real days, and parse out the start times of talks"""
     fri_of_gb = datetime.strptime(app.config['GB_FRIDAY'], '%Y-%m-%d').date()
     days = {
             "Friday": 0,
@@ -93,6 +94,7 @@ def talks():
     snip_files = [x.name for x in os.scandir(app.config['SNIP_DIR'])]
 
     return render_template("talks.html", 
+                            gb_year=app.config['GB_SHORT_YEAR'],
                             talks=talks,
                             raw_files=raw_files,
                             edited_files=edited_files,
@@ -199,10 +201,15 @@ def editing():
     # Talks that need editing
     talks_to_edit = Talk.query.filter(Talk.editor_name==None).filter(Talk.id.in_(raw_talks_available))
     
-
     # - A way for someone to download raw files, assign a talk to an editor, upload the edited files
     editors = Editor.query.all()
-    return render_template("editing.html", editors=editors, talks_to_edit=talks_to_edit, raw_talks_available=raw_talks_available, edited_talks_available=edited_talks_available, processed_talks_available=processed_talks_available, snips_available=snips_available)
+    return render_template("editing.html", 
+            editors=editors, 
+            talks_to_edit=talks_to_edit, 
+            raw_talks_available=raw_talks_available, 
+            edited_talks_available=edited_talks_available, 
+            processed_talks_available=processed_talks_available, 
+            snips_available=snips_available)
 
 
 @app.route('/getfile', methods=['GET'])

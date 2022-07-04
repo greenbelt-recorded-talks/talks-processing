@@ -3,6 +3,7 @@ ffmpeg-normalize
 Flask
 Flask-SQLAlchemy
 Flask-Login
+Flask-Markdown
 flake8
 mutagen
 pydub

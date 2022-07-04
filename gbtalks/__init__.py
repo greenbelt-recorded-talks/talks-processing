@@ -1,9 +1,7 @@
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
 
 db = SQLAlchemy()
-login_manager = LoginManager()
 
 
 def register_blueprints(app):
@@ -28,13 +26,16 @@ def create_app():
 
     # Initialize Plugins
     db.init_app(app)
-    login_manager.init_app(app)
 
     # Import blueprints
     register_blueprints(app)
 
     # Register Commands
     register_commands(app)
+
+    # Use Markdown
+    from flaskext.markdown import Markdown
+    Markdown(app)
 
     with app.app_context():
         # Imports

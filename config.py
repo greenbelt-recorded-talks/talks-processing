@@ -23,8 +23,6 @@ class Config:
     TOP_TAIL_DIR = "/home/gbtalks/top_tail"
     IMG_DIR = "/home/gbtalks/images"
 
-    ROBTEST = "test"
-
     TALKS_DIRS = {
         "raw": {
             "directory": "/storage/uploads",
@@ -44,7 +42,6 @@ class Config:
             }
     }
 
-    robtest = "test"
-
     # Greenbelt
     GB_FRIDAY = "2019-08-23"
+    GB_SHORT_YEAR = GB_FRIDAY[2:4]

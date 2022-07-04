@@ -1,9 +1,29 @@
 <!doctype html>
 <title>{% block title %}{% endblock %} - Greenbelt Recorded Talks</title>
-<link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/pure-min.css" integrity="sha384-oAOxQR6DkCoMliIh8yFnu25d7Eq/PHS21PClpwjOTeU2jRSq11vu66rf90/cZr47" crossorigin="anonymous">
+<!-- UIkit CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.14.3/dist/css/uikit.min.css" />
+
+<!-- UIkit JS -->
+<script src="https://cdn.jsdelivr.net/npm/uikit@3.14.3/dist/js/uikit.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/uikit@3.14.3/dist/js/uikit-icons.min.js"></script>
+
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+
+<nav class="uk-navbar-container" uk-navbar>
+	<a class="uk-navbar-item uk-logo" href="#"><img src="{{ url_for('static', filename='gb_logo.svg') }}"/></a>
+	<p class="uk-navbar-item uk-logo">Recorded Talks</p>
+	<div class="uk-navbar-right">
+        <ul class="uk-navbar-nav">
+            <li class="uk-active"><a href="recorders">Recorders</a></li>
+            <li class="uk-parent"><a href="editing">Editing</a></li>
+	    <li class="uk-parent"><a href="talks">Talks</a></li>
+            <li><a href=""></a></li>
+        </ul>
+    </div>
+</nav>
+
+
 <nav>
-  <h1>GB Recorded Talks</h1>
   {#<ul>
     {% if g.user %}
       <li><span>{{ g.user['username'] }}</span>
@@ -21,5 +41,5 @@
   {% for message in get_flashed_messages() %}
     <div class="flash">{{ message }}</div>
   {% endfor %}
-  {% block content %}{% endblock %}
+  <div class="uk-container">{% block content %}{% endblock %}</div>
 </section>
