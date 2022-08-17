@@ -41,8 +41,17 @@ def start_time_of_talk(day, time):
     try:
         time_of_talk = datetime.strptime(time, '%I:%M %p').time()
     except ValueError:
-        time_of_talk = datetime.strptime(time, '%H:%M:%S').time()
+        try:
+            time_of_talk = datetime.strptime(time, '%H:%M:%S').time()
+        except ValueError:
+            time_of_talk = datetime.strptime(time, '%H:%M').time()
     return datetime.combine(day_of_talk, time_of_talk)
+
+
+
+@app.route('/', methods=['GET'])
+def index():
+    return redirect('talks')
 
 
 @app.route('/talks', methods=['GET','POST'])
@@ -65,18 +74,21 @@ def talks():
 
                 with open(os.path.join(app.config['UPLOAD_DIR'], filename), newline='') as csvfile:
                     talksreader = csv.reader(csvfile)
+                    next(talksreader, None)  # skip the headers
                     for talk_line in talksreader:
                         start_time = start_time_of_talk(talk_line[2], talk_line[3])
                         end_time = start_time + timedelta(hours=1)
                         is_priority = True if talk_line[10] == "Yes" else False
+                        is_rotaed = True if talk_line[11] == "Yes" else False
                         talk = Talk(id=talk_line[0].split('-')[1], 
-                                title=talk_line[5], 
-                                description=talk_line[6], 
-                                speaker=talk_line[7],
+                                title=talk_line[4],
+                                description=talk_line[7],
+                                speaker=talk_line[6],
                                 venue=talk_line[1],
                                 start_time=start_time,
                                 end_time=end_time,
-                                is_priority=is_priority)
+                                is_priority=is_priority,
+                                is_rotaed=is_rotaed)
                         db.session.add(talk)
 
                 db.session.commit()

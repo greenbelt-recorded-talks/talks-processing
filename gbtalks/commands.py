@@ -99,13 +99,16 @@ def convert_talks():
     # Make sure we only run one of these at a time
     only_once_preventer = singleton.SingleInstance(flavor_id='convert_talks')
 
+    gb_year = str(app.config['GB_FRIDAY'][2:4])
+    gb_prefix = "gb" + gb_year + "-"
+
     # Work out which files need to be converted by looking at the filesystem
     # If a talk has an edited file and a snip, but no converted file, convert it!
 
-    edited_files = set([x.name.replace('_EDITED.mp3','').replace('gb19-','') for x in os.scandir(app.config['EDITED_UPLOAD_DIR']) if x.name.endswith('EDITED.mp3')]) or set()
+    edited_files = set([x.name.replace('_EDITED.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['EDITED_UPLOAD_DIR']) if x.name.endswith('EDITED.mp3')]) or set()
     pprint.pprint(edited_files)
-    processed_files = set([x.name.replace('mp3.mp3','').replace('gb19-','') for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith('mp3.mp3')]) or set()
-    snip_files = set([x.name.replace('_SNIP.mp3','').replace('gb19-','') for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith('SNIP.mp3')]) or set()
+    processed_files = set([x.name.replace('mp3.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith('mp3.mp3')]) or set()
+    snip_files = set([x.name.replace('_SNIP.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith('SNIP.mp3')]) or set()
 
     pprint.pprint("Edited")
     pprint.pprint(edited_files)
@@ -118,13 +121,12 @@ def convert_talks():
 
     edited_without_snip = set(edited_files.difference(snip_files))
     snip_without_edited = set(snip_files.difference(edited_files))
-
     exclude_list = set(edited_without_snip|snip_without_edited)
 
     if len(exclude_list) > 0:
-        print("Exclude list:", exclude_list)
+        print("Excluded due to snip without edited file, or edited file without snip:", exclude_list)
 
-    talks = edited_files.union(snip_files) 
+    talks = edited_files.union(snip_files)
     talks.difference_update(exclude_list)
     talks.difference_update(processed_files)
 
@@ -228,6 +230,7 @@ def all_talks():
 
 
         ### For each one that has a label file, check the list of talks and filesizes against the proof list. Copy any files that are missing or the wrong size. Remove any files that shouldn't be there.
+
         ### Check the list against the list of all talks that we know of. If the stick is complete, add it to the set of completed all talks stick
 
         ### If there is one that doesn't have a label file, add one and then copy all the files that we have to the disk

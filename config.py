@@ -43,5 +43,5 @@ class Config:
     }
 
     # Greenbelt
-    GB_FRIDAY = "2019-08-23"
+    GB_FRIDAY = "2022-08-26"
     GB_SHORT_YEAR = GB_FRIDAY[2:4]

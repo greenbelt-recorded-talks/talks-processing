@@ -14,6 +14,7 @@ class Talk(db.Model):
     venue = db.Column(db.String)
 
     is_priority = db.Column(db.Boolean)
+    is_rotaed = db.Column(db.Boolean)
 
     recorder_name = db.Column(db.String, db.ForeignKey('recorders.name'))
     editor_name = db.Column(db.String, db.ForeignKey('editors.name'))
