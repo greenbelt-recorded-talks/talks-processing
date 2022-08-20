@@ -21,6 +21,28 @@ This page provides a range of tools that set up the application. Use with care: 
 <div class="uk-card uk-card-default uk-card-body">
 
 {% filter markdown %}
+### Upload All Talks Index File
+
+The All Talks USB stick has a PDF file on it which lists out what all of the talks are. We create this during the festival (usually based on the order form), and update it as talks are either added or removed from the list. 
+
+Uploading a file here will replace the existing one. 
+
+{% endfilter %}
+
+        <form action="put_alltalks_pdf" method=post enctype=multipart/form-data>
+                <label for=file>File</label>
+                <input name=file type=file id=file accept=".pdf">
+                <button>Submit</button>
+        </form>
+
+
+</div>
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
 
 ### Replace Talks File
 

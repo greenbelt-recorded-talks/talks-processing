@@ -1,2 +1,2 @@
-cd /storage/cds/gb19-$1
+cd /storage/cds/gb22-$1
 ls

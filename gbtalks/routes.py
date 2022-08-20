@@ -123,6 +123,45 @@ def setup():
     return render_template("setup.html")
 
 
+@app.route('/put_alltalks_pdf', methods=['POST'])
+def put_alltalks_pdf():
+    """Upload the all talks PDF to the USB gold copy"""
+
+    if 'file' not in request.files:
+        flash('No file supplied!')
+        return redirect(url_for('setup'))
+
+    file = request.files['file']
+
+    if file:
+        filename = "GB" + app.config['GB_SHORT_YEAR'] + "-AllTalksIndex.pdf"
+        file.save(os.path.join(app.config['USB_GOLD_DIR'], filename))
+
+    return redirect(url_for('setup'))
+
+
+@app.route('/create_alltalks_gold', methods=['POST'])
+def create_alltalks_gold():
+    """Create the alltalks USB Gold copy"""
+
+    # First, wipe all mp3s from the gold dir (don't touch the PDF) 
+    # For each talk in the database, either copy the processed file to the USB gold dir, or add it to the list of talks that couldn't be copied to show to the user
+
+
+@app.route('/copy_all_talks', methods=['POST'])
+def copy_all_talks():
+    """Copy the USB gold copy on to every connected USB drive"""
+
+    # First, detect all USB drives
+    # Then, give up if any aren't either ~8GB, ~16GB or ~128GB 
+    # Then, copy the USB gold to /dev/shm
+    # Then, spawn a bunch of children to do some rsyncing 
+
+@app.route('/duplication', methods=['GET'])
+def duplication():
+    """Functions and instructions for the duplication team"""
+
+    return render_template("duplication.html")
 
 @app.route('/recorders', methods=['GET','POST'])
 def recorders():

@@ -152,6 +152,8 @@ def burn_cd(talk_id, cd_index, cd_writer):
 @click.option('--talk')
 @click.option('--cds')
 def burn_cds(talk, cds):
+    """Burn CDs"""
+
     import subprocess
 
     # Work out how many CDs we need

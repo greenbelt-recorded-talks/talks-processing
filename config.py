@@ -22,6 +22,7 @@ class Config:
     SNIP_DIR = "/storage/processed"
     TOP_TAIL_DIR = "/home/gbtalks/top_tail"
     IMG_DIR = "/home/gbtalks/images"
+    USB_GOLD_DIR = "/home/gbtalks/usb_gold"
 
     TALKS_DIRS = {
         "raw": {
