@@ -1,0 +1,111 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h1 class="uk-heading-line uk-text-center"><span>Setup</span></h1>
+
+<div class="uk-card uk-card-default uk-card-body">
+{% filter markdown %}
+
+### Duplication
+
+This page provides instructions on how to use the duplication tools on the GB Talks server
+{% endfilter %}
+</div>
+
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
+### Burning CDs
+
+The Team Leaders and the shop team will decide on which talks (if any) to burn to CD, and when. Usually, there will be some expected "best sellers" that the shop team will want several copies of as soon as possible, but other talks will be burned on request, when festival-goers order them at the shop. 
+
+To burn CDs for talks:
+
+* Check that the talk is actually ready to be burned. Go to the [talks page](talks) and check that the Processed file is available for the talk that you want to burn. If it is, then you're good to go
+* Make sure that you know which CD drive has which number (if they have stickers on, it's a good bet they're right)
+* Log in to the server via SSH (instructions for this will be provided separately - talk to the team leaders)
+* Put the CD in the drive
+* run: `cd /home/gbtalks/talks-processing/cd_tools`
+* To write (for example) talk gb22-99 to drive 1, run: `./makecd.sh 99 1` 
+
+If it works, after a few minutes, the drive will eject and you'll see a message saying `TALK GB22-99 WRITTEN TO DRIVE 1". 
+
+If it hasn't worked, you'll see a load of error messages go past. Talk to Rob if this happens! 
+
+{% endfilter %}
+
+</div>
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
+### Making Talks USBs
+
+There's no magic to these. 
+
+Once all of the talks that have been ordered have been processed (check on the [talks page](talks)), just grab an 8GB USB stick and use the nearest available laptop to download the files from the server and copy them to the USB stick. Make sure that the USB bag has this year's sticker on it, and send it back to the shop when it's done. 
+
+{% endfilter %}
+
+</div>
+
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
+### Making All Talks USBs (for this year)
+
+On-site, on Monday night, it's important that you use only USB3 sticks, because they're much faster. Any USB2 stick plugged into the server will slow down the whole operation, so USB3 sticks only. You can identify USB3 sticks by the blue plastic in the USB port, and they'll be either 16GB or 128GB. 
+
+* Log into the server
+* `cd /home/gbtalks/talks-processing/gbtalks`
+* `source .ve/bin/activate`
+* 
+
+{% endfilter %}
+
+</div>
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
+### Making All Talks USBs (for previous years)
+
+There is a complete archive of GB Talks on the server in the `/backups/talks` directory. Copy those (with `scp` or `rsync`) to your local computer, and copy them to a USB stick. 
+
+It's unlikely that there will be any of these orders in 2022, as all previous talks are available free on the website. 
+
+{% endfilter %}
+
+</div>
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
+### Making All Talks DVDs (for any year)
+
+Only a fool would do this. Put the order form on Rob's to-do pile, and pray for his immortal soul. We'll do all DVD orders after the festival. 
+
+{% endfilter %}
+
+</div>
+
+
+{% endblock %}
