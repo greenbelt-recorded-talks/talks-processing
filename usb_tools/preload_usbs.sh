@@ -7,20 +7,10 @@ if (( $EUID != 0 )); then
     exit
 fi
 
-# Then, check that the USB gold dir is there and has at least 50 files in it
-
 if ! ls /usb_gold > /dev/null; then 
     echo "USB gold dir missing"
     exit
 fi
-
-if (( $(ls /usb_gold | wc -l ) < 50)); then
-    echo "USB gold dir has less than 50 files - are you sure it's ready?"
-    exit
-fi
-
-# If any USBs are mounted, error out - that's not right
-
 
 echo -n "There are "
 /home/gbtalks/talks-processing/usb_tools/count_connected_usbs.sh

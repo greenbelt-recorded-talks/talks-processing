@@ -34,7 +34,6 @@ def get_cd_dir_for_talk(talk):
     return app.config['CD_DIR'] + '/gb' + app.config['GB_FRIDAY'][2:4] + "-"  + str(talk).zfill(3) + '/'
 
 def process_talk(talk):
-
     top = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'top.mp3')
     tail = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'tail.mp3')
 
@@ -94,7 +93,7 @@ def process_talk(talk):
 @click.command()
 @with_appcontext
 def convert_talks():
-    """Convert edited talks to lower-quality versions to save on disk space"""
+    """Convert edited talks to lower-quality versions to save disk space"""
 
     # Make sure we only run one of these at a time
     only_once_preventer = singleton.SingleInstance(flavor_id='convert_talks')
@@ -106,16 +105,8 @@ def convert_talks():
     # If a talk has an edited file and a snip, but no converted file, convert it!
 
     edited_files = set([x.name.replace('_EDITED.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['EDITED_UPLOAD_DIR']) if x.name.endswith('EDITED.mp3')]) or set()
-    pprint.pprint(edited_files)
     processed_files = set([x.name.replace('mp3.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith('mp3.mp3')]) or set()
     snip_files = set([x.name.replace('_SNIP.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith('SNIP.mp3')]) or set()
-
-    pprint.pprint("Edited")
-    pprint.pprint(edited_files)
-    pprint.pprint("Processed")
-    pprint.pprint(processed_files)
-    pprint.pprint("Snip")
-    pprint.pprint(snip_files)
 
     # If there are any snips that don't have edited files, or edited files that don't have snips, skip over them and error
 
@@ -130,12 +121,10 @@ def convert_talks():
     talks.difference_update(exclude_list)
     talks.difference_update(processed_files)
 
-    pprint.pprint("Talks")
-    pprint.pprint(talks)
     talks_to_process = [Talk.query.get(x) for x in list(talks)] or []
 
-    top = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'top.mp3')
-    tail = AudioSegment.from_file(app.config['TOP_TAIL_DIR'] + '/' + 'tail.mp3')
+    pprint.pprint("Processing Talks:")
+    pprint.pprint(talks_to_process)
 
     with Pool(3) as p:
         p.map(process_talk, talks_to_process)
@@ -145,105 +134,5 @@ def burn_cd(talk_id, cd_index, cd_writer):
     talk_cd_files = [x for x in list(os.scandir(get_cd_dir_for_talk(talk_id))) if x.is_file()]
     cd_files = talk_cd_files[::15][cd_index]
     subprocess.call(['wodim', 'dev=/dev/sg' + cd_writer, '-dao' , '-pad', '-audio', '-eject', cd_files])
-
-
-@click.command()
-@with_appcontext
-@click.option('--talk')
-@click.option('--cds')
-def burn_cds(talk, cds):
-    """Burn CDs"""
-
-    import subprocess
-
-    # Work out how many CDs we need
-    # If there are more than 15 files (15 * 5min = 75, capacity of a CD is 79 minutes), we need 2 CDs
-
-    cd_dir = get_cd_dir_for_talk(talk)
-    try:
-        files = len([x for x in list(os.scandir(cd_dir)) if x.is_file()])
-
-        print("Talk length is " + files_count*5 + " minutes. Ish." )
-        
-        for cd in cds:
-            for idx,cd_files in enumerable(files[::15]):
-                print("Burning CD #" + idx)
-            
-
-    except:
-        print("Talk not ready yet")
-
-
-def copy_all_talks(usb_label):
-    # rsync the master copy to the labelled USB
-
-    subprocess.run(['rsync', '--delete', '--archive', '/usb_master/', '/usbs/' + str(usb_label)])
-
-@click.command()
-@with_appcontext
-def all_talks():
-    """Make all talks USBs"""
-
-    # Make sure we only run one of these at a time
-    only_once_preventer = singleton.SingleInstance(flavor_id='all_talks')
-
-    completed_all_talks = set()
-    usb_label = 1
-    command = ''
-
-    # Initialise by scanning all USB ports and starting update runs for all connected drives with labels
-
-    ## Look at all the USBs that are currently plugged in
-    lsblk = subprocess.check_output(['lsblk', '-JO'], text=True)
-    all_disks = json.loads(lsblk)
-
-    p = Pool(24)
-
-    for usb in [x for x in all_disks['blockdevices'] if x['tran'] == 'usb']:
-        try:
-            with open(usb['children'][0]['mountpoint'] + '/label', 'r') as content_file:
-                usb_label = content_file.read()
-            p.apply_async(copy_all_talks(usb_label))
-        except (FileNotFoundError, TypeError):
-            print("Unlabelled USB found - please remove!")
-            sys.exit()
-
-    # Start a continuous loop, which waits for input at the end
-    while(command != 'quit'):
-        
-        lsblk = subprocess.check_output(['lsblk', '-JO'], text=True)
-        all_disks = json.loads(lsblk)
-
-        usb_label = command
-        
-        for usb in [x for x in all_disks['blockdevices'] if x['tran'] == 'usb']:
-            try:
-                with open(usb['children'][0]['mountpoint'] + '/label', 'r') as content_file:
-                    usb_label = content_file.read()
-                p.apply_async(copy_all_talks(usb_label))
-            except (FileNotFoundError, TypeError):
-                # If there isn't a label, then set up the disk and make one
-                if click.confirm('Please insert USB with label ' + usb_label):
-                    subprocess.run(['sudo', 'mount', '/dev/' + usb['kname'] + '1', '/usbs/' + str(usb_label)])
-                    subprocess.run(['sudo', 'chown', '-R', 'gbtalks:', '/usbs/' + str(usb_label), '-o', 'uid=1000,gid=1000,utf8,dmask=027,fmask=137'])
-                    file = open('/usbs/' + usb_label + '/label', 'w')
-                    file.write(str(usb_label))
-                    file.close()
-
-
-        ### For each one that has a label file, check the list of talks and filesizes against the proof list. Copy any files that are missing or the wrong size. Remove any files that shouldn't be there.
-
-        ### Check the list against the list of all talks that we know of. If the stick is complete, add it to the set of completed all talks stick
-
-        ### If there is one that doesn't have a label file, add one and then copy all the files that we have to the disk
-
-        ### If there is more than one without a label file, ask the user to take one out!
-
-
-
-        ## Ask for the ID of the next USB to be plugged in (default to most recent input +1), then end the loop iteration
-        print("Plug in a USB, enter its ID, then press Enter")
-        command = click.prompt("ID")
-
 
 
