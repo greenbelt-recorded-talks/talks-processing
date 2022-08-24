@@ -40,10 +40,9 @@ def process_talk(talk):
     # Add the top and tail, create a high-quality mp3
     hq_mp3 = top + AudioSegment.from_file(get_path_for_file(talk.id, "edited")) + tail
 
-    # Create a reduced-bitrate MP3 from the source MP3
+    # Export a WAV file of the top/tailed audio into /tmp for further processing
     hq_mp3.export('/tmp/toptailed' + str(talk.id) + '.wav',
-                    format='wav',
-                    parameters=["-f"])
+                    format='wav')
 
     # Normalise to a fixed level
     subprocess.call(['ffmpeg-normalize', '/tmp/toptailed' + str(talk.id) + '.wav',
@@ -93,7 +92,7 @@ def process_talk(talk):
 @click.command()
 @with_appcontext
 def convert_talks():
-    """Convert edited talks to lower-quality versions to save disk space"""
+    """Create production files (MP3 and CD) from edited files"""
 
     # Make sure we only run one of these at a time
     only_once_preventer = singleton.SingleInstance(flavor_id='convert_talks')
