@@ -50,6 +50,7 @@ def process_talk(talk):
                     '--loudness-range-target', '3',
                     '-t', '-13', '-f', '-ar', '44100'])
 
+    # Load the normalised file back in
     hq_mp3 = AudioSegment.from_file('/tmp/normalized' + str(talk.id) + '.wav')
 
     # Create a reduced-bitrate MP3 from the normalized file

@@ -1,4 +1,5 @@
 import csv
+import filetype
 from flask import request, redirect, url_for, render_template, make_response, send_from_directory, send_file
 from datetime import datetime, date, time, timedelta
 from flask import current_app as app
@@ -279,6 +280,28 @@ def getfile():
     talk_id = request.args.get("talk_id")
 
     return send_file(get_path_for_file(talk_id, file_type), as_attachment=True)
+
+
+@app.route('/upload_cover_image', methods=['POST'])
+def upload_cover_image():
+    """ Upload a new cover image, then redirect back to where you came from """
+
+    source_path = request.referrer.split("/")[-1]
+
+    if 'file' not in request.files:
+        flash('No file part')
+        return redirect(request.url)
+
+    file = request.files['file']
+
+    if file:
+        kind = filetype.guess(file.read(261))
+        if kind.extension == "png":
+            file.save(app.config["IMG_DIR"] + '/alltalksicon.png')
+        else:
+            flash("Must be a PNG")
+
+    return redirect(url_for(source_path))
 
 
 @app.route('/uploadtalk', methods=['POST'])

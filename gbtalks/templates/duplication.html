@@ -9,7 +9,33 @@
 
 ### Duplication
 
-This page provides instructions on how to use the duplication tools on the GB Talks server
+This page provides instructions on how to use the duplication tools on the GB Talks server. All duplication operations are carried out via SSH on the server. 
+{% endfilter %}
+</div>
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
+### Software Overview
+
+In `/home/gbtalks/talks-processing` there are two directories with duplication software in: `usb_tools` and `cd_tools`.
+
+In `usb_tools` you will find:
+
+* `count_connected_usbs.sh`: Tells you how many USB drives are connected
+* `make_all_talks_usbs.sh`: Turns all connected USB drives into all talks USBs
+* `make_single_all_talks_usb.sh`: Makes a single, specific USB drive into an all talks USB
+* `mount_all_usbs.sh`: Mounts all connected USB drives so that you can do other file operations on them
+* `preload_usbs.sh`: Turns all connected USB drives into all talks USBs with the files that we have so far
+
+In `cd_tools` you will find:
+* `checkfor.sh`: Checks that CD files are available for a particular talk
+* `makecd.sh`: Writes a specific talk to a specific drive
+* `whichdrive.sh`: Opens each CD drive in turn so that you can identify which drive is which
+
 {% endfilter %}
 </div>
 

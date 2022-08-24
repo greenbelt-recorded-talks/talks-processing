@@ -43,6 +43,29 @@ Uploading a file here will replace the existing one.
 <div class="uk-card uk-card-default uk-card-body">
 
 {% filter markdown %}
+### Upload Icon
+
+The icon is used as the cover image for MP3 files. It must be a square PNG, recommended 300x300 pixels. 
+
+Uploading a file here will replace the existing one.
+
+{% endfilter %}
+
+        <form action="upload_cover_image" method=post enctype=multipart/form-data>
+                <label for=file>File</label>
+                <input name=file type=file id=file accept=".png">
+                <button>Submit</button>
+        </form>
+
+
+</div>
+
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
 
 ### Replace Talks File
 

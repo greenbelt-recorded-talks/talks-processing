@@ -1,5 +1,6 @@
 blkinfo
 ffmpeg-normalize
+filetype
 Flask
 Flask-SQLAlchemy
 Flask-Login
