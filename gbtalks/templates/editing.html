@@ -5,10 +5,8 @@
 <h1 class="uk-heading-line uk-text-center"><span>Talks Editing</span></h1>
 
 
-<div class="uk-card uk-card-body uk-card-default">
+<div class="uk-card uk-card-body uk-card-default" style="display: none;">
 <h1> Editors </h1>
-
-Note that "Additional Talks" should be edited only when requested by the Team Leaders: they may not have been cleared for release
 
 <table>
 <tr>
@@ -50,6 +48,9 @@ Note that "Additional Talks" should be edited only when requested by the Team Le
 <div class="uk-card uk-card-body uk-card-default">
 
 <h1> Talks To Edit </h1>
+
+Note that "Additional Talks" (talks with IDs > 100) should be edited only when requested by the Team Leaders: they may not have been cleared for release
+
 <table>
 <tr>
 	<th>Talk ID</th>
@@ -60,7 +61,7 @@ Note that "Additional Talks" should be edited only when requested by the Team Le
 	<th>RAW file</th>
 	<th>Edited file</th>
 	<th>Snip File</th>
-	<th>Processed File</th>
+	<th>Upload</th>
 </tr>
 {% for talk in talks_to_edit %}
 <tr>
@@ -69,31 +70,29 @@ Note that "Additional Talks" should be edited only when requested by the Team Le
         <td>{{ talk.venue }}</td>
         <td>{{ talk.speaker }}</td>
         <td>{{ talk.title }}</td>
-	{% for file_type in 'raw','edited','snip','processed' %}
-
-	<td><form method=post action="uploadtalk" enctype=multipart/form-data>
+	<td><a href="{{ url_for('getfile', talk_id=talk.id, file_type='raw') }}">Download</a></td>
+	<form method=post action="upload_talk_and_snip" enctype=multipart/form-data>
+	{% for file_type in 'edited','snip' %}
+	<input type=hidden name=talk_id value="{{ talk.id }}">
+	<td>
 		<table>
-			<tr><td>{% if talk.id | string in raw_talks_available %} 
+			<tr><td>{% if talk.id in raw_talks_available %} 
 					<a href="{{ url_for('getfile', talk_id=talk.id, file_type='{{ file_type }}') }}">{{ file_type.title() }} File</a> {% endif %}</td></tr>
 			<tr><td>
-					<input type=hidden name=file_type value="{{ file_type }}">
-				<input type=hidden name=talk_id value="{{ talk.id }}">
-				<input type=file name=file>
+				<input type=file name={{ file_type }}file>
 			</td></tr>
-			<tr><td>
-				<input type=submit>
-				
-			</td></tr>
-		</table></form>
+		</table>
 	</td>
 	{% endfor %}
+	<td><input type=submit value="Upload"></td>
+	</form>
 </tr>
 {% endfor %}
 </table>
 
 </div>
 <hr class="uk-divider-icon">
-<div class="uk-card uk-card-body uk-card-default">
+<div class="uk-card uk-card-body uk-card-default" style="display: none;">
 {% filter markdown %}
 ## Upload New Editors File
 

@@ -235,6 +235,7 @@ def editing():
             
             db.session.add(editor)
             db.session.add(talk)
+            db.session.commit()
 
             return redirect(url_for('editing'))
 
@@ -248,24 +249,26 @@ def editing():
         if request.args.get("download_raw_talk"):
             return send_from_directory(app.config["RAW_UPLOAD_DIR"], filename=request.args["download_raw_talk"] + "_RAW.mp3" , as_attachment=True)
 
-    # Data on the current state of the talks files
-    raw_talks_available = [x.name.split("_")[0] for x in os.scandir(app.config['RAW_UPLOAD_DIR']) if x.name.endswith("_RAW.mp3")] 
-    edited_talks_available = [x.name.split("_")[0] for x in os.scandir(app.config['EDITED_UPLOAD_DIR']) if x.name.endswith("_EDITED.mp3")]
-    processed_talks_available = [x.name.split("_")[0] for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith("_PROCESSED.mp3")]
-    snips_available = [x.name.split("_")[0] for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith("_SNIP.mp3")]
+
+    gb_year = str(app.config['GB_FRIDAY'][2:4])
+    gb_prefix = "gb" + gb_year + "-"
+
+    raw_files = set([x.name.replace('_RAW.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['RAW_UPLOAD_DIR']) if x.name.endswith('RAW.mp3')]) or set()
+    edited_files = set([x.name.replace('_EDITED.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['EDITED_UPLOAD_DIR']) if x.name.endswith('EDITED.mp3')]) or set()
+    processed_files = set([x.name.replace('mp3.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith('mp3.mp3')]) or set()
+    snip_files = set([x.name.replace('_SNIP.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith('SNIP.mp3')]) or set()
     
-    # Talks that need editing
-    talks_to_edit = Talk.query.filter(Talk.editor_name==None).filter(Talk.id.in_(raw_talks_available))
+    talks_to_edit = Talk.query.filter(Talk.id.in_(set(raw_files.difference(edited_files))))
     
     # - A way for someone to download raw files, assign a talk to an editor, upload the edited files
     editors = Editor.query.all()
     return render_template("editing.html", 
             editors=editors, 
             talks_to_edit=talks_to_edit, 
-            raw_talks_available=raw_talks_available, 
-            edited_talks_available=edited_talks_available, 
-            processed_talks_available=processed_talks_available, 
-            snips_available=snips_available)
+            raw_talks_available=raw_files, 
+            edited_talks_available=edited_files, 
+            processed_talks_available=processed_files, 
+            snips_available=snip_files)
 
 
 @app.route('/getfile', methods=['GET'])
@@ -298,3 +301,30 @@ def uploadtalk():
 
     return redirect(url_for(source_path))
 
+
+@app.route('/upload_talk_and_snip', methods=['POST'])
+def upload_talk_and_snip():
+    """ Upload a talk and snip file together, then redirect back to where you came from """
+
+    talk_id = request.form.get("talk_id")
+
+    source_path = request.referrer.split("/")[-1]
+
+    if 'snipfile' not in request.files:
+        flash('No snip file')
+        return redirect(request.url)
+
+    if 'editedfile' not in request.files:
+        flash('No edited file')
+        return redirect(request.url)
+
+    snipfile = request.files['snipfile']
+    editedfile = request.files['editedfile']
+
+    if snipfile and editedfile:
+        snipfile.save(os.path.join(get_path_for_file(talk_id, 'snip')))
+        editedfile.save(os.path.join(get_path_for_file(talk_id, 'edited')))
+    else:
+        flash("Something went wrong! Check the logs")
+
+    return redirect(url_for(source_path))
