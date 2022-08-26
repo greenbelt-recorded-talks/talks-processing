@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h1 class="uk-heading-line uk-text-center"><span>Talks Front Desk</span></h1>
+
+<div class="uk-card uk-card-body uk-card-default">
+
+<h1> Front Desk </h1>
+
+The talks below are the ones that have started, but that RAW files haven't yet been uploaded for.
+
+<table>
+<tr>
+	<th>Talk ID</th>
+	<th>Time</th>
+        <th>Venue</th>
+        <th>Speaker</th>
+        <th>Title</th>
+	<th>Upload</th>
+</tr>
+{% for talk in talks_to_upload %}
+{% if talk.id not in raw_talks_available %}
+<tr>
+	<td>{{ talk.id }}</td>
+        <td>{{ talk.start_time }}</td>
+        <td>{{ talk.venue }}</td>
+        <td>{{ talk.speaker }}</td>
+        <td>{{ talk.title }}</td>
+	<td>
+		<form method=post enctype=multipart/form-data name=upload_talk action=uploadtalk>
+                	<input name=file type=file id=file accept=".mp3">
+                        <input name=file_type type=hidden value="raw">
+                        <input name=talk_id type=hidden value="{{talk.id}}">
+                        <button>Upload</button>
+                </form>
+	</td>
+	</form>
+</tr>
+{% endif %}
+{% endfor %}
+</table>
+
+</div>
+<hr class="uk-divider-icon">
+<div class="uk-card uk-card-body uk-card-default" style="display: none;">
+{% filter markdown %}
+## Upload New Editors File
+
+Upload a CSV file containing the names of the editors. Each line in the file should contain: Editor name.
+
+Example:
+
+
+        "Gandalf"
+        "Gloin"
+        "Elrond"
+
+When you upload the file, all previous editors and assignments will be deleted.
+{% endfilter %}
+
+<form method=post enctype=multipart/form-data>
+        <label for=file>File</label>
+        <input name=file type=file id=file accept=".csv">
+        <input name=form_name type=hidden value=upload_editors_list>
+        <button>Submit</button>
+</form>
+</div>
+
+{% endblock %}
+
+

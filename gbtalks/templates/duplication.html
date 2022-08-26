@@ -58,8 +58,9 @@ To burn CDs for talks:
 * Make sure that you know which CD drive has which number (if they have stickers on, it's a good bet they're right)
 * Log in to the server via SSH (instructions for this will be provided separately - talk to the team leaders)
 * Put the CD in the drive
-* run: `cd /home/gbtalks/talks-processing/cd_tools`
-* To write (for example) talk gb22-99 to drive 1, run: `./makecd.sh 99 1` 
+* To write (for example) talk gb22-99 to drive 1, run: `sudo /home/gbtalks/talks-processing/cd_tools/makecd.sh 99 1` 
+
+If prompted for a password, it's gbtalks
 
 If it works, after a few minutes, the drive will eject and you'll see a message saying `TALK GB22-99 WRITTEN TO DRIVE 1". 
 If it hasn't worked, you'll see a load of error messages go past. Talk to Rob if this happens! 

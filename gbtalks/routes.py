@@ -199,7 +199,27 @@ def recorders():
 
     recorders = Recorder.query.all()
     return render_template("recorders.html", recorders=recorders)
-                
+
+
+@app.route('/front_desk', methods=['GET','POST'])
+def front_desk():
+    """ Management functions for front desk """
+
+    gb_year = str(app.config['GB_FRIDAY'][2:4])
+    gb_prefix = "gb" + gb_year + "-"                
+    
+    raw_files = set([int(x.name.replace('_RAW.mp3','').replace(gb_prefix,'')) for x in os.scandir(app.config['RAW_UPLOAD_DIR']) if x.name.endswith('RAW.mp3')]) or set()
+
+    past_horizon = datetime.now() + timedelta(hours = 1)
+
+    talks_to_upload = Talk.query.filter(Talk.start_time < past_horizon)
+
+    # - A way for someone to download raw files, assign a talk to an editor, upload the edited files
+    editors = Editor.query.all()
+    return render_template("front_desk.html",
+            talks_to_upload=talks_to_upload,
+            raw_talks_available=raw_files)
+
 
 @app.route('/editing', methods=['GET','POST'])
 def editing():
