@@ -1,2 +1,1 @@
-cd /storage/cds/gb22-$1
-ls
+cd /storage/cds/gb22-$1 && ls

@@ -79,8 +79,8 @@ def talks():
                     for talk_line in talksreader:
                         start_time = start_time_of_talk(talk_line[2], talk_line[3])
                         end_time = start_time + timedelta(hours=1)
-                        is_priority = True if talk_line[10] == "Yes" else False
-                        is_rotaed = True if talk_line[11] == "Yes" else False
+                        is_priority = True if talk_line[8] == "Yes" else False
+                        is_rotaed = True if talk_line[9] == "Yes" else False
                         talk = Talk(id=talk_line[0].split('-')[1], 
                                 title=talk_line[4],
                                 description=talk_line[7],
