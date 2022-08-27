@@ -3,6 +3,7 @@ import filetype
 from flask import request, redirect, url_for, render_template, make_response, send_from_directory, send_file
 from datetime import datetime, date, time, timedelta
 from flask import current_app as app
+from sqlalchemy import desc, asc
 from .models import db, Talk, Recorder, Editor
 from werkzeug.utils import secure_filename
 import os
@@ -100,7 +101,7 @@ def talks():
 
     show_additional_talks = True if request.args.get("show_additional_talks") == "true" else False
 
-    talks = Talk.query.all()
+    talks = Talk.query.order_by(asc(Talk.start_time)).all()
     raw_files = [x.name for x in os.scandir(app.config['RAW_UPLOAD_DIR'])]
     edited_files = [x.name for x in os.scandir(app.config['EDITED_UPLOAD_DIR'])]
     processed_files = [x.name for x in os.scandir(app.config['PROCESSED_DIR'])]
@@ -214,8 +215,6 @@ def front_desk():
 
     talks_to_upload = Talk.query.filter(Talk.start_time < past_horizon)
 
-    # - A way for someone to download raw files, assign a talk to an editor, upload the edited files
-    editors = Editor.query.all()
     return render_template("front_desk.html",
             talks_to_upload=talks_to_upload,
             raw_talks_available=raw_files)
@@ -279,7 +278,7 @@ def editing():
     processed_files = set([x.name.replace('mp3.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith('mp3.mp3')]) or set()
     snip_files = set([x.name.replace('_SNIP.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith('SNIP.mp3')]) or set()
     
-    talks_to_edit = Talk.query.filter(Talk.id.in_(set(raw_files.difference(edited_files))))
+    talks_to_edit = Talk.query.filter(Talk.id.in_(set(raw_files.difference(edited_files)))).order_by(asc(Talk.start_time))
     
     # - A way for someone to download raw files, assign a talk to an editor, upload the edited files
     editors = Editor.query.all()
