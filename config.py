@@ -24,7 +24,7 @@ class Config:
         "TOP_TAIL_DIR": "/home/gbtalks/top_tail",
         "IMG_DIR": "/home/gbtalks/images",
         "USB_GOLD_DIR": "/home/gbtalks/usb_gold"
-    }:
+    }.items():
         setattr(self, envvar, os.getenv(envvar, default))
 
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/storage/uploads")
