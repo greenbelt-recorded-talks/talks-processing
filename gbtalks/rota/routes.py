@@ -123,20 +123,20 @@ def clear_rota():
 def rota():
     """Define a rota"""
 
-    app.logger.error("Generating a rota")
 
     talks = Talk.query.filter(Talk.is_priority==True).order_by(Talk.start_time)
     recorders = Recorder.query.all()
+
+    app.logger.error("Generating a rota for " + str(len(talks)) + "talks")
+
 
     if request.method == 'POST':
         # If we've been asked to make a new rota, clear out the old one
         clear_rota()
 
-    import pprint
-
     for talk in talks:
 
-        app.logger.error("Finding a recorder for " talk)
+        app.logger.error("Finding a recorder for " + talk)
 
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
