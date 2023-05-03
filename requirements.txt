@@ -8,5 +8,6 @@ Flask-Markdown
 flake8
 mutagen
 pydub
+python-dotenv
 tendo
 uwsgi
