@@ -14,7 +14,7 @@ def talk_would_clash(recorder, talk):
     # A talk clashes if it starts while the recorder is currently recording, or within 20 mins of another talk ending
 
     for existing_talk in recorder.talks:
-        pprint.pprint("Comparing")
+        rota_blueprint.logger.info("Comparing")
         pprint.pprint(talk)
         pprint.pprint(existing_talk)
         if (existing_talk.start_time <= talk.start_time <= (existing_talk.end_time + timedelta(minutes=20))
