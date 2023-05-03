@@ -14,44 +14,31 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = os.getenv("SQLALCHEMY_TRACK_MODIFICATIONS")
 
     # Files
-    for envvar, default in {
-        "UPLOAD_DIR": "/storage/uploads",
-    	"RAW_UPLOAD_DIR": "/storage/uploads",
-    	"EDITED_UPLOAD_DIR": "/storage/uploads",
-        "PROCESSED_DIR": "/storage/processed",
-        "CD_DIR": "/storage/cds",
-        "SNIP_DIR": "/storage/processed",
-        "TOP_TAIL_DIR": "/home/gbtalks/top_tail",
-        "IMG_DIR": "/home/gbtalks/images",
-        "USB_GOLD_DIR": "/home/gbtalks/usb_gold"
-    }.items():
-        setattr(Config, envvar, os.getenv(envvar, default))
-
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/storage/uploads")
-    RAW_UPLOAD_DIR = "/storage/uploads"
-    EDITED_UPLOAD_DIR = "/storage/uploads"
-    PROCESSED_DIR = "/storage/processed"
-    CD_DIR = "/storage/cds"
-    SNIP_DIR = "/storage/processed"
-    TOP_TAIL_DIR = "/home/gbtalks/top_tail"
-    IMG_DIR = "/home/gbtalks/images"
-    USB_GOLD_DIR = "/home/gbtalks/usb_gold"
+    RAW_UPLOAD_DIR = os.getenv("RAW_UPLOAD_DIR", "/storage/uploads")
+    EDITED_UPLOAD_DIR = os.getenv("EDITED_UPLOAD_DIR", "/storage/uploads")
+    PROCESSED_DIR = os.getenv("PROCESSED_DIR", "/storage/processed")
+    CD_DIR = os.getenv("CD_DIR", "/storage/cds")
+    SNIP_DIR = os.getenv("SNIP_DIR", "/storage/processed")
+    TOP_TAIL_DIR = os.getenv("TOP_TAIL_DIR", "/home/gbtalks/top_tail")
+    IMG_DIR = os.getenv("IMG_DIR", "/home/gbtalks/images")
+    USB_GOLD_DIR = os.getenv("USB_GOLD_DIR", "/home/gbtalks/usb_gold")
 
     TALKS_DIRS = {
         "raw": {
-            "directory": "/storage/uploads",
+            "directory": RAW_UPLOAD_DIR,
             "suffix": "_RAW"
             },
         "edited":{
-            "directory": "/storage/uploads",
+            "directory": EDITED_UPLOAD_DIR,
             "suffix": "_EDITED"
             },
         "processed": {
-            "directory": "/storage/processed",
+            "directory": PROCESSED_DIR,
             "suffix": "mp3"
             },
         "snip": {
-            "directory": "/storage/processed",
+            "directory": SNIP_DIR,
             "suffix": "_SNIP"
             }
     }
