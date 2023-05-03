@@ -25,7 +25,7 @@ class Config:
         "IMG_DIR": "/home/gbtalks/images",
         "USB_GOLD_DIR": "/home/gbtalks/usb_gold"
     }.items():
-        setattr(self, envvar, os.getenv(envvar, default))
+        setattr(Config, envvar, os.getenv(envvar, default))
 
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/storage/uploads")
     RAW_UPLOAD_DIR = "/storage/uploads"
