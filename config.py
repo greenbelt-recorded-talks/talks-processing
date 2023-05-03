@@ -9,8 +9,7 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY')
 
     # Database
-    SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI")
-    SQLALCHEMY_DATABASE_URI = "sqlite:///gbtalks.sqlite"
+    SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///gbtalks.sqlite")
     SQLALCHEMY_TRACK_MODIFICATIONS = os.getenv("SQLALCHEMY_TRACK_MODIFICATIONS")
 
     # Files
