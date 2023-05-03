@@ -127,7 +127,7 @@ def rota():
     talks = Talk.query.filter(Talk.is_priority==True).order_by(Talk.start_time)
     recorders = Recorder.query.all()
 
-    app.logger.error("Generating a rota for " + str(len(talks)) + "talks")
+    app.logger.error("Generating a rota for " + str(talks.count()) + " talks")
 
 
     if request.method == 'POST':
