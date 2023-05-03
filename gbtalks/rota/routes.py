@@ -5,7 +5,6 @@ from datetime import datetime, date, time, timedelta
 from flask import current_app as app
 from gbtalks.models import db, Talk, Recorder
 import random
-import pprint
 
 shift_length = 3
 break_between_shifts = 3
@@ -124,6 +123,8 @@ def clear_rota():
 def rota():
     """Define a rota"""
 
+    app.logger.error("Generating a rota")
+
     talks = Talk.query.filter(Talk.is_priority==True).order_by(Talk.start_time)
     recorders = Recorder.query.all()
 
@@ -134,6 +135,8 @@ def rota():
     import pprint
 
     for talk in talks:
+
+        app.logger.error("Finding a recorder for " talk)
 
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
