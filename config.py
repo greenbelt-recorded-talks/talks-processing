@@ -4,7 +4,7 @@ class Config:
     """Set Flask configuration vars from .env file."""
 
     # General
-    TESTING = os.getenv("TESTING") 
+    TESTING = os.getenv("TESTING")
     FLASK_DEBUG = os.getenv("FLASK_DEBUG")
     SECRET_KEY = os.getenv('SECRET_KEY')
 
@@ -14,7 +14,20 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = os.getenv("SQLALCHEMY_TRACK_MODIFICATIONS")
 
     # Files
-    UPLOAD_DIR = "/storage/uploads"
+    for envvar, default in {
+        "UPLOAD_DIR": "/storage/uploads",
+    	"RAW_UPLOAD_DIR": "/storage/uploads",
+    	"EDITED_UPLOAD_DIR": "/storage/uploads",
+        "PROCESSED_DIR": "/storage/processed",
+        "CD_DIR": "/storage/cds",
+        "SNIP_DIR": "/storage/processed",
+        "TOP_TAIL_DIR": "/home/gbtalks/top_tail",
+        "IMG_DIR": "/home/gbtalks/images",
+        "USB_GOLD_DIR": "/home/gbtalks/usb_gold"
+    }:
+        setattr(self, envvar, os.getenv(envvar, default))
+
+    UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/storage/uploads")
     RAW_UPLOAD_DIR = "/storage/uploads"
     EDITED_UPLOAD_DIR = "/storage/uploads"
     PROCESSED_DIR = "/storage/processed"
