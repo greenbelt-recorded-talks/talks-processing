@@ -11,3 +11,6 @@ pydub
 python-dotenv
 tendo
 uwsgi
+requests
+oauthlib
+pyOpenSSL
