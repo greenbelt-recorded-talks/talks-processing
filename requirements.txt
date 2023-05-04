@@ -2,6 +2,7 @@ blkinfo
 ffmpeg-normalize
 filetype
 Flask
+Flask-Dance[sqla]
 Flask-SQLAlchemy
 Flask-Login
 Flask-Markdown
@@ -11,6 +12,3 @@ pydub
 python-dotenv
 tendo
 uwsgi
-requests
-oauthlib
-pyOpenSSL
