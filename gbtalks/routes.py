@@ -370,3 +370,10 @@ def upload_talk_and_snip():
         flash("Something went wrong! Check the logs")
 
     return redirect(url_for(source_path))
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    flash("You have logged out")
+    return redirect(url_for("index"))
