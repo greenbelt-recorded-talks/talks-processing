@@ -53,11 +53,13 @@ def start_time_of_talk(day, time):
 
 
 @app.route('/', methods=['GET'])
+@login_required
 def index():
     return redirect('talks')
 
 
 @app.route('/talks', methods=['GET','POST'])
+@login_required
 def talks():
     """View talks in the database, replace the talks list, upload files for talks"""
 
@@ -120,6 +122,7 @@ def talks():
 
 
 @app.route('/setup', methods=['GET'])
+@login_required
 def setup():
     """Various setup functions"""
 
@@ -127,6 +130,7 @@ def setup():
 
 
 @app.route('/put_alltalks_pdf', methods=['POST'])
+@login_required
 def put_alltalks_pdf():
     """Upload the all talks PDF to the USB gold copy"""
 
@@ -144,6 +148,7 @@ def put_alltalks_pdf():
 
 
 @app.route('/create_alltalks_gold', methods=['POST'])
+@login_required
 def create_alltalks_gold():
     """Create the alltalks USB Gold copy"""
 
@@ -152,6 +157,7 @@ def create_alltalks_gold():
 
 
 @app.route('/copy_all_talks', methods=['POST'])
+@login_required
 def copy_all_talks():
     """Copy the USB gold copy on to every connected USB drive"""
 
@@ -161,12 +167,14 @@ def copy_all_talks():
     # Then, spawn a bunch of children to do some rsyncing 
 
 @app.route('/duplication', methods=['GET'])
+@login_required
 def duplication():
     """Functions and instructions for the duplication team"""
 
     return render_template("duplication.html")
 
 @app.route('/recorders', methods=['GET','POST'])
+@login_required
 def recorders():
     """View or add recorders to the database"""
 
@@ -204,6 +212,7 @@ def recorders():
 
 
 @app.route('/front_desk', methods=['GET','POST'])
+@login_required
 def front_desk():
     """ Management functions for front desk """
 
@@ -222,6 +231,7 @@ def front_desk():
 
 
 @app.route('/editing', methods=['GET','POST'])
+@login_required
 def editing():
     """ Where editors obtain and upload files """
 
@@ -293,6 +303,7 @@ def editing():
 
 
 @app.route('/getfile', methods=['GET'])
+@login_required
 def getfile():
     """ Download a talk file """
 
@@ -303,6 +314,7 @@ def getfile():
 
 
 @app.route('/upload_cover_image', methods=['POST'])
+@login_required
 def upload_cover_image():
     """ Upload a new cover image, then redirect back to where you came from """
 
@@ -325,6 +337,7 @@ def upload_cover_image():
 
 
 @app.route('/uploadtalk', methods=['POST'])
+@login_required
 def uploadtalk():
     """ Upload a talk file, then redirect back to where you came from """
 
@@ -346,6 +359,7 @@ def uploadtalk():
 
 
 @app.route('/upload_talk_and_snip', methods=['POST'])
+@login_required
 def upload_talk_and_snip():
     """ Upload a talk and snip file together, then redirect back to where you came from """
 
