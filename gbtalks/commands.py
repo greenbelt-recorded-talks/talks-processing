@@ -135,4 +135,9 @@ def burn_cd(talk_id, cd_index, cd_writer):
     cd_files = talk_cd_files[::15][cd_index]
     subprocess.call(['wodim', 'dev=/dev/sg' + cd_writer, '-dao' , '-pad', '-audio', '-eject', cd_files])
 
-
+@click.command(name="createdb")
+@with_appcontext
+def create_db():
+    db.create_all()
+    db.session.commit()
+    print("Database tables created")

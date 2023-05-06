@@ -10,7 +10,7 @@ class Config:
 
     # Database
     SQLALCHEMY_DATABASE_URI = os.getenv("SQLALCHEMY_DATABASE_URI", "sqlite:///gbtalks.sqlite")
-    SQLALCHEMY_TRACK_MODIFICATIONS = os.getenv("SQLALCHEMY_TRACK_MODIFICATIONS")
+    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # Files
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/storage/uploads")
@@ -45,3 +45,8 @@ class Config:
     # Greenbelt
     GB_FRIDAY = "2022-08-26"
     GB_SHORT_YEAR = GB_FRIDAY[2:4]
+
+    # Login
+
+    GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
+    GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET")
