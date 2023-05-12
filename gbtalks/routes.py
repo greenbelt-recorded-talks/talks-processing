@@ -128,6 +128,7 @@ def talks():
 
 
 @app.route('/setup', methods=['GET'])
+@current_user_is_team_leader
 @login_required
 def setup():
     """Various setup functions"""
