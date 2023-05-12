@@ -4,6 +4,7 @@ from flask import flash, request, redirect, url_for, render_template, make_respo
 from datetime import datetime, date, time, timedelta
 from flask import current_app as app
 from flask_login import login_required, logout_user
+from functools import wraps
 from sqlalchemy import desc, asc
 from .models import db, Talk, Recorder, Editor
 from werkzeug.utils import secure_filename
@@ -51,12 +52,16 @@ def start_time_of_talk(day, time):
     return datetime.combine(day_of_talk, time_of_talk)
 
 def current_user_is_team_leader(func):
-    def inner():
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        """A wrapper function"""
         if not current_user.email in TEAM_LEADERS_EMAILS:
             return current_app.login_manager.unauthorized()
         else:
             pass
-
+        
+        func()
+    return wrapper
 
 @app.route('/', methods=['GET'])
 @login_required
