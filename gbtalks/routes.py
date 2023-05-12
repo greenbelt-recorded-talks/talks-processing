@@ -4,6 +4,7 @@ from flask import flash, request, redirect, url_for, render_template, make_respo
 from datetime import datetime, date, time, timedelta
 from flask import current_app as app
 from flask_login import login_required, logout_user
+from flask_login.utils import _get_user 
 from functools import wraps
 from sqlalchemy import desc, asc
 from .models import db, Talk, Recorder, Editor
