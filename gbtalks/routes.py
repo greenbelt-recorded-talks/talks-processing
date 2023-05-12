@@ -59,13 +59,11 @@ def start_time_of_talk(day, time):
 def current_user_is_team_leader(func):
     @wraps(func)
     def wrapper(*args, **kwargs):
-        """A wrapper function"""
+        """Make sure that the user is on the list of team leaders"""
         if not current_user.email in app.config["TEAM_LEADERS_EMAILS"]:
             return current_app.login_manager.unauthorized()
-        else:
-            pass
         
-        func()
+        return func(*args, **kwds)
     return wrapper
 
 @app.route('/', methods=['GET'])
