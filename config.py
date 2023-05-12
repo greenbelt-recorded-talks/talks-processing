@@ -50,3 +50,7 @@ class Config:
 
     GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")
     GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET")
+
+    # Team leaders perms (update on server)
+
+    TEAM_LEADERS_EMAILS = {'alice@example.com','bob@example.com'}
