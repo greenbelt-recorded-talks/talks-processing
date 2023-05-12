@@ -8,6 +8,7 @@ from functools import wraps
 from sqlalchemy import desc, asc
 from .models import db, Talk, Recorder, Editor
 from werkzeug.utils import secure_filename
+from werkzeug.local import LocalProxy
 import os
 import random 
 import sys
