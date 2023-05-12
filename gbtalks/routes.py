@@ -50,6 +50,12 @@ def start_time_of_talk(day, time):
             time_of_talk = datetime.strptime(time, '%H:%M').time()
     return datetime.combine(day_of_talk, time_of_talk)
 
+def current_user_is_team_leader(func):
+    def inner():
+        if not current_user.email in TEAM_LEADERS_EMAILS:
+            return current_app.login_manager.unauthorized()
+        else:
+            pass
 
 
 @app.route('/', methods=['GET'])
@@ -131,6 +137,7 @@ def setup():
 
 @app.route('/put_alltalks_pdf', methods=['POST'])
 @login_required
+@current_user_is_team_leader
 def put_alltalks_pdf():
     """Upload the all talks PDF to the USB gold copy"""
 
