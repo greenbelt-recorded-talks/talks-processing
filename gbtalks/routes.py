@@ -63,7 +63,7 @@ def current_user_is_team_leader(func):
         if not current_user.email in app.config["TEAM_LEADERS_EMAILS"]:
             return current_app.login_manager.unauthorized()
         
-        return func(*args, **kwds)
+        return func(*args, **kwargs)
     return wrapper
 
 @app.route('/', methods=['GET'])
