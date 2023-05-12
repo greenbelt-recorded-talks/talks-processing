@@ -13,6 +13,9 @@ import random
 import sys
 import pprint
 
+# current_user is a proxy for the current user
+current_user = LocalProxy(lambda: _get_user())
+
 def get_path_for_file(talk_id, file_type):
     path = app.config["TALKS_DIRS"][file_type]["directory"] + \
         "/gb" + \
