@@ -28,13 +28,6 @@
         </div>
 	<div>
             <ul class="uk-subnav uk-subnav-pill" uk-margin>
-                <li>Snip</li>
-                <li uk-filter-control="filter: [data-has-snip='false']; group: snip"><a href="#">No</a></li>
-                <li uk-filter-control="filter: [data-has-snip='true']; group: snip"><a href="#">Yes</a></li>
-            </ul>
-        </div>
-	<div>
-            <ul class="uk-subnav uk-subnav-pill" uk-margin>
 		<li>Processed</li>
                 <li uk-filter-control="filter: [data-has-processed='false']; group: processed"><a href="#">No</a></li>
                 <li uk-filter-control="filter: [data-has-processed='true']; group: processed"><a href="#">Yes</a></li>
@@ -55,12 +48,11 @@
 
 {% set has_raw = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+ "_RAW.mp3" in raw_files else "false" %}
 {% set has_edited = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_EDITED.mp3" in edited_files else "false" %}
-{% set has_snip = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_SNIP.mp3" in snip_files else "false" %}
 {% set has_processed = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"mp3.mp3" in processed_files else "false" %}
 {% set is_priority = "true" if talk["is_priority"] else "false" %} 
 
 
-<li class="uk-card uk-card-body uk-card-default" data-has-raw="{{ has_raw }}" data-has-edited="{{ has_edited }}" data-has-snip="{{ has_snip }}" data-has-processed="{{ has_processed }}" data-priority="{{ is_priority }}" >
+<li class="uk-card uk-card-body uk-card-default" data-has-raw="{{ has_raw }}" data-has-edited="{{ has_edited }}" data-has-processed="{{ has_processed }}" data-priority="{{ is_priority }}" >
 	<div class="uk-width-1-1">
 		<h3 class="uk-card-title">{{ 'gb' + gb_year + '-' + ('%03d' % talk.id) }}: {{ talk.title }}</h3>
 		<span class="uk-text-default uk-text-bold">{{ talk.speaker }}:</span>
@@ -97,21 +89,6 @@
                 			<input name=file_type type=hidden value="edited">
                 			<input name=talk_id type=hidden value="{{talk.id}}">
                 			<button>Upload</button>
-        			</form>
-			</div>
-    		</div>
-    		<div>
-        		<div class="uk-card uk-card-default uk-card-body">
-				<span>Snip</span>
-				{% if has_snip == "true" %}
-        			<p><a href="{{ url_for("getfile", file_type="snip", talk_id=talk.id) }}">Download</a></p>
-        			{% endif %}
-
-        			<form method=post enctype=multipart/form-data name=upload_snip action=uploadtalk>
-                			<input name=file type=file id=file accept=".mp3">
-        	        		<input name=file_type type=hidden value="snip">
-                			<input name=talk_id type=hidden value="{{talk.id}}">
-     	        			<button>Upload</button>
         			</form>
 			</div>
     		</div>

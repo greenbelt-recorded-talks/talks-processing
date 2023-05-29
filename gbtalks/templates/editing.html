@@ -60,7 +60,6 @@ Note that "Additional Talks" (talks with IDs > 100) should be edited only when r
         <th>Title</th>
 	<th>RAW file</th>
 	<th>Edited file</th>
-	<th>Snip File</th>
 	<th>Upload</th>
 </tr>
 {% for talk in talks_to_edit %}
@@ -71,19 +70,17 @@ Note that "Additional Talks" (talks with IDs > 100) should be edited only when r
         <td>{{ talk.speaker }}</td>
         <td>{{ talk.title }}</td>
 	<td><a href="{{ url_for('getfile', talk_id=talk.id, file_type='raw') }}">Download</a></td>
-	<form method=post action="upload_talk_and_snip" enctype=multipart/form-data>
-	{% for file_type in 'edited','snip' %}
+	<form method=post action="upload_talk" enctype=multipart/form-data>
 	<input type=hidden name=talk_id value="{{ talk.id }}">
 	<td>
 		<table>
 			<tr><td>{% if talk.id in raw_talks_available %} 
-					<a href="{{ url_for('getfile', talk_id=talk.id, file_type='{{ file_type }}') }}">{{ file_type.title() }} File</a> {% endif %}</td></tr>
+					<a href="{{ url_for('getfile', talk_id=talk.id, file_type='edited') }}">Edited File</a> {% endif %}</td></tr>
 			<tr><td>
-				<input type=file name={{ file_type }}file>
+				<input type=file name=editedfile>
 			</td></tr>
 		</table>
 	</td>
-	{% endfor %}
 	<td><input type=submit value="Upload"></td>
 	</form>
 </tr>

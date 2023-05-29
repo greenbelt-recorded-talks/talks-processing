@@ -18,7 +18,6 @@ class Config:
     EDITED_UPLOAD_DIR = os.getenv("EDITED_UPLOAD_DIR", "/storage/uploads")
     PROCESSED_DIR = os.getenv("PROCESSED_DIR", "/storage/processed")
     CD_DIR = os.getenv("CD_DIR", "/storage/cds")
-    SNIP_DIR = os.getenv("SNIP_DIR", "/storage/processed")
     TOP_TAIL_DIR = os.getenv("TOP_TAIL_DIR", "/home/gbtalks/top_tail")
     IMG_DIR = os.getenv("IMG_DIR", "/home/gbtalks/images")
     USB_GOLD_DIR = os.getenv("USB_GOLD_DIR", "/home/gbtalks/usb_gold")
@@ -35,10 +34,6 @@ class Config:
         "processed": {
             "directory": PROCESSED_DIR,
             "suffix": "mp3"
-            },
-        "snip": {
-            "directory": SNIP_DIR,
-            "suffix": "_SNIP"
             }
     }
 

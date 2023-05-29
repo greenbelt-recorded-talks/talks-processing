@@ -102,23 +102,12 @@ def convert_talks():
     gb_prefix = "gb" + gb_year + "-"
 
     # Work out which files need to be converted by looking at the filesystem
-    # If a talk has an edited file and a snip, but no converted file, convert it!
+    # If a talk has an edited file but no converted file, convert it!
 
     edited_files = set([x.name.replace('_EDITED.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['EDITED_UPLOAD_DIR']) if x.name.endswith('EDITED.mp3')]) or set()
     processed_files = set([x.name.replace('mp3.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['PROCESSED_DIR']) if x.name.endswith('mp3.mp3')]) or set()
-    snip_files = set([x.name.replace('_SNIP.mp3','').replace(gb_prefix,'') for x in os.scandir(app.config['SNIP_DIR']) if x.name.endswith('SNIP.mp3')]) or set()
 
-    # If there are any snips that don't have edited files, or edited files that don't have snips, skip over them and error
-
-    edited_without_snip = set(edited_files.difference(snip_files))
-    snip_without_edited = set(snip_files.difference(edited_files))
-    exclude_list = set(edited_without_snip|snip_without_edited)
-
-    if len(exclude_list) > 0:
-        print("Excluded due to snip without edited file, or edited file without snip:", exclude_list)
-
-    talks = edited_files.union(snip_files)
-    talks.difference_update(exclude_list)
+    talks = edited_files
     talks.difference_update(processed_files)
 
     talks_to_process = [Talk.query.get(x) for x in list(talks)] or []
