@@ -381,29 +381,6 @@ def uploadtalk():
     return redirect(url_for(source_path))
 
 
-@app.route('/upload_talk', methods=['POST'])
-@login_required
-@current_user_is_team_leader
-def upload_talk():
-    """ Upload a talk file, then redirect back to where you came from """
-
-    talk_id = request.form.get("talk_id")
-
-    source_path = request.referrer.split("/")[-1]
-
-    if 'editedfile' not in request.files:
-        flash('No edited file')
-        return redirect(request.url)
-
-    editedfile = request.files['editedfile']
-
-    if editedfile:
-        editedfile.save(os.path.join(get_path_for_file(talk_id, 'edited')))
-    else:
-        flash("Something went wrong! Check the logs")
-
-    return redirect(url_for(source_path))
-
 @app.route("/logout")
 @login_required
 def logout():

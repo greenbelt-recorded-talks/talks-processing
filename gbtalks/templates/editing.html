@@ -70,8 +70,9 @@ Note that "Additional Talks" (talks with IDs > 100) should be edited only when r
         <td>{{ talk.speaker }}</td>
         <td>{{ talk.title }}</td>
 	<td><a href="{{ url_for('getfile', talk_id=talk.id, file_type='raw') }}">Download</a></td>
-	<form method=post action="upload_talk" enctype=multipart/form-data>
+	<form method=post action="uploadtalk" enctype=multipart/form-data>
 	<input type=hidden name=talk_id value="{{ talk.id }}">
+        <input name=file_type type=hidden value="edited">
 	<td>
 		<table>
 			<tr><td>{% if talk.id in raw_talks_available %} 
