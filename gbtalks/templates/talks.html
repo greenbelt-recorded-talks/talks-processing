@@ -81,6 +81,7 @@
         		<div class="uk-card uk-card-default uk-card-body">
 				<span>Edited</span>
 				{% if has_edited == "true" %}
+				<p><audio controls src="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}"></audio></p>
         			<p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
         			{% endif %}
 
