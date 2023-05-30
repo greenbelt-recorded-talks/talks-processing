@@ -18,6 +18,7 @@ import pprint
 # current_user is a proxy for the current user
 current_user = LocalProxy(lambda: _get_user())
 
+
 def get_path_for_file(talk_id, file_type):
     path = app.config["TALKS_DIRS"][file_type]["directory"] + \
         "/gb" + \
@@ -27,10 +28,9 @@ def get_path_for_file(talk_id, file_type):
         app.config["TALKS_DIRS"][file_type]["suffix"] + \
         '.mp3'
 
-    pprint.pprint("Path")
-    pprint.pprint(path)
-
     return path
+
+
 
 def start_time_of_talk(day, time):
     """Convert "Greenbelt Days" to real days, and parse out the start times of talks"""
@@ -376,8 +376,32 @@ def uploadtalk():
     file = request.files['file']
         
     if file:
-        file.save(os.path.join(get_path_for_file(talk_id, file_type)))
+        # Save it to /tmp for now
+	uploaded_file_path = os.path.join('/tmp',get_path_for_file(talk_id, file_type))
+        file.save(uploaded_file_path)
+        # Check the size, and then see if another file of the same size exists in the relevant directory for the file type, error if so 
+	uploaded_file_size = os.path.getsize(uploaded_file_path)
 
+	for filename in os.listdir(app.config["TALKS_DIRS"][file_type]["directory"]):
+            existing_file_path = os.path.join(app.config["TALKS_DIRS"][file_type]["directory"], filename)
+            
+            if os.path.getsize(existing_file_path) == uploaded_file_size:
+                error_message = """
+The file you uploaded had the same file size as an existing file: {}
+
+This almost certainly means that the file has the same contents. Usually, this means that a mistake is in the process of being made. 
+
+Speak to your nearest team leader for advice. 
+
+If you are the nearest team leader, check the contents of the existing file and the new file carefully, and make a decision as to which one is the correct one. You might need to delete the existing file to allow this one to be uploaded. Don't forget to clean up when you're done - such as checking for CD files, processed files, database entries, already-shipped USBs, etc. 
+""".format(existing_file_path)
+
+                return render_template("error.html",
+                            error_text=error_message)
+
+        # If we've made it this far, we're all good - move the file into position
+        os.rename(uploaded_file_path, os.path.join(get_path_for_file(talk_id, file_type))
+			
     return redirect(url_for(source_path))
 
 

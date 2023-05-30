@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h1 class="uk-heading-line uk-text-center"><span>Error</span></h1>
+
+<div class="uk-card uk-card-body uk-card-default">
+
+<h1> An error has occurred and the action you tried to take hasn't happened </h1>
+
+<p> If you're not sure what this means or what to do about it, talk to the nearest team leader: don't just ignore this, because it's probably important to someone</p>
+
+{{ error_text }}
+
+</div>
+
+{% endblock %}
+
+
