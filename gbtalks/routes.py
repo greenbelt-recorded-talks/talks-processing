@@ -377,7 +377,7 @@ def uploadtalk():
         
     if file:
         # Save it to /tmp for now
-	uploaded_file_path = os.path.join('/tmp',get_path_for_file(talk_id, file_type))
+        uploaded_file_path = os.path.join('/tmp',get_path_for_file(talk_id, file_type))
         file.save(uploaded_file_path)
         # Check the size, and then see if another file of the same size exists in the relevant directory for the file type, error if so 
 	uploaded_file_size = os.path.getsize(uploaded_file_path)
