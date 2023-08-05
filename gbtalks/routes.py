@@ -465,7 +465,7 @@ If you are the nearest team leader, check the contents of the existing file and 
 
                 return render_template("error.html", error_text=error_message)
 
-	app.logger.error("Moving file into position")
+        app.logger.error("Moving file into position")
 
         # If we've made it this far, we're all good - move the file into position
         os.rename(
