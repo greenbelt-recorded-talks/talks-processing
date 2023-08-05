@@ -454,7 +454,7 @@ def uploadtalk():
 
                     if existing_file_size == uploaded_file_size:
                         app.logger.error(
-                            "File size collision detected: %s has size %d bytes, which is the same as uploaded file %s",
+                            "File size collision detected: %s has size %s bytes, which is the same as uploaded file %s",
                             existing_file_path,
                             existing_file_size,
                             uploaded_file_path,
