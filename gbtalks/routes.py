@@ -23,6 +23,7 @@ from werkzeug.local import LocalProxy
 import os
 import random
 import sys
+import shutil
 import shortuuid
 import pprint
 
@@ -477,7 +478,7 @@ If you are the nearest team leader, check the contents of the existing file and 
                         return render_template("error.html", error_text=error_message)
 
         # If we've made it this far, we're all good - move the file into position
-        os.rename(
+        shutil.move(
             uploaded_file_path, os.path.join(get_path_for_file(talk_id, file_type))
         )
 
