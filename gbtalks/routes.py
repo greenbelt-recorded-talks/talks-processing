@@ -133,8 +133,8 @@ def talks():
     )
 
     talks = Talk.query.order_by(asc(Talk.start_time)).all()
-    raw_files = [x.name for x in os.scandir(app.config["RAW_UPLOAD_DIR"])]
-    edited_files = [x.name for x in os.scandir(app.config["EDITED_UPLOAD_DIR"])]
+    raw_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
+    edited_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
     processed_files = [x.name for x in os.scandir(app.config["PROCESSED_DIR"])]
 
     return render_template(
@@ -259,7 +259,7 @@ def front_desk():
         set(
             [
                 int(x.name.replace("_RAW.mp3", "").replace(gb_prefix, ""))
-                for x in os.scandir(app.config["RAW_UPLOAD_DIR"])
+                for x in os.scandir(app.config["UPLOAD_DIR"])
                 if x.name.endswith("RAW.mp3")
             ]
         )
@@ -329,7 +329,7 @@ def editing():
     else:
         if request.args.get("download_raw_talk"):
             return send_from_directory(
-                app.config["RAW_UPLOAD_DIR"],
+                app.config["UPLOAD_DIR"],
                 filename=request.args["download_raw_talk"] + "_RAW.mp3",
                 as_attachment=True,
             )
@@ -341,7 +341,7 @@ def editing():
         set(
             [
                 x.name.replace("_RAW.mp3", "").replace(gb_prefix, "")
-                for x in os.scandir(app.config["RAW_UPLOAD_DIR"])
+                for x in os.scandir(app.config["UPLOAD_DIR"])
                 if x.name.endswith("RAW.mp3")
             ]
         )
@@ -351,7 +351,7 @@ def editing():
         set(
             [
                 x.name.replace("_EDITED.mp3", "").replace(gb_prefix, "")
-                for x in os.scandir(app.config["EDITED_UPLOAD_DIR"])
+                for x in os.scandir(app.config["UPLOAD_DIR"])
                 if x.name.endswith("EDITED.mp3")
             ]
         )
@@ -438,14 +438,14 @@ def uploadtalk():
     file = request.files["file"]
 
     if file:
-        # Save it to /tmp for now, at the same path as it would normally use to avoid collision
-        target_file_path = get_path_for_file(talk_id, file_type)
-        uploaded_file_path = os.path.join("/tmp", target_file_path[1:])
+        # Save it to /tmp for now
+        uploaded_file_path = os.path.join("/tmp", shortuuid.uuid())
         file.save(uploaded_file_path)
         # Check the size, and then see if another file of the same size exists in the relevant directory for the file type, error if so
         uploaded_file_size = os.path.getsize(uploaded_file_path)
 
-        for filename in os.listdir(app.config["TALKS_DIRS"][file_type]["directory"]):
+	for talks_dir in 
+        for filename in os.walk(app.config["TALKS_DIRS"][file_type]["directory"]):
             existing_file_path = os.path.join(
                 app.config["TALKS_DIRS"][file_type]["directory"], filename
             )

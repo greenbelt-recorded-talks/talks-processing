@@ -14,8 +14,8 @@ class Config:
 
     # Files
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/storage/uploads")
-    RAW_UPLOAD_DIR = os.getenv("RAW_UPLOAD_DIR", "/storage/uploads")
-    EDITED_UPLOAD_DIR = os.getenv("EDITED_UPLOAD_DIR", "/storage/uploads")
+    RAW_UPLOAD_DIR = UPLOAD_DIR
+    EDITED_UPLOAD_DIR = UPLOAD_DIR
     PROCESSED_DIR = os.getenv("PROCESSED_DIR", "/storage/processed")
     CD_DIR = os.getenv("CD_DIR", "/storage/cds")
     TOP_TAIL_DIR = os.getenv("TOP_TAIL_DIR", "/home/gbtalks/top_tail")

@@ -125,7 +125,7 @@ def convert_talks():
         set(
             [
                 x.name.replace("_EDITED.mp3", "").replace(gb_prefix, "")
-                for x in os.scandir(app.config["EDITED_UPLOAD_DIR"])
+                for x in os.scandir(app.config["UPLOAD_DIR"])
                 if x.name.endswith("EDITED.mp3")
             ]
         )
