@@ -120,6 +120,7 @@ def talks():
                             description=talk_line[6],
                             speaker=talk_line[0],
                             venue=talk_line[4],
+                            day=talk_line[2],
                             start_time=start_time,
                             end_time=end_time,
                             is_priority=is_priority,

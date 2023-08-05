@@ -9,6 +9,7 @@ class Talk(db.Model):
     description = db.Column(db.String)
     speaker = db.Column(db.String)
 
+    day = db.Column(db.String)
     start_time = db.Column(db.DateTime)
     end_time = db.Column(db.DateTime)
 
