@@ -14,8 +14,6 @@ class Config:
 
     # Files
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/storage/uploads")
-    RAW_UPLOAD_DIR = UPLOAD_DIR
-    EDITED_UPLOAD_DIR = UPLOAD_DIR
     PROCESSED_DIR = os.getenv("PROCESSED_DIR", "/storage/processed")
     CD_DIR = os.getenv("CD_DIR", "/storage/cds")
     TOP_TAIL_DIR = os.getenv("TOP_TAIL_DIR", "/home/gbtalks/top_tail")
@@ -24,11 +22,11 @@ class Config:
 
     TALKS_DIRS = {
         "raw": {
-            "directory": RAW_UPLOAD_DIR,
+            "directory": UPLOAD_DIR,
             "suffix": "_RAW"
             },
         "edited":{
-            "directory": EDITED_UPLOAD_DIR,
+            "directory": UPLOAD_DIR,
             "suffix": "_EDITED"
             },
         "processed": {

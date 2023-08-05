@@ -23,6 +23,7 @@ from werkzeug.local import LocalProxy
 import os
 import random
 import sys
+import shortuuid
 import pprint
 
 # current_user is a proxy for the current user
@@ -444,26 +445,26 @@ def uploadtalk():
         # Check the size, and then see if another file of the same size exists in the relevant directory for the file type, error if so
         uploaded_file_size = os.path.getsize(uploaded_file_path)
 
-	for talks_dir in 
-        for filename in os.walk(app.config["TALKS_DIRS"][file_type]["directory"]):
-            existing_file_path = os.path.join(
-                app.config["TALKS_DIRS"][file_type]["directory"], filename
-            )
+        for root,dirs,files in os.walk(app.config["UPLOAD_DIR"]):
+            for name in files:
+                if name.endswith(".mp3"):
+                    existing_file_path = os.path.join(root,name)
+                    existing_file_size = os.path.getsize(existing_file_path)
 
-            if os.path.getsize(existing_file_path) == uploaded_file_size:
+                    if existing_file_size == uploaded_file_size:
                 error_message = """
 The file you uploaded had the same file size as an existing file: {}; {} bytes
 
 Your file has been uploaded to {}
 
-This almost certainly means that the file has the same contents. Usually, this means that a mistake is in the process of being made. 
+This almost certainly means that the file has the same contents. Usually, this means that a mistake is in the process of being made.
 
-Speak to your nearest team leader for advice. 
+Speak to your nearest team leader for advice.
 
-If you are the nearest team leader, check the contents of the existing file and the new file carefully, and make a decision as to which one is the correct one. You might need to delete the existing file to allow this one to be uploaded. Don't forget to clean up when you're done - such as checking for CD files, processed files, database entries, already-shipped USBs, etc. 
+If you are the nearest team leader, check the contents of the existing file and the new file carefully, and make a decision as to which one is the correct one. You might need to delete the existing file to allow this one to be uploaded. Don't forget to clean up when you're done - such as checking for CD files, processed files, database entries, already-shipped USBs, etc.
 """.format(
                     existing_file_path,
-                    os.path.getsize(existing_file_path),
+                    existing_file_size,
                     uploaded_file_path,
                 )
 
