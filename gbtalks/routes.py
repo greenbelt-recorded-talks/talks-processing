@@ -439,8 +439,8 @@ def uploadtalk():
 
     if file:
         # Save it to /tmp for now, at the same path as it would normally use to avoid collision
-        uploaded_file_path = os.path.join("/tmp", get_path_for_file(talk_id, file_type)[1:])
-        app.logger.error(uploaded_file_path)
+        target_file_path = get_path_for_file(talk_id, file_type)
+        uploaded_file_path = os.path.join("/tmp", target_file_path[1:])
         file.save(uploaded_file_path)
         # Check the size, and then see if another file of the same size exists in the relevant directory for the file type, error if so
         uploaded_file_size = os.path.getsize(uploaded_file_path)
@@ -454,13 +454,17 @@ def uploadtalk():
                 error_message = """
 The file you uploaded had the same file size as an existing file: {}; {} bytes
 
+Your file has been uploaded to {}
+
 This almost certainly means that the file has the same contents. Usually, this means that a mistake is in the process of being made. 
 
 Speak to your nearest team leader for advice. 
 
 If you are the nearest team leader, check the contents of the existing file and the new file carefully, and make a decision as to which one is the correct one. You might need to delete the existing file to allow this one to be uploaded. Don't forget to clean up when you're done - such as checking for CD files, processed files, database entries, already-shipped USBs, etc. 
 """.format(
-                    existing_file_path, os.path.getsize(existing_file_path)
+                    existing_file_path,
+                    os.path.getsize(existing_file_path),
+                    uploaded_file_path,
                 )
 
                 return render_template("error.html", error_text=error_message)
