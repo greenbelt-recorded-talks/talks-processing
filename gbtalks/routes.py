@@ -454,7 +454,7 @@ def uploadtalk():
 
                     if existing_file_size == uploaded_file_size:
                         app.logger.error(
-                            "File size collision detected: {} has size {}, which is the same as uploaded file {}",
+                            "File size collision detected: %s has size %d bytes, which is the same as uploaded file %s",
                             existing_file_path,
                             existing_file_size,
                             uploaded_file_path,
@@ -471,9 +471,7 @@ Speak to your nearest team leader for advice.
 
 If you are the nearest team leader, check the contents of the existing file and the new file carefully, and make a decision as to which one is the correct one. You might need to delete the existing file to allow this one to be uploaded. Don't forget to clean up when you're done - such as checking for CD files, processed files, database entries, already-shipped USBs, etc.
 """.format(
-                            existing_file_path,
-                            existing_file_size,
-                            uploaded_file_path,
+                            existing_file_path, existing_file_size, uploaded_file_path
                         )
 
                         return render_template("error.html", error_text=error_message)
