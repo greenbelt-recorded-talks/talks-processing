@@ -23,11 +23,12 @@ class Talk(db.Model):
 
     def __repr__(self):
         return (
-            "<Talk(id='%d', title='%s', description='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s', priority='%s')>"
+            "<Talk(id='%d', title='%s', description='%s', day='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s', priority='%s')>"
             % (
                 self.id,
                 self.title,
                 self.description,
+                self.day,
                 self.start_time,
                 self.end_time,
                 self.venue,
