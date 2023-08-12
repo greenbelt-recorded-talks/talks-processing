@@ -209,7 +209,7 @@ def rota():
         clear_rota()
 
     for talk in talks:
-        app.logger.error("Finding a recorder for talk " + talk.id)
+        app.logger.error("Finding a recorder for talk " + str(talk.id))
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
             continue
