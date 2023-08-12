@@ -21,21 +21,13 @@ def talk_would_clash(recorder, talk):
     # A talk clashes if it starts while the recorder is currently recording, or within 20 mins of another talk ending
 
     for existing_talk in recorder.talks:
-        app.logger.error(
-            "talk_would_clash: Comparing "
-            + str(talk.id)
-            + " with "
-            + str(existing_talk.id)
-        )
         if existing_talk.start_time <= talk.start_time <= (
             existing_talk.end_time + timedelta(minutes=20)
         ) or existing_talk.start_time <= talk.end_time <= (
             existing_talk.end_time + timedelta(minutes=20)
         ):
-            app.logger.error("Clashes!")
             return True
 
-    app.logger.error("Does not clash")
     return False
 
 
@@ -175,6 +167,7 @@ def rota():
         clear_rota()
 
     for talk in talks:
+        app.logger.error("Finding a recorder for talk " + talk.id)
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
             continue
