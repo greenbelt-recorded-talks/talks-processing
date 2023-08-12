@@ -45,15 +45,13 @@ There is no way to specify which days a recorder is available for. If two people
 
 {% for recorder in recorders %}
 <div style="break-after:page"></div>
+{% filter markdown %}
+## {{ recorder.name }}
+
+{{ recorder.max_shifts_per_day }} shift(s) per day
+{% endfilter %}
+
 <table class="uk-table">
-<tr>
-	<th>Recorder</th>
-        <th>Talks Recorded</th>
-</tr>
-<tr>
-	<td>{{ recorder.name }} <br /> {{ recorder.max_shifts_per_day }} shift(s) per day</td>
-        <td>
-<table>
 {% for talk in recorder.talks %}
 <tr>
 	<th>Talk ID</th>
@@ -70,11 +68,6 @@ There is no way to specify which days a recorder is available for. If two people
 	<td>{{ talk.title }}</td>
 </tr>
 {% endfor %}
-</table>
-
-</td>
-</tr>
-
 </table>
 {% endfor %}
 </div>
