@@ -22,43 +22,7 @@ There is no way to update the online rota with manual changes, apart from by dir
 
 </div>
 
-<h1>Rota by venue</h1>
-<span><a href="{{ url_for('rota.big_rota_print') }}">Printable version</a></span>
-<table class="pure-table pure-table-bordered">
-	<tr>
-	<th> Venue </th>
-{% for talk_time in times %}
-
-	<th>{{ talk_time }}</th>
-
-{% endfor %}
-	</tr>
-
-{% for talk_venue in venues %}
-
-	<tr>
-		<td> {{ talk_venue }} </td>
-{% for talk_time in times %}
-
-<td>
-		{% for talk in talks %}
-		{% if talk["start_time"] == talk_time and talk["venue"] == talk_venue %}
-		<div class ="{% if talk["is_priority"] %} priority_talk {% endif %} {% if talk["recorded_by"] is not none %} is_recorded {% endif %} ">
-			<p>{{ talk["title"] }}</p>
-			<p>{{ talk["speaker"] }}</p>
-			<p>{{ talk["recorder_name"] }}</p>
-		</div>
-		{% endif %}
-		{% endfor %}
-		
-</td>
-{% endfor %}
-	</tr>
-
-{% endfor %}
-
-</table>
-
+<span><a href="{{ url_for('rota.big_rota_print') }}">Rota by venue</a></span>
 
 <h1> Rota by Time </h1>
 
