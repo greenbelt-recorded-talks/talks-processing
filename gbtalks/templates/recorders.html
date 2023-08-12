@@ -43,13 +43,14 @@ There is no way to specify which days a recorder is available for. If two people
 {% endfilter %}
 
 
+{% for recorder in recorders %}
+<div class="pagebreak"> </div>
 <table class="uk-table">
 <tr>
 	<th>Recorder</th>
 	<th>Max Shifts Per Day</th>
         <th>Talks Recorded</th>
 </tr>
-{% for recorder in recorders %}
 <tr>
 	<td>{{ recorder.name }}</td>
 	<td>{{ recorder.max_shifts_per_day }}</td>
