@@ -110,17 +110,17 @@ def talks():
                     talksreader = csv.reader(csvfile)
                     next(talksreader, None)  # skip the headers
                     for talk_line in talksreader:
-                        start_time = start_time_of_talk(talk_line[2], talk_line[3])
+                        start_time = start_time_of_talk(talk_line[3], talk_line[4])
                         end_time = start_time + timedelta(hours=1)
                         is_priority = True if talk_line[7] == "Yes" else False
                         is_rotaed = True if talk_line[8] == "Yes" else False
                         talk = Talk(
-                            id=talk_line[5].split("-")[1],
-                            title=talk_line[1],
+                            id=talk_line[0].split("-")[1],
+                            title=talk_line[2],
                             description=talk_line[6],
-                            speaker=talk_line[0],
-                            venue=talk_line[4],
-                            day=talk_line[2],
+                            speaker=talk_line[1],
+                            venue=talk_line[5],
+                            day=talk_line[3],
                             start_time=start_time,
                             end_time=end_time,
                             is_priority=is_priority,
