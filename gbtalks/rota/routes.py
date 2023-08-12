@@ -188,7 +188,7 @@ def find_recorder_for_talk(talk):
         # If we've got this far, we're ok to assign the talk to the candidate recorder
         assign_talk_to_recorder(candidate_recorder, talk)
 
-    return recorder or None
+    return candidate_recorder or None
 
 
 @rota_blueprint.route("/rota", methods=["GET", "POST"])
