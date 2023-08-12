@@ -161,7 +161,7 @@ def find_recorder_for_talk(talk):
 
     recorders = Recorder.query.all()
 
-    while recorder is None:
+    while recorder is None and len(recorders)>0:
         # Pick the recorder with fewest talks first, consider them a candidate
         recorders.sort(key=lambda x: len(x.talks))
         candidate_recorder = recorders.pop(0)
