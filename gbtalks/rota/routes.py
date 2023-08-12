@@ -156,12 +156,9 @@ def clear_rota():
 
 
 def find_recorder_for_talk(talk):
-    recorder = None
-    candidate_recorders = []
-
     recorders = Recorder.query.all()
 
-    while recorder is None and len(recorders)>0:
+    while talk.recorded_by is None and len(recorders)>0:
         # Pick the recorder with fewest talks first, consider them a candidate
         recorders.sort(key=lambda x: len(x.talks))
         candidate_recorder = recorders.pop(0)
@@ -188,9 +185,6 @@ def find_recorder_for_talk(talk):
             if talk_would_break_shift_pattern(candidate_recorder, talk):
                 continue
 
-        else:
-            candidate_recorder.talks = []
-
         # If we've got this far, we're ok to assign the talk to the candidate recorder
         assign_talk_to_recorder(candidate_recorder, talk)
 
@@ -201,20 +195,20 @@ def find_recorder_for_talk(talk):
 def rota():
     """Define a rota"""
 
-    talks = Talk.query.filter(Talk.is_priority == True).order_by(Talk.start_time)
-    recorders = Recorder.query.all()
-
     if request.method == "POST":
         # If we've been asked to make a new rota, clear out the old one
         clear_rota()
 
+    talks = Talk.query.filter(Talk.is_priority == True).order_by(Talk.start_time)
+
     for talk in talks:
         app.logger.error("Finding a recorder for talk " + str(talk.id))
+        
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
             continue
 
-        # Move on if the talk is in a venue that's externally rota-ed
+        # Move on if the talk has been externally rota-ed in some way
         if talk.is_rotaed is not True:
             continue
 
