@@ -51,7 +51,7 @@ There is no way to specify which days a recorder is available for. If two people
         <th>Talks Recorded</th>
 </tr>
 <tr>
-	<td>{{ recorder.name }} ({{ recorder.max_shifts_per_day }} shifts per day)</td>
+	<td>{{ recorder.name }} <br /> {{ recorder.max_shifts_per_day }} shift(s) per day</td>
         <td>
 <table>
 {% for talk in recorder.talks %}
@@ -64,7 +64,7 @@ There is no way to specify which days a recorder is available for. If two people
 </tr>
 <tr {% if talk["is_priority"] %} class="priority_talk" {% endif %}>
 	<td>{{ talk.id }}</td>
-	<td>{{ talk.start_time }}</td>
+	<td>{{ talk.day }} <br /> {{ talk.start_time }}</td>
 	<td>{{ talk.venue }}</td>
 	<td>{{ talk.speaker }}</td>
 	<td>{{ talk.title }}</td>
