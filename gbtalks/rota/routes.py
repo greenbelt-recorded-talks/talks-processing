@@ -279,3 +279,20 @@ def rota():
         venues[talk.venue] = None
 
     return render_template("rota.html", talks=talks, times=times, venues=venues)
+
+
+
+
+@rota_blueprint.route("/big_rota_print", methods=["GET"])
+def big_rota_print():
+    """Print the big rota"""
+
+    talks = Talk.query.order_by(Talk.start_time).all()
+    times = {}
+    venues = {}
+
+    for talk in talks:
+        times[talk.start_time] = None
+        venues[talk.venue] = None
+
+    return render_template("big_rota_print.html", talks=talks, times=times, venues=venues)
