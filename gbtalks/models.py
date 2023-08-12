@@ -1,5 +1,7 @@
 from . import db
 
+from sqlalchemy.ext.hybrid import hybrid_property
+
 
 class Talk(db.Model):
     __tablename__ = "talks"
@@ -43,9 +45,19 @@ class Recorder(db.Model):
 
     name = db.Column(db.String, primary_key=True)
     max_shifts_per_day = db.Column(db.Integer)
-    can_record_in_red_tent = db.Column(db.Boolean)
 
     talks = db.relationship("Talk", backref="recorded_by", order_by="Talk.start_time")
+
+
+    def __repr__(self):
+        return (
+            "<Recorder(name='%s', max_shifts_per_day='%d', number_of_talks='%d'))>"
+            % (
+                self.name,
+                self.max_shifts_per_day,
+                len(self.talks)
+            )
+        )
 
 
 class Editor(db.Model):
