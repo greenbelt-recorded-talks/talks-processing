@@ -2,8 +2,8 @@
 
 {% block content %}
 
-<h1 class="uk-heading-line uk-text-center"><span>Rota</span></h1>
 
+<h1 class="uk-heading-line uk-text-center"><span>Rota</span></h1>
 
 <p>This page provides a way to create a new rota, a tabular view of the rota by venue, and a timeline view of the rota (scroll down!)</p>
 
@@ -22,7 +22,16 @@ There is no way to update the online rota with manual changes, apart from by dir
 
 </div>
 
+<div class="uk-card uk-card-body uk-card-default">
+
+<h1>Rota by venue</h1>
+
+<p>Provides a landscape, tabular view of the rota, with times across the top and venues down the side. On its own page for ease of printing:</p> 
+
 <span><a href="{{ url_for('rota.big_rota_print') }}">Rota by venue</a></span>
+
+</div>
+
 
 <h1> Rota by Time </h1>
 
