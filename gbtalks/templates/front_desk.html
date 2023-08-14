@@ -13,6 +13,7 @@ The talks below are the ones that have started, but that RAW files haven't yet b
 <table>
 <tr>
 	<th>Talk ID</th>
+        <th>Day</th>
 	<th>Time</th>
         <th>Venue</th>
         <th>Speaker</th>
@@ -23,6 +24,7 @@ The talks below are the ones that have started, but that RAW files haven't yet b
 {% if talk.id not in raw_talks_available %}
 <tr>
 	<td>{{ talk.id }}</td>
+        <td>{{ talk.day }}</td>
         <td>{{ talk.start_time }}</td>
         <td>{{ talk.venue }}</td>
         <td>{{ talk.speaker }}</td>
@@ -41,30 +43,6 @@ The talks below are the ones that have started, but that RAW files haven't yet b
 {% endfor %}
 </table>
 
-</div>
-<hr class="uk-divider-icon">
-<div class="uk-card uk-card-body uk-card-default" style="display: none;">
-{% filter markdown %}
-## Upload New Editors File
-
-Upload a CSV file containing the names of the editors. Each line in the file should contain: Editor name.
-
-Example:
-
-
-        "Gandalf"
-        "Gloin"
-        "Elrond"
-
-When you upload the file, all previous editors and assignments will be deleted.
-{% endfilter %}
-
-<form method=post enctype=multipart/form-data>
-        <label for=file>File</label>
-        <input name=file type=file id=file accept=".csv">
-        <input name=form_name type=hidden value=upload_editors_list>
-        <button>Submit</button>
-</form>
 </div>
 
 {% endblock %}
