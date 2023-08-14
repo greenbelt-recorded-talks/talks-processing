@@ -26,45 +26,18 @@ There is no way to update the online rota with manual changes, apart from by dir
 
 <div class="uk-card uk-card-body uk-card-default">
 
-<h1>Rota by venue</h1>
+<h1>Print Rota</h1>
 
+<h2>Rota by venue</h2>
 <p>Provides a landscape, tabular view of the rota, with times across the top and venues down the side. On its own page for ease of printing:</p> 
 
 <span><a href="{{ url_for('rota.rota_by_venue') }}">Rota by venue</a></span>
 
+<h2>Rota by time</h2>
+
+<p>Provides a vertical, tabular view of the rota, organised by time. On its own page for ease of printing:</p>
+
+<span><a href="{{ url_for('rota.rota_by_time') }}">Rota by time</a></span>
+
 </div>
-
-<hr class="uk-divider-icon">
-
-<h1> Rota by Time </h1>
-
-<table class="pure-table pure-table-bordered">
-<tr>
-	<th>Talk ID</th>
-	<th>Venue</th>
-	<th>Title</th>
-	<th>Speaker(s)</th>
-        <th>Recorded By</th>
-        <th>Day</th>
-	<th>Start Time</th>
-        <th>End Time</th>
-</tr>
-{% for talk in talks %}
-<tr class="{% if talk["is_priority"] %} priority_talk {% endif %} {% if talk["recorded_by"] is not none %} is_recorded {% endif %}">
-	<td>{{ talk.id }}</td>
-	<td>{{ talk.venue }}</td>
-	<td>{{ talk.title }}</td>
-        <td>{{ talk.speaker }}</td>
-	<td>{{ talk.recorder_name }}</td>
-        <td>{{ talk.day }}</td>
-        <td>{{ talk.start_time }}</td>
-        <td>{{ talk.end_time }}</td>
-</tr>
-
-
-{% endfor %}
-</table>
-
-{% endblock %}
-
 
