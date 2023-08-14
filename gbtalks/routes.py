@@ -271,7 +271,9 @@ def front_desk():
 
     past_horizon = datetime.now() + timedelta(hours=1)
 
-    talks_to_upload = Talk.query.filter(Talk.start_time < past_horizon)
+    talks_to_upload = Talk.query.filter(Talk.start_time < past_horizon).order_by(
+        asc(Talk.start_time)
+    )
 
     return render_template(
         "front_desk.html",
