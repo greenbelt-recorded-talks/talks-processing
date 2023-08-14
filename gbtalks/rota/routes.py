@@ -283,7 +283,22 @@ def rota():
 
 @rota_blueprint.route("/rota_by_venue", methods=["GET"])
 def rota_by_venue():
-    """Print the big rota by venue"""
+    """Print the rota by venue"""
+
+    talks = Talk.query.order_by(Talk.start_time).all()
+    times = {}
+    venues = {}
+
+    for talk in talks:
+        times[talk.start_time] = None
+        venues[talk.venue] = None
+
+    return render_template("rota_by_venue.html", talks=talks, times=times, venues=venues)
+
+
+@rota_blueprint.route("/rota_by_time", methods=["GET"])
+def rota_by_time():
+    """Print the rota by time"""
 
     talks = Talk.query.order_by(Talk.start_time).all()
     times = {}
