@@ -1,4 +1,7 @@
-{% extends 'base.html' %}
+<!-- UIkit CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.14.3/dist/css/uikit.min.css" />
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 
 {% block content %}
 
@@ -8,7 +11,7 @@
 <tr>
 	<th>Sign Out</th>
 	<th>Sign In</th>
-        <td>Recorder</td>
+        <th>Recorder</th>
 	<th>Talk ID</th>
 	<th>Zoom #</th>
 	<th>Day</th>
@@ -32,7 +35,7 @@
 	<td>{{ talk.venue }}</td>
         <td>{{ talk.speaker }}</td>
         <td>{{ talk.title }}</td>
-        <th></th>
+        <td></td>
 </tr>
 
 
