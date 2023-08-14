@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h1> Rota by Time </h1>
+
+<table class="pure-table pure-table-bordered">
+<tr>
+	<th>Sign Out</th>
+	<th>Sign In</th>
+        <td>Recorder</td>
+	<th>Talk ID</th>
+	<th>Zoom #</th>
+	<th>Day</th>
+        <th>Start Time</th>
+        <th>End Time</th>
+	<th>Venue</th>
+        <th>Speaker(s)</th>
+	<th>Title</th>
+        <th>Headphones?</th>
+</tr>
+{% for talk in talks %}
+<tr class="{% if talk["is_priority"] %} priority_talk {% endif %} {% if talk["recorded_by"] is not none %} is_recorded {% endif %}">
+	<td></td>
+        <td></td>
+        <td>{{ talk.recorder_name }}</td>
+	<td>{{ talk.id }}</td>
+        <td></td>
+        <td>{{ talk.day }}</td>
+        <td>{{ talk.start_time }}</td>
+        <td>{{ talk.end_time }}</td>
+	<td>{{ talk.venue }}</td>
+        <td>{{ talk.speaker }}</td>
+        <td>{{ talk.title }}</td>
+        <th></th>
+</tr>
+
+
+{% endfor %}
+</table>
+
+{% endblock %}
+
+
