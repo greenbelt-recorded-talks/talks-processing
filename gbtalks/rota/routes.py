@@ -308,4 +308,4 @@ def rota_by_time():
         times[talk.start_time] = None
         venues[talk.venue] = None
 
-    return render_template("rota_by_venue.html", talks=talks, times=times, venues=venues)
+    return render_template("rota_by_time.html", talks=talks, times=times, venues=venues)
