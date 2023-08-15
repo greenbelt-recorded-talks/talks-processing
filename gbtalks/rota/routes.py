@@ -202,7 +202,7 @@ def rota():
     talks = Talk.query.filter(Talk.is_priority == True).order_by(Talk.start_time)
 
     for talk in talks:
-        app.logger.error("Finding a recorder for talk " + str(talk.id))
+        app.logger.error("Finding a recorder for priority talk " + str(talk.id))
         
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
@@ -237,6 +237,8 @@ def rota():
     )
 
     for talk in additional_talks:
+        app.logger.error("Finding a recorder for additional talk " + str(talk.id))
+
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
             continue
@@ -262,11 +264,11 @@ def rota():
                 if (
                     future_talk.start_time < talk.end_time + timedelta(hours=1)
                     and future_talk.start_time > talk.end_time + timedelta(minutes=20)
-                    and talk_would_break_shift_pattern(candidate_recorder, future_talk)
+                    and talk_would_break_shift_pattern(assigned_recorder, future_talk)
                     is False
-                    and talk_would_clash(candidate_recorder, future_talk) is False
+                    and talk_would_clash(assigned_recorder, future_talk) is False
                 ):
-                    assign_talk_to_recorder(candidate_recorder, talk)
+                    assign_talk_to_recorder(assigned_recorder, talk)
 
     # Set up everything we need for rendering the page
 
