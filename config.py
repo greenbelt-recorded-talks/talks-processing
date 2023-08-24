@@ -36,7 +36,7 @@ class Config:
     }
 
     # Greenbelt
-    GB_FRIDAY = "2022-08-26"
+    GB_FRIDAY = "2023-08-25"
     GB_SHORT_YEAR = GB_FRIDAY[2:4]
 
     # Login
@@ -46,4 +46,4 @@ class Config:
 
     # Team leaders perms (update on server)
 
-    TEAM_LEADERS_EMAILS = {'alice@example.com','bob@example.com'}
+    TEAM_LEADERS_EMAILS = {'gb-talks-onsite@greenbelt.org.uk','rob@redpath.family', 'recordedtalks@greenbelt.org.uk'}

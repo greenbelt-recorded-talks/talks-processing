@@ -22,7 +22,31 @@ def run_command(cmd):
         os.system(cmd)
 
 
-def get_path_for_file(talk_id, file_type):
+def get_path_for_file(talk_id, file_type, title, speaker):
+    # Processed files should have more descriptive filenames
+    # Note 254 character limit for USB stick filenames
+
+    if "," in speaker:
+        speaker = speaker.split(",")[0] + " & others"
+
+    if file_type == "processed":
+        filename = (
+            app.config["TALKS_DIRS"][file_type]["directory"]
+            + "/Greenbelt "
+            + app.config["GB_FRIDAY"][0:4]
+            + ": "
+            + str(talk_id).zfill(3)
+            + " "
+            + title[:120]
+            + " | "
+            + speaker[:120]
+            + ".mp3"
+        )
+
+        return filename
+
+    # otherwise...
+
     return (
         app.config["TALKS_DIRS"][file_type]["directory"]
         + "/gb"
