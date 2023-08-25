@@ -31,9 +31,8 @@ import pprint
 current_user = LocalProxy(lambda: _get_user())
 
 
-def get_path_for_file(talk_id, file_type):
-
-    if file_type in {"raw", "edited", "processed"}:
+def get_path_for_file(talk_id, file_type, title=None, speaker=None):
+    if file_type in {"raw", "edited"}:
         path = (
             app.config["TALKS_DIRS"][file_type]["directory"]
             + "/gb"
@@ -44,8 +43,32 @@ def get_path_for_file(talk_id, file_type):
             + ".mp3"
         )
 
+    if file_type == "processed":
+        if "," in speaker:
+            speaker = speaker.split(",")[0] + " & others"
+
+        path = (
+            app.config["TALKS_DIRS"][file_type]["directory"]
+            + "/Greenbelt "
+            + app.config["GB_FRIDAY"][0:4]
+            + ": "
+            + str(talk_id).zfill(3)
+            + " "
+            + title[:120]
+            + " | "
+            + speaker[:120]
+            + ".mp3"
+        )
+
     if file_type == "recorder_notes":
-        path = app.config["IMG_DIR"] + "/gb" + str(app.config["GB_FRIDAY"][2:4]) + "-" + talk_id + "recorder_notes.jpg" 
+        path = (
+            app.config["IMG_DIR"]
+            + "/gb"
+            + str(app.config["GB_FRIDAY"][2:4])
+            + "-"
+            + talk_id
+            + "recorder_notes.jpg"
+        )
 
     return path
 
@@ -149,7 +172,7 @@ def talks():
         raw_files=raw_files,
         edited_files=edited_files,
         processed_files=processed_files,
-        notes_files=notes_files
+        notes_files=notes_files,
     )
 
 
@@ -400,7 +423,12 @@ def getfile():
     file_type = request.args.get("file_type")
     talk_id = request.args.get("talk_id")
 
-    return send_file(get_path_for_file(talk_id, file_type), as_attachment=True)
+    talk = Talk.query.get(talk_id)
+
+    return send_file(
+        get_path_for_file(talk_id, file_type, talk.title, talk.speaker),
+        as_attachment=True,
+    )
 
 
 @app.route("/upload_cover_image", methods=["POST"])
@@ -483,8 +511,12 @@ If you are the nearest team leader, check the contents of the existing file and 
                         return render_template("error.html", error_text=error_message)
 
         # If we've made it this far, we're all good - move the file into position
+        talk = Talk.query.get(talk_id)
         shutil.move(
-            uploaded_file_path, os.path.join(get_path_for_file(talk_id, file_type))
+            uploaded_file_path,
+            os.path.join(
+                get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+            ),
         )
 
     return redirect(url_for(source_path))
@@ -509,10 +541,17 @@ def uploadrecordernotes():
     if file:
         kind = filetype.guess(file.read(261))
         if kind.extension == "jpg":
-            file.save(app.config["IMG_DIR"] + "/gb" + str(app.config["GB_FRIDAY"][2:4]) + "-" + talk_id + "recorder_notes.jpg")
+            file.save(
+                app.config["IMG_DIR"]
+                + "/gb"
+                + str(app.config["GB_FRIDAY"][2:4])
+                + "-"
+                + talk_id
+                + "recorder_notes.jpg"
+            )
         else:
             flash("Must be a JPEG")
-    
+
     return redirect(url_for(source_path))
 
 

@@ -29,7 +29,7 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
     if file_type == "processed":
         if "," in speaker:
             speaker = speaker.split(",")[0] + " & others"
-        
+
         filename = (
             app.config["TALKS_DIRS"][file_type]["directory"]
             + "/Greenbelt "
@@ -77,15 +77,18 @@ def process_talk(talk):
     hq_mp3 = top + AudioSegment.from_file(get_path_for_file(talk.id, "edited")) + tail
 
     # Export a WAV file of the top/tailed audio into /tmp for further processing
-    hq_mp3.export("/tmp/toptailed" + str(talk.id) + ".wav", format="wav")
+    toptail_path = "/tmp/toptailed" + str(talk.id) + ".wav"
+    hq_mp3.export(toptail_path, format="wav")
+
+    normalized_path = "/tmp/normalized" + str(talk.id) + ".wav"
 
     # Normalise to a fixed level
     subprocess.call(
         [
             "ffmpeg-normalize",
-            "/tmp/toptailed" + str(talk.id) + ".wav",
+            toptail_path,
             "-o",
-            "/tmp/normalized" + str(talk.id) + ".wav",
+            normalized_path,
             "--loudness-range-target",
             "3",
             "-t",
@@ -100,7 +103,11 @@ def process_talk(talk):
     hq_mp3 = AudioSegment.from_file("/tmp/normalized" + str(talk.id) + ".wav")
 
     # Create a reduced-bitrate MP3 from the normalized file
-    hq_mp3.export(get_path_for_file(talk.id, "processed", talk.title, talk.speaker), format="mp3", bitrate="128k")
+    hq_mp3.export(
+        get_path_for_file(talk.id, "processed", talk.title, talk.speaker),
+        format="mp3",
+        bitrate="128k",
+    )
 
     # Put appropriate metadata on the resultant mp3
     mp3 = ID3(get_path_for_file(talk.id, "processed", talk.title, talk.speaker))
@@ -129,6 +136,13 @@ def process_talk(talk):
             get_cd_dir_for_talk(talk.id) + "/" + str(idx).zfill(2) + ".wav",
             format="wav",
         )
+
+    # Clean up
+    if os.path.exists(toptail_path):
+        os.remove(toptail_path)
+
+    if os.path.exists(normalized_path):
+        os.remove(normalized_path)
 
 
 @click.command()

@@ -37,7 +37,7 @@ class Talk(db.Model):
                 self.end_time,
                 self.venue,
                 self.recorder_name,
-                self.is_priority
+                self.is_priority,
             )
         )
 
@@ -50,15 +50,10 @@ class Recorder(db.Model):
 
     talks = db.relationship("Talk", backref="recorded_by", order_by="Talk.start_time")
 
-
     def __repr__(self):
         return (
             "<Recorder(name='%s', max_shifts_per_day='%d', number_of_talks='%d'))>"
-            % (
-                self.name,
-                self.max_shifts_per_day,
-                len(self.talks)
-            )
+            % (self.name, self.max_shifts_per_day, len(self.talks))
         )
 
 
