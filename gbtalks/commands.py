@@ -112,13 +112,13 @@ def process_talk(talk):
     # Put appropriate metadata on the resultant mp3
     mp3 = ID3(get_path_for_file(talk.id, "processed", talk.title, talk.speaker))
 
-    mp3["TALB"] = TALB(text="Greenbelt Festival Talks " + app.config["GB_FRIDAY"][:-4])
-    mp3["TCOP"] = TCOP(text=app.config["GB_FRIDAY"][:-4] + " Greenbelt Festivals")
+    mp3["TALB"] = TALB(text="Greenbelt Festival Talks " + app.config["GB_FRIDAY"][0:4])
+    mp3["TCOP"] = TCOP(text=app.config["GB_FRIDAY"][0:4] + " Greenbelt Festivals")
     mp3["TIT2"] = TIT2(text=talk.title)
     mp3["TPE1"] = TPE1(text=talk.speaker)
     mp3["TPE2"] = TPE2(text=talk.speaker)
     mp3["TRCK"] = TRCK(text=str(talk.id))
-    mp3["TDRC"] = TDRC(text=str(app.config["GB_FRIDAY"][:-4]))
+    mp3["TDRC"] = TDRC(text=str(app.config["GB_FRIDAY"][0:4]))
     mp3["COMM"] = COMM(text=talk.description)
     mp3["TCMP"] = TCMP(text="1")
 
