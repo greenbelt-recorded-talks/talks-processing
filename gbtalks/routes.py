@@ -32,15 +32,20 @@ current_user = LocalProxy(lambda: _get_user())
 
 
 def get_path_for_file(talk_id, file_type):
-    path = (
-        app.config["TALKS_DIRS"][file_type]["directory"]
-        + "/gb"
-        + app.config["GB_FRIDAY"][2:4]
-        + "-"
-        + str(talk_id).zfill(3)
-        + app.config["TALKS_DIRS"][file_type]["suffix"]
-        + ".mp3"
-    )
+
+    if file_type in {"raw", "edited", "processed"}:
+        path = (
+            app.config["TALKS_DIRS"][file_type]["directory"]
+            + "/gb"
+            + app.config["GB_FRIDAY"][2:4]
+            + "-"
+            + str(talk_id).zfill(3)
+            + app.config["TALKS_DIRS"][file_type]["suffix"]
+            + ".mp3"
+        )
+
+    if file_type == "recorder_notes":
+        path = app.config["IMG_DIR"] + "/gb" + str(app.config["GB_FRIDAY"][2:4]) + "-" + talk_id + "recorder_notes.jpg" 
 
     return path
 
@@ -135,6 +140,7 @@ def talks():
     raw_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
     edited_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
     processed_files = [x.name for x in os.scandir(app.config["PROCESSED_DIR"])]
+    notes_files = [x.name for x in os.scandir(app.config["IMG_DIR"])]
 
     return render_template(
         "talks.html",
@@ -143,6 +149,7 @@ def talks():
         raw_files=raw_files,
         edited_files=edited_files,
         processed_files=processed_files,
+        notes_files=notes_files
     )
 
 
@@ -388,7 +395,7 @@ def editing():
 @login_required
 @current_user_is_team_leader
 def getfile():
-    """Download a talk file"""
+    """Download a file"""
 
     file_type = request.args.get("file_type")
     talk_id = request.args.get("talk_id")
@@ -412,10 +419,73 @@ def upload_cover_image():
 
     if file:
         kind = filetype.guess(file.read(261))
+        file.seek(0)
         if kind.extension == "png":
             file.save(app.config["IMG_DIR"] + "/alltalksicon.png")
         else:
             flash("Must be a PNG")
+
+    return redirect(url_for(source_path))
+
+
+@app.route("/uploadtalk", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def uploadtalk():
+    """Upload a talk file, then redirect back to where you came from"""
+
+    file_type = request.form.get("file_type")
+    talk_id = request.form.get("talk_id")
+
+    source_path = request.referrer.split("/")[-1]
+
+    if "file" not in request.files:
+        flash("No file part")
+        return redirect(request.url)
+
+    file = request.files["file"]
+
+    if file:
+        # Save it to /tmp for now
+        uploaded_file_path = os.path.join("/tmp", shortuuid.uuid())
+        file.save(uploaded_file_path)
+        # Check the size, and then see if another file of the same size exists in the relevant directory for the file type, error if so
+        uploaded_file_size = os.path.getsize(uploaded_file_path)
+
+        for root, dirs, files in os.walk(app.config["UPLOAD_DIR"]):
+            for name in files:
+                if name.endswith(".mp3"):
+                    existing_file_path = os.path.join(root, name)
+                    existing_file_size = os.path.getsize(existing_file_path)
+
+                    if existing_file_size == uploaded_file_size:
+                        app.logger.error(
+                            "File size collision detected: %s has size %s bytes, which is the same as uploaded file %s",
+                            existing_file_path,
+                            existing_file_size,
+                            uploaded_file_path,
+                        )
+
+                        error_message = """
+The file you uploaded had the same file size as an existing file: {}; {} bytes
+
+Your file has been uploaded to {}
+
+This almost certainly means that the file has the same contents. Usually, this means that a mistake is in the process of being made.
+
+Speak to your nearest team leader for advice.
+
+If you are the nearest team leader, check the contents of the existing file and the new file carefully, and make a decision as to which one is the correct one. You might need to delete the existing file to allow this one to be uploaded. Don't forget to clean up when you're done - such as checking for CD files, processed files, database entries, already-shipped USBs, etc.
+""".format(
+                            existing_file_path, existing_file_size, uploaded_file_path
+                        )
+
+                        return render_template("error.html", error_text=error_message)
+
+        # If we've made it this far, we're all good - move the file into position
+        shutil.move(
+            uploaded_file_path, os.path.join(get_path_for_file(talk_id, file_type))
+        )
 
     return redirect(url_for(source_path))
 
@@ -439,7 +509,7 @@ def uploadrecordernotes():
     if file:
         kind = filetype.guess(file.read(261))
         if kind.extension == "jpg":
-            file.save(app.config["IMG_DIR"] + "/recordernotes" + talk_id + ".jpg")
+            file.save(app.config["IMG_DIR"] + "/gb" + str(app.config["GB_FRIDAY"][2:4]) + "-" + talk_id + "recorder_notes.jpg")
         else:
             flash("Must be a JPEG")
     

@@ -78,7 +78,7 @@ Note that "Additional Talks" (talks with IDs > 100) should be edited only when r
 			<tr><td>{% if talk.id in raw_talks_available %} 
 					<a href="{{ url_for('getfile', talk_id=talk.id, file_type='edited') }}">Edited File</a> {% endif %}</td></tr>
 			<tr><td>
-				<input type=file name=editedfile>
+				<input type=file name=file>
 			</td></tr>
 		</table>
 	</td>

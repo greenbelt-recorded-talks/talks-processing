@@ -22,14 +22,14 @@ def run_command(cmd):
         os.system(cmd)
 
 
-def get_path_for_file(talk_id, file_type, title, speaker):
+def get_path_for_file(talk_id, file_type, title=None, speaker=None):
     # Processed files should have more descriptive filenames
     # Note 254 character limit for USB stick filenames
 
-    if "," in speaker:
-        speaker = speaker.split(",")[0] + " & others"
-
     if file_type == "processed":
+        if "," in speaker:
+            speaker = speaker.split(",")[0] + " & others"
+        
         filename = (
             app.config["TALKS_DIRS"][file_type]["directory"]
             + "/Greenbelt "
@@ -100,10 +100,10 @@ def process_talk(talk):
     hq_mp3 = AudioSegment.from_file("/tmp/normalized" + str(talk.id) + ".wav")
 
     # Create a reduced-bitrate MP3 from the normalized file
-    hq_mp3.export(get_path_for_file(talk.id, "processed"), format="mp3", bitrate="128k")
+    hq_mp3.export(get_path_for_file(talk.id, "processed", talk.title, talk.speaker), format="mp3", bitrate="128k")
 
     # Put appropriate metadata on the resultant mp3
-    mp3 = ID3(get_path_for_file(talk.id, "processed"))
+    mp3 = ID3(get_path_for_file(talk.id, "processed", talk.title, talk.speaker))
 
     mp3["TALB"] = TALB(text="Greenbelt Festival Talks " + app.config["GB_FRIDAY"][:-4])
     mp3["TCOP"] = TCOP(text=app.config["GB_FRIDAY"][:-4] + " Greenbelt Festivals")
@@ -158,9 +158,9 @@ def convert_talks():
     processed_files = (
         set(
             [
-                x.name.replace("mp3.mp3", "").replace(gb_prefix, "")
+                x.name.split(" ")[2]
                 for x in os.scandir(app.config["PROCESSED_DIR"])
-                if x.name.endswith("mp3.mp3")
+                if x.name.endswith(".mp3")
             ]
         )
         or set()

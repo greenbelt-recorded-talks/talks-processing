@@ -48,9 +48,9 @@
 
 {% set has_raw = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+ "_RAW.mp3" in raw_files else "false" %}
 {% set has_edited = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_EDITED.mp3" in edited_files else "false" %}
-{% set has_processed = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"mp3.mp3" in processed_files else "false" %}
+{% set has_processed = "true" if 'Greenbelt 20' + gb_year + ': ' + ('%03d' % talk.id)|string+" " + talk.title + " | " + talk.speaker + ".mp3" in processed_files else "false" %}
+{% set has_notes = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string + "recorder_notes.jpg" in notes_files else "false" %}
 {% set is_priority = "true" if talk["is_priority"] else "false" %} 
-
 
 <li class="uk-card uk-card-body uk-card-default" data-has-raw="{{ has_raw }}" data-has-edited="{{ has_edited }}" data-has-processed="{{ has_processed }}" data-priority="{{ is_priority }}" >
 	<div class="uk-width-1-1">
@@ -103,6 +103,15 @@
         			{% endif %}
 			</div>
     		</div>
+                <div>
+                        <div class="uk-card uk-card-default uk-card-body">
+                                <span>Recorders Notes</span>
+                                {% if has_notes == "true" %}
+				<p><img src="{{ url_for("getfile", file_type="recorder_notes", talk_id=talk.id) }}" style="width:50px;height:100px;" ></p>
+                                <p><a href="{{ url_for("getfile", file_type="recorder_notes", talk_id=talk.id) }}">Download</a></p>
+                                {% endif %}
+                        </div>
+                </div>
 	</div>
 </div>
 </li>
