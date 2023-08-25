@@ -10,6 +10,8 @@
 
 The talks below are the ones that have started, but that RAW files haven't yet been uploaded for.
 
+If you have a recorder notes photo, upload this first, as the talk will disappear from this list when the RAW file is uploaded
+
 <table>
 <tr>
 	<th>Talk ID</th>
@@ -18,7 +20,8 @@ The talks below are the ones that have started, but that RAW files haven't yet b
         <th>Venue</th>
         <th>Speaker</th>
         <th>Title</th>
-	<th>Upload</th>
+	<th>RAW file</th>
+	<th>Recorder Notes Photo</th>
 </tr>
 {% for talk in talks_to_upload %}
 {% if talk.id not in raw_talks_available %}
@@ -37,6 +40,13 @@ The talks below are the ones that have started, but that RAW files haven't yet b
                         <button>Upload</button>
                 </form>
 	</td>
+	<td>
+                <form method=post enctype=multipart/form-data name=upload_photo action=uploadrecordernotes>
+                        <input name=file type=file id=file accept=".jpg">
+                        <input name=talk_id type=hidden value="{{talk.id}}">
+                        <button>Upload</button>
+                </form>
+        </td>
 	</form>
 </tr>
 {% endif %}

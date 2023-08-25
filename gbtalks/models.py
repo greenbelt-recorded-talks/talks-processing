@@ -23,6 +23,8 @@ class Talk(db.Model):
     recorder_name = db.Column(db.String, db.ForeignKey("recorders.name"))
     editor_name = db.Column(db.String, db.ForeignKey("editors.name"))
 
+    notes_photo = db.Column(db.LargeBinary)
+
     def __repr__(self):
         return (
             "<Talk(id='%d', title='%s', description='%s', day='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s', priority='%s')>"
@@ -35,7 +37,7 @@ class Talk(db.Model):
                 self.end_time,
                 self.venue,
                 self.recorder_name,
-                self.is_priority,
+                self.is_priority
             )
         )
 

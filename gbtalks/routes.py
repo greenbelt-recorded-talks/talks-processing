@@ -131,10 +131,6 @@ def talks():
                 db.session.commit()
                 return redirect(url_for("talks", filename=filename))
 
-    show_additional_talks = (
-        True if request.args.get("show_additional_talks") == "true" else False
-    )
-
     talks = Talk.query.order_by(asc(Talk.start_time)).all()
     raw_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
     edited_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
@@ -147,7 +143,6 @@ def talks():
         raw_files=raw_files,
         edited_files=edited_files,
         processed_files=processed_files,
-        show_additional_talks=show_additional_talks,
     )
 
 
@@ -269,7 +264,7 @@ def front_desk():
         or set()
     )
 
-    past_horizon = datetime.now() + timedelta(hours=1)
+    past_horizon = datetime.now() + timedelta(minutes=30)
 
     talks_to_upload = Talk.query.filter(Talk.start_time < past_horizon).order_by(
         asc(Talk.start_time)
@@ -425,65 +420,29 @@ def upload_cover_image():
     return redirect(url_for(source_path))
 
 
-@app.route("/uploadtalk", methods=["POST"])
+@app.route("/uploadrecordernotes", methods=["POST"])
 @login_required
 @current_user_is_team_leader
-def uploadtalk():
-    """Upload a talk file, then redirect back to where you came from"""
+def uploadrecordernotes():
+    """Upload a recorder notes photo, then redirect back where you came from"""
 
-    file_type = request.form.get("file_type")
     talk_id = request.form.get("talk_id")
 
     source_path = request.referrer.split("/")[-1]
 
     if "file" not in request.files:
-        flash("No file part")
+        flash("No file!")
         return redirect(request.url)
 
     file = request.files["file"]
 
     if file:
-        # Save it to /tmp for now
-        uploaded_file_path = os.path.join("/tmp", shortuuid.uuid())
-        file.save(uploaded_file_path)
-        # Check the size, and then see if another file of the same size exists in the relevant directory for the file type, error if so
-        uploaded_file_size = os.path.getsize(uploaded_file_path)
-
-        for root, dirs, files in os.walk(app.config["UPLOAD_DIR"]):
-            for name in files:
-                if name.endswith(".mp3"):
-                    existing_file_path = os.path.join(root, name)
-                    existing_file_size = os.path.getsize(existing_file_path)
-
-                    if existing_file_size == uploaded_file_size:
-                        app.logger.error(
-                            "File size collision detected: %s has size %s bytes, which is the same as uploaded file %s",
-                            existing_file_path,
-                            existing_file_size,
-                            uploaded_file_path,
-                        )
-
-                        error_message = """
-The file you uploaded had the same file size as an existing file: {}; {} bytes
-
-Your file has been uploaded to {}
-
-This almost certainly means that the file has the same contents. Usually, this means that a mistake is in the process of being made.
-
-Speak to your nearest team leader for advice.
-
-If you are the nearest team leader, check the contents of the existing file and the new file carefully, and make a decision as to which one is the correct one. You might need to delete the existing file to allow this one to be uploaded. Don't forget to clean up when you're done - such as checking for CD files, processed files, database entries, already-shipped USBs, etc.
-""".format(
-                            existing_file_path, existing_file_size, uploaded_file_path
-                        )
-
-                        return render_template("error.html", error_text=error_message)
-
-        # If we've made it this far, we're all good - move the file into position
-        shutil.move(
-            uploaded_file_path, os.path.join(get_path_for_file(talk_id, file_type))
-        )
-
+        kind = filetype.guess(file.read(261))
+        if kind.extension == "jpg":
+            file.save(app.config["IMG_DIR"] + "/recordernotes" + talk_id + ".jpg")
+        else:
+            flash("Must be a JPEG")
+    
     return redirect(url_for(source_path))
 
 
