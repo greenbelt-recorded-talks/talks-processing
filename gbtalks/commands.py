@@ -7,6 +7,8 @@ from flask import current_app as app
 from flask.cli import with_appcontext
 from werkzeug.exceptions import MethodNotAllowed, NotFound
 
+import shutil
+
 from .models import db, Talk, Recorder, Editor
 import sys
 from tendo import singleton
@@ -23,18 +25,26 @@ def run_command(cmd):
 
 
 def get_path_for_file(talk_id, file_type, title=None, speaker=None):
-    # Processed files should have more descriptive filenames
-    # Note 254 character limit for USB stick filenames
+    if file_type in {"raw", "edited"}:
+        path = (
+            app.config["TALKS_DIRS"][file_type]["directory"]
+            + "/gb"
+            + app.config["GB_FRIDAY"][2:4]
+            + "-"
+            + str(talk_id).zfill(3)
+            + app.config["TALKS_DIRS"][file_type]["suffix"]
+            + ".mp3"
+        )
 
     if file_type == "processed":
         if "," in speaker:
             speaker = speaker.split(",")[0] + " & others"
 
-        filename = (
+        path = (
             app.config["TALKS_DIRS"][file_type]["directory"]
-            + "/Greenbelt "
-            + app.config["GB_FRIDAY"][0:4]
-            + ": "
+            + "/GB"
+            + app.config["GB_FRIDAY"][2:4]
+            + "-"
             + str(talk_id).zfill(3)
             + " "
             + title[:120]
@@ -43,19 +53,17 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
             + ".mp3"
         )
 
-        return filename
+    if file_type == "recorder_notes":
+        path = (
+            app.config["IMG_DIR"]
+            + "/gb"
+            + str(app.config["GB_FRIDAY"][2:4])
+            + "-"
+            + talk_id
+            + "recorder_notes.jpg"
+        )
 
-    # otherwise...
-
-    return (
-        app.config["TALKS_DIRS"][file_type]["directory"]
-        + "/gb"
-        + app.config["GB_FRIDAY"][2:4]
-        + "-"
-        + str(talk_id).zfill(3)
-        + app.config["TALKS_DIRS"][file_type]["suffix"]
-        + ".mp3"
-    )
+    return path
 
 
 def get_cd_dir_for_talk(talk):
@@ -100,7 +108,7 @@ def process_talk(talk):
     )
 
     # Load the normalised file back in
-    hq_mp3 = AudioSegment.from_file("/tmp/normalized" + str(talk.id) + ".wav")
+    hq_mp3 = AudioSegment.from_file(normalized_path)
 
     # Create a reduced-bitrate MP3 from the normalized file
     hq_mp3.export(
@@ -128,21 +136,26 @@ def process_talk(talk):
         )
     mp3.save()
 
-    # Create files for later CD burning
-    # Split the mp3 into 5min (300k ms) slices
-    os.makedirs(get_cd_dir_for_talk(talk.id))
-    for idx, cd_file in enumerate(hq_mp3[::300000]):
-        cd_file.export(
-            get_cd_dir_for_talk(talk.id) + "/" + str(idx).zfill(2) + ".wav",
-            format="wav",
-        )
-
     # Clean up
     if os.path.exists(toptail_path):
         os.remove(toptail_path)
 
     if os.path.exists(normalized_path):
         os.remove(normalized_path)
+
+    # Create files for later CD burning
+    cd_dir = get_cd_dir_for_talk(talk.id)
+    if os.path.exists(cd_dir):
+        shutil.rmtree(cd_dir)
+
+    os.makedirs(cd_dir)
+
+    # Split the mp3 into 5min (300k ms) slices
+    for idx, cd_file in enumerate(hq_mp3[::300000]):
+        cd_file.export(
+            cd_dir + "/" + str(idx).zfill(2) + ".wav",
+            format="wav",
+        )
 
 
 @click.command()
@@ -172,7 +185,7 @@ def convert_talks():
     processed_files = (
         set(
             [
-                x.name.split(" ")[2]
+                x.name.split("-")[1].split(" ")[0]
                 for x in os.scandir(app.config["PROCESSED_DIR"])
                 if x.name.endswith(".mp3")
             ]

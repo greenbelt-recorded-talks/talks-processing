@@ -48,7 +48,7 @@
 
 {% set has_raw = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+ "_RAW.mp3" in raw_files else "false" %}
 {% set has_edited = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_EDITED.mp3" in edited_files else "false" %}
-{% set has_processed = "true" if 'Greenbelt 20' + gb_year + ': ' + ('%03d' % talk.id)|string+" " + talk.title + " | " + talk.speaker + ".mp3" in processed_files else "false" %}
+{% set has_processed = "true" if 'GB' + gb_year + '-' + ('%03d' % talk.id)|string+" " + talk.title + " | " + talk.speaker + ".mp3" in processed_files else "false" %}
 {% set has_notes = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string + "recorder_notes.jpg" in notes_files else "false" %}
 {% set is_priority = "true" if talk["is_priority"] else "false" %} 
 
