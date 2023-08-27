@@ -54,9 +54,13 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
             + "-"
             + str(talk_id).zfill(3)
             + " "
-            + title[:120]
+            + title[:120].replace(
+                "/", "∕"
+            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
             + " | "
-            + speaker[:120]
+            + speaker[:120].replace(
+                "/", "∕"
+            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
             + ".mp3"
         )
 
@@ -162,7 +166,9 @@ def talks():
     talks = Talk.query.order_by(asc(Talk.start_time)).all()
     raw_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
     edited_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
-    processed_files = [x.name for x in os.scandir(app.config["PROCESSED_DIR"])]
+    processed_files = [
+        x.name.split(" ")[0] for x in os.scandir(app.config["PROCESSED_DIR"])
+    ]
     notes_files = [x.name for x in os.scandir(app.config["IMG_DIR"])]
 
     return render_template(
@@ -552,6 +558,23 @@ def uploadrecordernotes():
         else:
             flash("Must be a JPEG")
 
+    return redirect(url_for(source_path))
+
+
+@app.route("/deletetalk", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def deletetalk():
+    """Delete a talk file"""
+
+    file_type = request.form.get("file_type")
+    talk_id = request.form.get("talk_id")
+
+    talk = Talk.query.get(talk_id)
+
+    os.remove(get_path_for_file(talk_id, file_type, talk.title, talk.speaker))
+
+    source_path = request.referrer.split("/")[-1]
     return redirect(url_for(source_path))
 
 

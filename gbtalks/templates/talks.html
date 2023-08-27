@@ -48,7 +48,7 @@
 
 {% set has_raw = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+ "_RAW.mp3" in raw_files else "false" %}
 {% set has_edited = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string+"_EDITED.mp3" in edited_files else "false" %}
-{% set has_processed = "true" if 'GB' + gb_year + '-' + ('%03d' % talk.id)|string+" " + talk.title + " | " + talk.speaker + ".mp3" in processed_files else "false" %}
+{% set has_processed = "true" if 'GB' + gb_year + '-' + ('%03d' % talk.id)|string in processed_files else "false" %}
 {% set has_notes = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string + "recorder_notes.jpg" in notes_files else "false" %}
 {% set is_priority = "true" if talk["is_priority"] else "false" %} 
 
@@ -69,50 +69,64 @@
                                 	<p><audio controls src="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}"></audio></p>
         				<p><a href="{{ url_for("getfile", file_type="raw", talk_id=talk.id) }}">Download</a></p>
 					{% endif %}
-
+				<hr class="uk-divider-icon"/>
+				Replace file:
 				<form method=post enctype=multipart/form-data name=upload_talk action=uploadtalk>
                 			<input name=file type=file id=file accept=".mp3">
                 			<input name=file_type type=hidden value="raw">
                 			<input name=talk_id type=hidden value="{{talk.id}}">
                 			<button>Upload</button>
         			</form>
-			</div>
-    		</div>
-    		<div>
-        		<div class="uk-card uk-card-default uk-card-body">
+				<hr class="uk-divider-icon"/>
+				</div>
+    			</div>
+    			<div>
+        			<div class="uk-card uk-card-default uk-card-body">
 				<span>Edited</span>
 				{% if has_edited == "true" %}
 				<p><audio controls src="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}"></audio></p>
         			<p><a href="{{ url_for("getfile", file_type="edited", talk_id=talk.id) }}">Download</a></p>
         			{% endif %}
-
-       				 <form method=post enctype=multipart/form-data name=upload_edited_talk action=uploadtalk>
+				<hr class="uk-divider-icon"/>
+				Replace file:
+       				<form method=post enctype=multipart/form-data name=upload_edited_talk action=uploadtalk>
                 			<input name=file type=file id=file accept=".mp3">
                 			<input name=file_type type=hidden value="edited">
                 			<input name=talk_id type=hidden value="{{talk.id}}">
                 			<button>Upload</button>
         			</form>
-			</div>
-    		</div>
-    		<div>
-        		<div class="uk-card uk-card-default uk-card-body">
+				<hr class="uk-divider-icon"/>
+
+				</div>
+    			</div>
+		</div>
+		<div class="uk-child-width-expand@s uk-text-center" uk-grid>
+    			<div>
+        			<div class="uk-card uk-card-default uk-card-body">
 				<span>Processed</span>
 				{% if has_processed == "true" %}
                                 <p><audio controls src="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}"></audio></p>
         			<p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
-        			{% endif %}
-			</div>
-    		</div>
-                <div>
-                        <div class="uk-card uk-card-default uk-card-body">
+				<hr class="uk-divider-icon"/>
+				<form action=deletetalk method=post onSubmit="return confirm('Are you sure you want to delete the processed file for talk {{ talk.id }}?')">
+					<input name=file_type type=hidden value="processed">
+					<input name=talk_id type=hidden value="{{talk.id}}">
+					<button style="color:red">Delete Processed File</button>
+				</form>
+				{% endif %}
+
+				</div>
+    			</div>
+                	<div>
+                        	<div class="uk-card uk-card-default uk-card-body">
                                 <span>Recorders Notes</span>
                                 {% if has_notes == "true" %}
 				<p><img src="{{ url_for("getfile", file_type="recorder_notes", talk_id=talk.id) }}" style="width:50px;height:100px;" ></p>
                                 <p><a href="{{ url_for("getfile", file_type="recorder_notes", talk_id=talk.id) }}">Download</a></p>
                                 {% endif %}
-                        </div>
-                </div>
-	</div>
+                        	</div>
+                	</div>
+		</div>
 </div>
 </li>
 

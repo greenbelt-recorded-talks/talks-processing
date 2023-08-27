@@ -47,9 +47,13 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
             + "-"
             + str(talk_id).zfill(3)
             + " "
-            + title[:120]
+            + title[:120].replace(
+                "/", "∕"
+            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
             + " | "
-            + speaker[:120]
+            + speaker[:120].replace(
+                "/", "∕"
+            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
             + ".mp3"
         )
 
