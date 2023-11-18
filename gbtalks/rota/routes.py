@@ -20,6 +20,23 @@ break_between_shifts = 3
 def talk_would_clash(recorder, talk):
     # A talk clashes if it starts while the recorder is currently recording, or within 20 mins of another talk ending
 
+# Examples:
+# Recorder has existing talk at 16:00. Candidate talk is at 17:00.
+# First condition:
+# Candidate talk clashes because:
+# * It starts after 16:00
+# AND
+# * It starts before 17:20 (assuming a 1h talk)
+#
+# Second condition:
+# Candidate talk clashes because:
+# * It ends after 16:00
+# AND
+# * It ends before 17:20 (assuming a 1h talk)
+#
+# A talk at 17:30 would not clash. 
+#
+
     for existing_talk in recorder.talks:
         if existing_talk.start_time <= talk.start_time <= (
             existing_talk.end_time + timedelta(minutes=20)
@@ -167,7 +184,7 @@ def find_recorder_for_talk(talk):
         if candidate_recorder.talks:
             candidate_recorders_last_talk = candidate_recorder.talks[-1]
 
-            # Move on if the recorder is current recording
+            # Move on if the recorder is currently recording
             if talk_would_clash(candidate_recorder, talk):
                 continue
 
