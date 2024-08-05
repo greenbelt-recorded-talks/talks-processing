@@ -17,7 +17,7 @@ class Config:
     PROCESSED_DIR = os.getenv("PROCESSED_DIR", "/storage/processed")
     CD_DIR = os.getenv("CD_DIR", "/storage/cds")
     TOP_TAIL_DIR = os.getenv("TOP_TAIL_DIR", "/home/gbtalks/top_tail")
-    IMG_DIR = os.getenv("IMG_DIR", "/home/gbtalks/images")
+    IMG_DIR = os.getenv("IMG_DIR", "/storage/images")
     USB_GOLD_DIR = os.getenv("USB_GOLD_DIR", "/home/gbtalks/usb_gold")
 
     TALKS_DIRS = {

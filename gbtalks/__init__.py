@@ -54,7 +54,8 @@ def create_app():
     setup_login(app)
 
     # Use Markdown
-    from flaskext.markdown import Markdown
+
+    from .markdown.markdown import Markdown
 
     Markdown(app)
 

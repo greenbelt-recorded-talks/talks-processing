@@ -7,11 +7,10 @@ from flask import (
     redirect,
     url_for,
     render_template,
-    make_response,
     send_from_directory,
     send_file,
 )
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, timedelta
 from flask import current_app as app
 from flask_login import login_required, logout_user
 from flask_login.utils import _get_user
@@ -21,80 +20,16 @@ from .models import db, Talk, Recorder, Editor
 from werkzeug.utils import secure_filename
 from werkzeug.local import LocalProxy
 import os
-import random
-import sys
 import shutil
 import shortuuid
 import pprint
+from .libgbtalks import (
+    get_path_for_file, 
+    start_time_of_talk
+)
 
 # current_user is a proxy for the current user
 current_user = LocalProxy(lambda: _get_user())
-
-
-def get_path_for_file(talk_id, file_type, title=None, speaker=None):
-    if file_type in {"raw", "edited"}:
-        path = (
-            app.config["TALKS_DIRS"][file_type]["directory"]
-            + "/gb"
-            + app.config["GB_FRIDAY"][2:4]
-            + "-"
-            + str(talk_id).zfill(3)
-            + app.config["TALKS_DIRS"][file_type]["suffix"]
-            + ".mp3"
-        )
-
-    if file_type == "processed":
-        if "," in speaker:
-            speaker = speaker.split(",")[0] + " & others"
-
-        path = (
-            app.config["TALKS_DIRS"][file_type]["directory"]
-            + "/GB"
-            + app.config["GB_FRIDAY"][2:4]
-            + "-"
-            + str(talk_id).zfill(3)
-            + " "
-            + title[:120].replace(
-                "/", "∕"
-            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
-            + " | "
-            + speaker[:120].replace(
-                "/", "∕"
-            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
-            + ".mp3"
-        )
-
-    if file_type == "recorder_notes":
-        path = (
-            app.config["IMG_DIR"]
-            + "/gb"
-            + str(app.config["GB_FRIDAY"][2:4])
-            + "-"
-            + talk_id
-            + "recorder_notes.jpg"
-        )
-
-    return path
-
-
-def start_time_of_talk(day, time):
-    """Convert "Greenbelt Days" to real days, and parse out the start times of talks"""
-    fri_of_gb = datetime.strptime(app.config["GB_FRIDAY"], "%Y-%m-%d").date()
-    days = {"Friday": 0, "Saturday": 1, "Sunday": 2, "Monday": 3}
-
-    try:
-        day_of_talk = fri_of_gb + timedelta(days=days.get(day))
-    except TypeError:
-        day_of_talk = datetime.strptime(day, "%d/%m/%y").date()
-
-    try:
-        time_of_talk = datetime.strptime(time, "%I:%M %p").time()
-    except ValueError:
-        try:
-            time_of_talk = datetime.strptime(time, "%H:%M:%S").time()
-        except ValueError:
-            time_of_talk = datetime.strptime(time, "%H:%M").time()
-    return datetime.combine(day_of_talk, time_of_talk)
 
 
 def current_user_is_team_leader(func):
@@ -180,6 +115,29 @@ def talks():
         processed_files=processed_files,
         notes_files=notes_files,
     )
+
+@app.route("/edit_talk", methods=["GET","POST"])
+@login_required
+@current_user_is_team_leader
+def edit_talk():
+    """Edit an individual talk in the database"""
+
+    if request.method == "GET":
+        talk_id = request.args.get("talk_id")
+        talk = Talk.query.get(talk_id)
+        return render_template("edit_talk.html",
+                                talk_id=talk.id,
+                                title=talk.title
+                                )
+
+
+    if request.method == "POST":
+        talk_id = request.form.get("talk_id")
+        talk = Talk.query.get(talk_id)
+
+        talk.title = request.form.get("title")
+        db.session.commit()
+        return redirect(url_for("talks") + "#talk_" +  talk_id)
 
 
 @app.route("/setup", methods=["GET"])

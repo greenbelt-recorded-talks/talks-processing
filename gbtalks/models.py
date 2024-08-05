@@ -19,15 +19,18 @@ class Talk(db.Model):
 
     is_priority = db.Column(db.Boolean)
     is_rotaed = db.Column(db.Boolean)
+    is_cleared = db.Column(db.Boolean)
+    
+    content_warning = db.Column(db.String)
+
+    notes_photo = db.Column(db.LargeBinary)
 
     recorder_name = db.Column(db.String, db.ForeignKey("recorders.name"))
     editor_name = db.Column(db.String, db.ForeignKey("editors.name"))
 
-    notes_photo = db.Column(db.LargeBinary)
-
     def __repr__(self):
         return (
-            "<Talk(id='%d', title='%s', description='%s', day='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s', priority='%s')>"
+            "<Talk(id='%d', title='%s', description='%s', day='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s', cleared='%s', content_warning='%s')>"
             % (
                 self.id,
                 self.title,
@@ -37,7 +40,8 @@ class Talk(db.Model):
                 self.end_time,
                 self.venue,
                 self.recorder_name,
-                self.is_priority,
+                self.is_cleared,
+                self.content_warning
             )
         )
 
