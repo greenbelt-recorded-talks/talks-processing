@@ -1,0 +1,117 @@
+---
+- name: Install Server Packages
+  hosts: localhost
+  become_user: root
+  become: true
+
+  tasks:
+    - name: Ensure all system packages are installed
+      ansible.builtin.apt:
+        name: 
+          - git
+          - zsh
+          - nginx
+          - ffmpeg
+          - htop
+          - iotop
+          - curl
+          - nmap
+          - python3.12-venv
+          - gcc
+          - python3-dev
+          - libpcre3
+          - libpcre3-dev
+        state: latest
+    - name: Create the gbtalks user
+      ansible.builtin.user:
+        name: gbtalks
+        shell: /bin/zsh
+        groups: syslog
+        append: yes
+
+- name: Set up the gbtalks user
+  hosts: localhost
+  become_user: root
+  become: true
+
+  roles:
+    - role: gantsign.oh-my-zsh
+      users:
+        - username: gbtalks
+          ohmyzsh:
+            theme: powerlevel10k/powerlevel10k
+    - role: diodonfrost.p10k
+      p10k_users: 
+        - gbtalks
+      zsh_plugin: ohmyzsh
+
+
+- name: Install the talks-processing application
+  hosts: localhost
+  become_user: gbtalks
+  become: true
+
+
+  tasks:
+    - name: Check out talks-processing repo
+      ansible.builtin.git:
+        repo: 'https://github.com/greenbelt-recorded-talks/talks-processing.git'
+        dest: /home/gbtalks/talks-processing
+    - name: Install Python requirements in venv
+      ansible.builtin.pip:
+        requirements: /home/gbtalks/talks-processing/requirements.txt
+        virtualenv: /home/gbtalks/talks-processing/.ve
+        virtualenv_command: python3 -m venv
+    - name: Configure the uwsgi service
+      ansible.builtin.copy:
+        src: gbtalks-uwsgi.conf
+        dest: /etc/systemd/system/gbtalks.service
+        owner: root
+        group: root
+        mode: '0644'
+      become_user: root
+      become: true
+    - name: Create the uwsgi log directory
+      ansible.builtin.file:
+        path: /var/log/uwsgi
+        state: directory
+        owner: root
+        group: gbtalks
+        mode: '0775'
+    - name: Create the uwsgi log file
+      ansible.builtin.file:
+        path: /var/log/uwsgi/gbtalks.log
+        state: touch
+        owner: gbtalks
+        group: gbtalks
+        mode: '0644'
+    - name: Copy the nginx configuration
+      ansible.builtin.copy:
+        src: gbtalks-nginx
+        dest: /etc/nginx/sites-available/gbtalks
+        owner: root
+        group: root
+        mode: '0644'
+      become_user: root
+      become: true
+    - name: Enable the site
+      ansible.builtin.file:
+        dest: /etc/nginx/sites-enabled/gbtalks
+        src: /etc/nginx/sites-available/gbtalks
+        state: link
+        owner: root
+        group: root
+      become_user: root
+      become: true
+    - name: Start the gbtalks service
+      ansible.builtin.service:
+        name: gbtalks
+        state: restarted
+      become_user: root
+      become: true
+    - name: Restart nginx
+      ansible.builtin.service:
+        name: nginx
+        state: restarted
+      become_user: root
+      become: true
