@@ -10,6 +10,7 @@ flake8
 mutagen
 pydub
 python-dotenv
+setuptools
 shortuuid
 tendo
 uwsgi
