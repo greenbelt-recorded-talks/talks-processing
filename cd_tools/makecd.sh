@@ -11,7 +11,7 @@ talk=$(printf %03d $1)
 
 echo $talk
 
-echo "Writing Talk GB23-" $talk " to drive $2"
-cd /storage/cds/gb23-$talk || exit 1
+echo "Writing Talk GB24-" $talk " to drive $2"
+cd /storage/cds/gb24-$talk || exit 1
 sudo wodim dev=/dev/sr$2 -dao -pad -audio -eject * 2>&1 | tee -a ~/cdlog.txt > /dev/null
-echo "TALK GB23-$talk WRITTEN TO DRIVE $2"
+echo "TALK GB24-$talk WRITTEN TO DRIVE $2"
