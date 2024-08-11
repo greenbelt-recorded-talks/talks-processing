@@ -120,7 +120,7 @@
         name: "Convert talks"
         minute: "*/5"
         job: "/home/gbtalks/talks-processing/conversion_cron.sh 2>&1 | logger -t gbtalks-conversion-cron"
-  -   name: Create the working directories
+    - name: Create the working directories
       ansible.builtin.file:
         path: "{{ item }}"
         state: directory
