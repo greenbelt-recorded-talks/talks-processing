@@ -548,6 +548,18 @@ def deletetalk():
     return redirect(url_for(source_path))
 
 
+@app.route("/talks_products.csv", methods=["GET"])
+def talks_products():
+    """ CSV download of talks products for import into the GB website """
+    talks = Talk.query.all()
+    return render_template(
+        "talks_products.csv",
+        talks=talks,
+        gb_short_year=app.config["GB_SHORT_YEAR"]
+    )
+
+
+
 @app.route("/logout")
 @login_required
 def logout():

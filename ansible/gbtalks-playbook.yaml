@@ -107,6 +107,7 @@
       ansible.builtin.service:
         name: gbtalks
         state: restarted
+        enabled: true
       become_user: root
       become: true
     - name: Restart nginx

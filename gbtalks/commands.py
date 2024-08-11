@@ -27,15 +27,15 @@ def run_command(cmd):
 # Character mapping table to avoid FAT filesystem character problems
 character_mapping = str.maketrans(
     {
-        '"', '＂',
-        '*', '＊',
-        '/', '∕',
-        ':','：',
-        '<','＜',
-        '>','＞',
-        '?','？',
-        '\\','＼',
-        '|','｜'
+        '"': '＂',
+        '*': '＊',
+        '/': '∕',
+        ':':'：',
+        '<':'＜',
+        '>':'＞',
+        '?':'？',
+        '\\':'＼',
+        '|':'｜'
     }
 )
 
