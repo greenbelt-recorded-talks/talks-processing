@@ -21,6 +21,7 @@
           - python3-dev
           - libpcre3
           - libpcre3-dev
+          - smartmontools
         state: latest
     - name: Create the gbtalks user
       ansible.builtin.user:
