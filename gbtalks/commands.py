@@ -24,6 +24,21 @@ def run_command(cmd):
         os.system(cmd)
 
 
+# Character mapping table to avoid FAT filesystem character problems
+character_mapping = str.maketrans(
+    {
+        '"', '＂',
+        '*', '＊',
+        '/', '∕',
+        ':','：',
+        '<','＜',
+        '>','＞',
+        '?','？',
+        '\\','＼',
+        '|','｜'
+    }
+)
+
 def get_path_for_file(talk_id, file_type, title=None, speaker=None):
     if file_type in {"raw", "edited"}:
         path = (
@@ -43,17 +58,13 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
         path = (
             app.config["TALKS_DIRS"][file_type]["directory"]
             + "/GB"
-            + app.config["GB_FRIDAY"][2:4]
-            + "-"
+            + app.config["GB_SHORT_YEAR"]
+            + " "
             + str(talk_id).zfill(3)
             + " "
-            + title[:120].replace(
-                "/", "∕"
-            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
-            + " | "
-            + speaker[:120].replace(
-                "/", "∕"
-            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
+            + title[:120].translate(character_mapping)
+            + " - "
+            + speaker[:120].translate(character_mapping)
             + ".mp3"
         )
 
@@ -61,10 +72,20 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
         path = (
             app.config["IMG_DIR"]
             + "/gb"
-            + str(app.config["GB_FRIDAY"][2:4])
+            + str(app.config["GB_SHORT_YEAR"])
             + "-"
             + talk_id
             + "recorder_notes.jpg"
+        )
+
+    if file_type == "web_mp3":
+        path = (
+            app.config["WEB_MP3_DIR"]
+            + "/gb"
+            + str(app.config["GB_SHORT_YEAR"])
+            + "-"
+            + talk_id
+            + "mp3.mp3"
         )
 
     return path
@@ -74,7 +95,7 @@ def get_cd_dir_for_talk(talk):
     return (
         app.config["CD_DIR"]
         + "/gb"
-        + app.config["GB_FRIDAY"][2:4]
+        + app.config["GB_SHORT_YEAR"]
         + "-"
         + str(talk).zfill(3)
         + "/"
@@ -92,9 +113,8 @@ def process_talk(talk):
     toptail_path = "/tmp/toptailed" + str(talk.id) + ".wav"
     hq_mp3.export(toptail_path, format="wav")
 
-    normalized_path = "/tmp/normalized" + str(talk.id) + ".wav"
-
     # Normalise to a fixed level
+    normalized_path = "/tmp/normalized" + str(talk.id) + ".wav"
     subprocess.call(
         [
             "ffmpeg-normalize",
@@ -140,12 +160,17 @@ def process_talk(talk):
         )
     mp3.save()
 
+
+
     # Clean up
     if os.path.exists(toptail_path):
         os.remove(toptail_path)
 
     if os.path.exists(normalized_path):
         os.remove(normalized_path)
+
+    # Copy the file to the web_mp3 directory with filename format gbXX-XXXmp3.mp3
+    shutil.copy(get_path_for_file(talk.id, "processed", talk.title, talk.speaker), get_path_for_file(talk.id, "web_mp3"))
 
     # Create files for later CD burning
     cd_dir = get_cd_dir_for_talk(talk.id)
