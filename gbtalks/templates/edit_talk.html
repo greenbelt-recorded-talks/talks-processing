@@ -5,20 +5,9 @@
 <h1 class="uk-heading-line uk-text-center"><span>Editing Talk {{ talk_id }} </span></h1>
 
 <div class="uk-card uk-card-default uk-card-body">
-
 <form action="edit_talk" method=post enctype=multipart/form-data>
 <input type="hidden" name="talk_id" value="{{ talk_id }}"/>
-
-<hr class="uk-divider-icon">
-
 <table class="uk-table uk-table-large uk-table-divider">
-    <caption>Talk ID: {{ talk_id }}</caption>
-    <thead>
-        <tr>
-            <th>Field</th>
-            <th>Value</th>
-        </tr>
-    </thead>
     <tbody>
         <tr>
             <td>Title</td>
@@ -26,11 +15,49 @@
         </tr>
         <tr>
             <td>Description</td>
+            <td><textarea class="uk-textarea" name="description" rows="8">{{ description }}"</textarea></td>
+        </tr>
+        <tr>
+            <td>Speaker</td>
+            <td><input class="uk-input" type="text" name="speaker" value="{{ speaker }}"/></td>
+        </tr>
+        <tr>
+            <td>Day</td>
+            <td>
+                <div class="uk-button uk-form-select uk-active" data-uk-form-select>
+                    <select class="uk-form-select" name="day">
+                        <option value="Friday" {% if day == "Friday" %}selected{% endif %}>Friday</option>
+                        <option value="Saturday" {% if day == "Saturday" %}selected{% endif %}>Saturday</option>
+                        <option value="Sunday" {% if day == "Sunday" %}selected{% endif %}>Sunday</option>
+                    </select>
+                </div>
+            </td>
+        </tr>
+        <tr>
+            <td>Start Time</td>
+            <td><input class="uk-input" type="time" name="start_time" value="{{ start_time }}"/></td>
+        </tr>
+        <tr>
+            <td>End Time</td>
+            <td><input class="uk-input" type="time" name="end_time" value="{{ end_time }}"/></td>
         </tr>
     </tbody>
 </table>
 
 <input type="submit" name="submit" value="Save" class="uk-button"/>
+
+</form>
+
+</div>
+
+<hr class="uk-divider-icon">
+
+
+<div><h4>Debug info:</h4>
+<span>
+    {{ talk|pprint }}
+</span>
+</div>
 
 </form>
 </div>

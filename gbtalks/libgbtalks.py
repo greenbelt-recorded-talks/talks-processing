@@ -46,8 +46,7 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
 
     return path
 
-
-def start_time_of_talk(day, time):
+def gb_time_to_datetime(day, time):
     """Convert "Greenbelt Days" to real days, and parse out the start times of talks"""
     fri_of_gb = datetime.strptime(app.config["GB_FRIDAY"], "%Y-%m-%d").date()
     days = {"Friday": 0, "Saturday": 1, "Sunday": 2, "Monday": 3}

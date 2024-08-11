@@ -25,7 +25,7 @@ import shortuuid
 import pprint
 from .libgbtalks import (
     get_path_for_file, 
-    start_time_of_talk
+    gb_time_to_datetime
 )
 
 # current_user is a proxy for the current user
@@ -77,7 +77,7 @@ def talks():
                     talksreader = csv.reader(csvfile)
                     next(talksreader, None)  # skip the headers
                     for talk_line in talksreader:
-                        start_time = start_time_of_talk(talk_line[3], talk_line[4])
+                        start_time = gb_time_to_datetime(talk_line[3], talk_line[4])
                         end_time = start_time + timedelta(hours=1)
                         is_priority = True if talk_line[7] == "Yes" else False
                         is_rotaed = True if talk_line[8] == "Yes" else False
@@ -127,7 +127,13 @@ def edit_talk():
         talk = Talk.query.get(talk_id)
         return render_template("edit_talk.html",
                                 talk_id=talk.id,
-                                title=talk.title
+                                title=talk.title,
+                                description=talk.description,
+                                speaker=talk.speaker,
+                                day=talk.day,
+                                start_time=talk.start_time.strftime("%H:%M:%S"),
+                                end_time=talk.end_time.strftime("%H:%M:%S"),
+                                talk=talk
                                 )
 
 
@@ -136,6 +142,12 @@ def edit_talk():
         talk = Talk.query.get(talk_id)
 
         talk.title = request.form.get("title")
+        talk.description = request.form.get("description")
+        talk.speaker = request.form.get("speaker")
+        talk.day = request.form.get("day")
+        talk.start_time = gb_time_to_datetime(request.form.get("day"), request.form.get("start_time"))
+        talk.end_time = gb_time_to_datetime(request.form.get("day"), request.form.get("end_time"))
+
         db.session.commit()
         return redirect(url_for("talks") + "#talk_" +  talk_id)
 
