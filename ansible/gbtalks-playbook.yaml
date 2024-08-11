@@ -52,7 +52,6 @@
   become_user: gbtalks
   become: true
 
-
   tasks:
     - name: Check out talks-processing repo
       ansible.builtin.git:
@@ -116,3 +115,38 @@
         state: restarted
       become_user: root
       become: true
+    - name: Set up conversion cron job
+      ansible.builtin.cron:
+        name: "Convert talks"
+        minute: "*/5"
+        job: "/home/gbtalks/talks-processing/conversion_cron.sh 2>&1 | logger -t gbtalks-conversion-cron"
+  -   name: Create the working directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: gbtalks
+        group: gbtalks
+        mode: '0775' 
+      loop:
+        - /storage
+        - /storage/uploads
+        - /storage/assets
+        - /storage/processed
+        - /storage/web_mp3s
+        - /storage/usb_gold
+        - /storage/cds
+
+- name: Set up backups
+  hosts: localhost
+  become_user: root
+  become: true
+
+  tasks:
+    - name: Create the backup directory
+      ansible.builtin.file:
+        path: /storage/backups
+        state: directory
+        owner: gbtalks
+        group: gbtalks
+        mode: '0775'
+
