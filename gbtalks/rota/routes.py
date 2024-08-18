@@ -11,8 +11,8 @@ from flask import current_app as app
 from gbtalks.models import db, Talk, Recorder
 
 shift_length = 3
-break_between_shifts = 3
-
+break_between_shifts = 2
+minimum_time_between_talks = 20
 
 def talk_would_clash(recorder, talk):
     # A talk clashes if it starts while the recorder is currently recording, or within 20 mins of another talk ending
@@ -36,9 +36,9 @@ def talk_would_clash(recorder, talk):
 
     for existing_talk in recorder.talks:
         if existing_talk.start_time <= talk.start_time <= (
-            existing_talk.end_time + timedelta(minutes=20)
+            existing_talk.end_time + timedelta(minutes=minimum_time_between_talks)
         ) or existing_talk.start_time <= talk.end_time <= (
-            existing_talk.end_time + timedelta(minutes=20)
+            existing_talk.end_time + timedelta(minutes=minimum_time_between_talks)
         ):
             return True
 
