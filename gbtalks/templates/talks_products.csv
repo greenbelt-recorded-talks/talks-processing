@@ -1,0 +1,6 @@
+Title,Description,Talk ID,Talk Variation ID,Media,Price,Virtual,Downloadable,Shipping Class,MP3 Filename,MP3 URL,Speakers,Festival,Date and Time,Panel,Venue,Categories,Talks Category,Parental Advisory,Explicit Content,,
+{% for talk in talks %}
+"{{ talk.title }}","{{ talk.description }}",GB{{ gb_short_year}}-{{ '%03d' % talk.id }},,,,,,,gb{{ gb_short_year}}-{{ '%03d' % talk.id }}mp3.mp3,/home/greenbeltorg/digital_downloads/gb{{ gb_short_year}}-{{ '%03d' % talk.id }}mp3.mp3,{{ talk.speaker }},20{{ gb_short_year }},"{{ talk.day }}
+,,GB{{ gb_short_year}}-{{ '%03d' % talk.id }}-DL,GB{{ gb_short_year}}-{{ '%03d' % talk.id }},download,3,yes,yes,,gb{{ gb_short_year}}-{{ '%03d' % talk.id }}mp3.mp3,/home/greenbeltorg/digital_downloads/gb{{ gb_short_year}}-{{ '%03d' % talk.id }}mp3.mp3
+,,GB{{ gb_short_year}}-{{ '%03d' % talk.id }}-DL,GB{{ gb_short_year}}-{{ '%03d' % talk.id }},memory-stick,3,,,memory-stick
+{% endfor %}

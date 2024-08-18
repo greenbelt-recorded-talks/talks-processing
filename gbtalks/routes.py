@@ -78,15 +78,15 @@ def talks():
                     next(talksreader, None)  # skip the headers
                     for talk_line in talksreader:
                         start_time = gb_time_to_datetime(talk_line[3], talk_line[4])
-                        end_time = start_time + timedelta(hours=1)
-                        is_priority = True if talk_line[7] == "Yes" else False
-                        is_rotaed = True if talk_line[8] == "Yes" else False
+                        end_time = gb_time_to_datetime(talk_line[3], talk_line[5])
+                        is_priority = True if talk_line[8] == "Yes" else False
+                        is_rotaed = True if talk_line[9] == "Yes" else False
                         talk = Talk(
                             id=talk_line[0].split("-")[1],
                             title=talk_line[2],
-                            description=talk_line[6],
+                            description=talk_line[7],
                             speaker=talk_line[1],
-                            venue=talk_line[5],
+                            venue=talk_line[6],
                             day=talk_line[3],
                             start_time=start_time,
                             end_time=end_time,
@@ -126,11 +126,6 @@ def edit_talk():
         talk_id = request.args.get("talk_id")
         talk = Talk.query.get(talk_id)
         return render_template("edit_talk.html",
-                                talk_id=talk.id,
-                                title=talk.title,
-                                description=talk.description,
-                                speaker=talk.speaker,
-                                day=talk.day,
                                 start_time=talk.start_time.strftime("%H:%M:%S"),
                                 end_time=talk.end_time.strftime("%H:%M:%S"),
                                 talk=talk
@@ -147,6 +142,11 @@ def edit_talk():
         talk.day = request.form.get("day")
         talk.start_time = gb_time_to_datetime(request.form.get("day"), request.form.get("start_time"))
         talk.end_time = gb_time_to_datetime(request.form.get("day"), request.form.get("end_time"))
+
+        talk.has_explicit_warning_sticker = True if request.form.get("has_explicit_warning_sticker") else False
+        talk.has_distressing_content_warning_sticker = True if request.form.get("has_distressing_content_warning_sticker") else False
+        talk.has_technical_issues_sticker = True if request.form.get("has_technical_issues_sticker") else False
+        talk.has_copyright_removal_sticker = True if request.form.get("has_copyright_removal_sticker") else False
 
         db.session.commit()
         return redirect(url_for("talks") + "#talk_" +  talk_id)

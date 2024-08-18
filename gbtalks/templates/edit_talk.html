@@ -2,33 +2,33 @@
 
 {% block content %}
 
-<h1 class="uk-heading-line uk-text-center"><span>Editing Talk {{ talk_id }} </span></h1>
+<h1 class="uk-heading-line uk-text-center"><span>Editing Talk {{ talk.id }} </span></h1>
 
 <div class="uk-card uk-card-default uk-card-body">
 <form action="edit_talk" method=post enctype=multipart/form-data>
-<input type="hidden" name="talk_id" value="{{ talk_id }}"/>
+<input type="hidden" name="talk_id" value="{{ talk.id }}"/>
 <table class="uk-table uk-table-large uk-table-divider">
     <tbody>
         <tr>
             <td>Title</td>
-            <td><input class="uk-input" type="text" name="title" value="{{ title }}"/></td>
+            <td><input class="uk-input" type="text" name="title" value="{{ talk.title }}"/></td>
         </tr>
         <tr>
             <td>Description</td>
-            <td><textarea class="uk-textarea" name="description" rows="8">{{ description }}"</textarea></td>
+            <td><textarea class="uk-textarea" name="description" rows="8">{{ talk.description }}"</textarea></td>
         </tr>
         <tr>
             <td>Speaker</td>
-            <td><input class="uk-input" type="text" name="speaker" value="{{ speaker }}"/></td>
+            <td><input class="uk-input" type="text" name="speaker" value="{{ talk.speaker }}"/></td>
         </tr>
         <tr>
             <td>Day</td>
             <td>
                 <div class="uk-button uk-form-select uk-active" data-uk-form-select>
                     <select class="uk-form-select" name="day">
-                        <option value="Friday" {% if day == "Friday" %}selected{% endif %}>Friday</option>
-                        <option value="Saturday" {% if day == "Saturday" %}selected{% endif %}>Saturday</option>
-                        <option value="Sunday" {% if day == "Sunday" %}selected{% endif %}>Sunday</option>
+                        <option value="Friday" {% if talk.day == "Friday" %}selected{% endif %}>Friday</option>
+                        <option value="Saturday" {% if talk.day == "Saturday" %}selected{% endif %}>Saturday</option>
+                        <option value="Sunday" {% if talk.day == "Sunday" %}selected{% endif %}>Sunday</option>
                     </select>
                 </div>
             </td>
@@ -41,6 +41,12 @@
             <td>End Time</td>
             <td><input class="uk-input" type="time" name="end_time" value="{{ end_time }}"/></td>
         </tr>
+        <tr>
+            <td>Explicit: <input class="uk-checkbox" type="checkbox" name="has_explicit_warning_sticker" {% if talk.has_explicit_warning_sticker %}checked{% endif %}"/></td>
+            <td>Advisory: <input class="uk-checkbox" type="checkbox" name="has_distressing_content_warning_sticker" {% if talk.has_distressing_content_warning_sticker %}checked{% endif %}/></td>
+            <td>Technical: <input class="uk-checkbox" type="checkbox" name="has_technical_issues_sticker" {% if talk.has_technical_issues_sticker %}checked{% endif %}/></td>
+            <td>Copyright: <input class="uk-checkbox" type="checkbox" name="has_copyright_removal_sticker" {% if talk.has_copyright_removal_sticker %}checked{% endif %}/></td>
+    </tr>
     </tbody>
 </table>
 

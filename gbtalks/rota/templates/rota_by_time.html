@@ -2,12 +2,16 @@
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.14.3/dist/css/uikit.min.css" />
 
 <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='rotastyle.css') }}">
+
 
 {% block content %}
 
 <h1> Rota by Time </h1>
 
-<table class="pure-table pure-table-bordered">
+{% for day in ["Friday", "Saturday", "Sunday"] %}
+<h2>{{day}}</h2>
+<table>
 <tr>
 	<th>Sign Out</th>
 	<th>Sign In</th>
@@ -23,6 +27,7 @@
         <th>Headphones?</th>
 </tr>
 {% for talk in talks %}
+{% if talk.day==day %}
 <tr class="{% if talk["is_priority"] %} priority_talk {% endif %} {% if talk["recorded_by"] is not none %} is_recorded {% endif %}">
 	<td></td>
         <td></td>
@@ -30,17 +35,20 @@
 	<td>{{ talk.id }}</td>
         <td></td>
         <td>{{ talk.day }}</td>
-        <td>{{ talk.start_time }}</td>
-        <td>{{ talk.end_time }}</td>
+        <td>{{ talk.start_time.strftime("%H:%M") }}</td>
+        <td>{{ talk.end_time.strftime("%H:%M") }}</td>
 	<td>{{ talk.venue }}</td>
         <td>{{ talk.speaker }}</td>
         <td>{{ talk.title }}</td>
         <td></td>
 </tr>
+{% endif %}
+{% endfor %}
 
+</table>
+<div class="pagebreak"> </div>
 
 {% endfor %}
-</table>
 
 {% endblock %}
 

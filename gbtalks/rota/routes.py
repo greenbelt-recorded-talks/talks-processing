@@ -5,13 +5,10 @@ from flask import (
     redirect,
     url_for,
     render_template,
-    make_response,
-    send_from_directory,
 )
-from datetime import datetime, date, time, timedelta
+from datetime import datetime, timedelta
 from flask import current_app as app
 from gbtalks.models import db, Talk, Recorder
-import random
 
 shift_length = 3
 break_between_shifts = 3
@@ -287,32 +284,24 @@ def rota():
                 ):
                     assign_talk_to_recorder(assigned_recorder, talk)
 
-    # Set up everything we need for rendering the page
-
-    talks = Talk.query.order_by(Talk.start_time).all()
-    times = {}
-    venues = {}
-
-    for talk in talks:
-        times[talk.start_time] = None
-        venues[talk.venue] = None
-
-    return render_template("rota.html", talks=talks, times=times, venues=venues)
+    return render_template("rota.html")
 
 
 @rota_blueprint.route("/rota_by_venue", methods=["GET"])
 def rota_by_venue():
     """Print the rota by venue"""
 
-    talks = Talk.query.order_by(Talk.start_time).all()
+    days = [t.day for t in Talk.query.order_by(Talk.start_time).group_by(Talk.day).distinct()]
+    talks = {}        
     times = {}
     venues = {}
+    
+    for day in days:
+        talks[day] = Talk.query.where(Talk.day == day).order_by(Talk.start_time) 
+        venues[day] = [t.venue for t in Talk.query.where(Talk.day==day).order_by(Talk.venue).group_by(Talk.venue).distinct()]
+        times[day] = [t.start_time for t in Talk.query.where(Talk.day==day).order_by(Talk.start_time).group_by(Talk.start_time).distinct()]
 
-    for talk in talks:
-        times[talk.start_time] = None
-        venues[talk.venue] = None
-
-    return render_template("rota_by_venue.html", talks=talks, times=times, venues=venues)
+    return render_template("rota_by_venue.html", talks=talks, times=times, venues=venues, days=days)
 
 
 @rota_blueprint.route("/rota_by_time", methods=["GET"])

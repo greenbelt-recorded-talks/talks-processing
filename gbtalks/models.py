@@ -21,7 +21,10 @@ class Talk(db.Model):
     is_rotaed = db.Column(db.Boolean)
     is_cleared = db.Column(db.Boolean)
     
-    content_warning = db.Column(db.String)
+    has_explicit_warning_sticker = db.Column(db.Boolean)
+    has_distressing_content_warning_sticker = db.Column(db.Boolean)
+    has_technical_issues_sticker = db.Column(db.Boolean)
+    has_copyright_removal_sticker = db.Column(db.Boolean)
 
     notes_photo = db.Column(db.LargeBinary)
 
@@ -30,7 +33,7 @@ class Talk(db.Model):
 
     def __repr__(self):
         return (
-            "<Talk(id='%d', title='%s', description='%s', day='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s', cleared='%s', content_warning='%s')>"
+            "<Talk(id='%d', title='%s', description='%s', day='%s', start_time='%s', end_time='%s', venue='%s', recorder_name='%s', cleared='%s', explicit='%s', distressing='%s', technical_issues='%s', copyright_removal='%s')>"
             % (
                 self.id,
                 self.title,
@@ -41,7 +44,10 @@ class Talk(db.Model):
                 self.venue,
                 self.recorder_name,
                 self.is_cleared,
-                self.content_warning
+                self.has_explicit_warning_sticker,
+                self.has_distressing_content_warning_sticker,
+                self.has_technical_issues_sticker,
+                self.has_copyright_removal_sticker,
             )
         )
 
