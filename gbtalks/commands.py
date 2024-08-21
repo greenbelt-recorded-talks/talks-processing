@@ -225,7 +225,7 @@ def convert_talks():
     talks = edited_files
     talks.difference_update(processed_files)
 
-    talks_to_process = [Talk.query.get(x) for x in list(talks)] or []
+    talks_to_process = [Talk.query.filter(Talk.id == x, Talk.is_cleared is True) for x in list(talks)] or []
 
     pprint.pprint("Processing Talks:")
     pprint.pprint(talks_to_process)

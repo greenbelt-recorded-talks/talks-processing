@@ -81,6 +81,7 @@ def talks():
                         end_time = gb_time_to_datetime(talk_line[3], talk_line[5])
                         is_priority = True if talk_line[8] == "Yes" else False
                         is_rotaed = True if talk_line[9] == "Yes" else False
+                        is_cleared = True if talk_line[10] == "Yes" else False
                         talk = Talk(
                             id=talk_line[0].split("-")[1],
                             title=talk_line[2],
@@ -92,6 +93,7 @@ def talks():
                             end_time=end_time,
                             is_priority=is_priority,
                             is_rotaed=is_rotaed,
+                            is_cleared=is_cleared
                         )
                         db.session.add(talk)
 
