@@ -47,6 +47,9 @@
             <td>Technical: <input class="uk-checkbox" type="checkbox" name="has_technical_issues_sticker" {% if talk.has_technical_issues_sticker %}checked{% endif %}/></td>
             <td>Copyright: <input class="uk-checkbox" type="checkbox" name="has_copyright_removal_sticker" {% if talk.has_copyright_removal_sticker %}checked{% endif %}/></td>
     </tr>
+    <tr>
+    	<td>Cleared for release: <input class="uk-checkbox" type="checkbox" name="is_cleared" {% if talk.is_cleared %}checked{% endif %}/></td>
+    </tr>
     </tbody>
 </table>
 

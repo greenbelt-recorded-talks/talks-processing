@@ -65,7 +65,7 @@ Note that "Additional Talks" (talks with IDs > 100) should be edited only when r
 {% for talk in talks_to_edit %}
 <tr>
 	<td>{{ talk.id }}</td>
-        <td>{{ talk.start_time }}</td>
+	<td>{{ talk.day }} {{ talk.start_time.strftime("%H:%M") }}</td>
         <td>{{ talk.venue }}</td>
         <td>{{ talk.speaker }}</td>
         <td>{{ talk.title }}</td>
@@ -84,6 +84,9 @@ Note that "Additional Talks" (talks with IDs > 100) should be edited only when r
 	</td>
 	<td><input type=submit value="Upload"></td>
 	</form>
+</tr>
+<tr>
+	<td colspan="8"><hr /></td>
 </tr>
 {% endfor %}
 </table>

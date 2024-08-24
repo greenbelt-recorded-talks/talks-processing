@@ -22,6 +22,7 @@
           - libpcre3
           - libpcre3-dev
           - smartmontools
+          - wodim
         state: latest
     - name: Create the gbtalks user
       ansible.builtin.user:

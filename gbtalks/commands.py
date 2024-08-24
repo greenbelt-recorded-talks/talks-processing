@@ -18,77 +18,14 @@ from multiprocessing import Pool
 from mutagen.id3 import ID3, TALB, TCOP, TIT2, TPE1, TPE2, TRCK, TDRC, COMM, TCMP, APIC
 import pprint
 
+from .libgbtalks import (
+    get_path_for_file,
+    gb_time_to_datetime
+)
 
 def run_command(cmd):
     with semaphore:
         os.system(cmd)
-
-
-# Character mapping table to avoid FAT filesystem character problems
-character_mapping = str.maketrans(
-    {
-        '"': '＂',
-        '*': '＊',
-        '/': '∕',
-        ':':'：',
-        '<':'＜',
-        '>':'＞',
-        '?':'？',
-        '\\':'＼',
-        '|':'｜'
-    }
-)
-
-def get_path_for_file(talk_id, file_type, title=None, speaker=None):
-    if file_type in {"raw", "edited"}:
-        path = (
-            app.config["TALKS_DIRS"][file_type]["directory"]
-            + "/gb"
-            + app.config["GB_FRIDAY"][2:4]
-            + "-"
-            + str(talk_id).zfill(3)
-            + app.config["TALKS_DIRS"][file_type]["suffix"]
-            + ".mp3"
-        )
-
-    if file_type == "processed":
-        if "," in speaker:
-            speaker = speaker.split(",")[0] + " & others"
-
-        path = (
-            app.config["TALKS_DIRS"][file_type]["directory"]
-            + "/GB"
-            + app.config["GB_SHORT_YEAR"]
-            + " "
-            + str(talk_id).zfill(3)
-            + " "
-            + title[:120].translate(character_mapping)
-            + " - "
-            + speaker[:120].translate(character_mapping)
-            + ".mp3"
-        )
-
-    if file_type == "recorder_notes":
-        path = (
-            app.config["IMG_DIR"]
-            + "/gb"
-            + str(app.config["GB_SHORT_YEAR"])
-            + "-"
-            + talk_id
-            + "recorder_notes.jpg"
-        )
-
-    if file_type == "web_mp3":
-        path = (
-            app.config["WEB_MP3_DIR"]
-            + "/gb"
-            + str(app.config["GB_SHORT_YEAR"])
-            + "-"
-            + talk_id
-            + "mp3.mp3"
-        )
-
-    return path
 
 
 def get_cd_dir_for_talk(talk):
@@ -102,9 +39,11 @@ def get_cd_dir_for_talk(talk):
     )
 
 
-def process_talk(talk):
+def process_talk(talk_id):
     top = AudioSegment.from_file(app.config["TOP_TAIL_DIR"] + "/" + "top.mp3")
     tail = AudioSegment.from_file(app.config["TOP_TAIL_DIR"] + "/" + "tail.mp3")
+
+    talk = db.session.get(Talk, talk_id)
 
     # Add the top and tail, create a high-quality mp3
     hq_mp3 = top + AudioSegment.from_file(get_path_for_file(talk.id, "edited")) + tail
@@ -170,7 +109,7 @@ def process_talk(talk):
         os.remove(normalized_path)
 
     # Copy the file to the web_mp3 directory with filename format gbXX-XXXmp3.mp3
-    shutil.copy(get_path_for_file(talk.id, "processed", talk.title, talk.speaker), get_path_for_file(talk.id, "web_mp3"))
+    shutil.copy(get_path_for_file(str(talk.id), "processed", talk.title, talk.speaker), get_path_for_file(str(talk.id), "web_mp3"))
 
     # Create files for later CD burning
     cd_dir = get_cd_dir_for_talk(talk.id)
@@ -225,7 +164,7 @@ def convert_talks():
     talks = edited_files
     talks.difference_update(processed_files)
 
-    talks_to_process = [Talk.query.filter(Talk.id == x, Talk.is_cleared is True) for x in list(talks)] or []
+    talks_to_process = [x for x in list(talks) if Talk.query.where(Talk.id==x, Talk.is_cleared)] or []
 
     pprint.pprint("Processing Talks:")
     pprint.pprint(talks_to_process)

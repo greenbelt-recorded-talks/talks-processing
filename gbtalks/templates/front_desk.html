@@ -28,7 +28,7 @@ If you have a recorder notes photo, upload this first, as the talk will disappea
 <tr>
 	<td>{{ talk.id }}</td>
         <td>{{ talk.day }}</td>
-        <td>{{ talk.start_time }}</td>
+        <td>{{ talk.start_time.strftime("%H:%M") }}</td>
         <td>{{ talk.venue }}</td>
         <td>{{ talk.speaker }}</td>
         <td>{{ talk.title }}</td>
@@ -48,6 +48,9 @@ If you have a recorder notes photo, upload this first, as the talk will disappea
                 </form>
         </td>
 	</form>
+</tr>
+<tr>
+	<td colspan="8"><hr /></td>
 </tr>
 {% endif %}
 {% endfor %}

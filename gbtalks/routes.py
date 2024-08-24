@@ -104,7 +104,7 @@ def talks():
     raw_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
     edited_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
     processed_files = [
-        x.name.split(" ")[0] for x in os.scandir(app.config["PROCESSED_DIR"])
+        x.name.split(" ")[1] for x in os.scandir(app.config["PROCESSED_DIR"])
     ]
     notes_files = [x.name for x in os.scandir(app.config["IMG_DIR"])]
 
@@ -149,6 +149,8 @@ def edit_talk():
         talk.has_distressing_content_warning_sticker = True if request.form.get("has_distressing_content_warning_sticker") else False
         talk.has_technical_issues_sticker = True if request.form.get("has_technical_issues_sticker") else False
         talk.has_copyright_removal_sticker = True if request.form.get("has_copyright_removal_sticker") else False
+
+        talk.is_cleared = True if request.form.get("is_cleared") else False
 
         db.session.commit()
         return redirect(url_for("talks") + "#talk_" +  talk_id)

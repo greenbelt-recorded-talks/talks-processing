@@ -1,6 +1,21 @@
 from flask import current_app as app
 from datetime import datetime, timedelta
 
+# Character mapping table to avoid FAT filesystem character problems
+character_mapping = str.maketrans(
+    {
+        '"': '＂',
+        '*': '＊',
+        '/': '∕',
+        ':':'：',
+        '<':'＜',
+        '>':'＞',
+        '?':'？',
+        '\\':'＼',
+        '|':'｜'
+    }
+)
+
 def get_path_for_file(talk_id, file_type, title=None, speaker=None):
     if file_type in {"raw", "edited"}:
         path = (
@@ -20,17 +35,13 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
         path = (
             app.config["TALKS_DIRS"][file_type]["directory"]
             + "/GB"
-            + app.config["GB_FRIDAY"][2:4]
-            + "-"
+            + app.config["GB_SHORT_YEAR"]
+            + " "
             + str(talk_id).zfill(3)
             + " "
-            + title[:120].replace(
-                "/", "∕"
-            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
-            + " | "
-            + speaker[:120].replace(
-                "/", "∕"
-            )  # Replace any forward slashes with UCS-2 codepoint 2215 (division slash)
+            + title[:120].translate(character_mapping)
+            + " - "
+            + speaker[:120].translate(character_mapping)
             + ".mp3"
         )
 
@@ -38,13 +49,24 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
         path = (
             app.config["IMG_DIR"]
             + "/gb"
-            + str(app.config["GB_FRIDAY"][2:4])
+            + str(app.config["GB_SHORT_YEAR"])
             + "-"
             + talk_id
             + "recorder_notes.jpg"
         )
 
+    if file_type == "web_mp3":
+        path = (
+            app.config["WEB_MP3_DIR"]
+            + "/gb"
+            + str(app.config["GB_SHORT_YEAR"])
+            + "-"
+            + talk_id
+            + "mp3.mp3"
+        )
+
     return path
+
 
 def gb_time_to_datetime(day, time):
     """Convert "Greenbelt Days" to real days, and parse out the start times of talks"""
