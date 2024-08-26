@@ -153,7 +153,7 @@ def convert_talks():
     processed_files = (
         set(
             [
-                x.name.split("-")[1].split(" ")[0]
+                x.name.split("_")[1]
                 for x in os.scandir(app.config["PROCESSED_DIR"])
                 if x.name.endswith(".mp3")
             ]
@@ -169,7 +169,7 @@ def convert_talks():
     pprint.pprint("Processing Talks:")
     pprint.pprint(talks_to_process)
 
-    with Pool(3) as p:
+    with Pool(5) as p:
         p.map(process_talk, talks_to_process)
 
 

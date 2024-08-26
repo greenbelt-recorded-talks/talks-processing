@@ -31,6 +31,21 @@
         groups: syslog
         append: yes
 
+- name: Mask unnecessary services
+  hosts: localhost
+  become_user: root
+  become: true
+
+  tasks:
+    - name: Mask unnecessary services
+      ansible.builtin.systemd_service:
+        name: 
+          - udisks2
+          - bluetooth
+        enabled: false
+        masked: yes
+
+
 - name: Set up the gbtalks user
   hosts: localhost
   become_user: root
@@ -137,6 +152,7 @@
         - /storage/web_mp3s
         - /storage/usb_gold
         - /storage/cds
+        - /usb_gold
 
 - name: Set up backups
   hosts: localhost

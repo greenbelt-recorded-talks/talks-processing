@@ -104,7 +104,7 @@ def talks():
     raw_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
     edited_files = [x.name for x in os.scandir(app.config["UPLOAD_DIR"])]
     processed_files = [
-        x.name.split(" ")[1] for x in os.scandir(app.config["PROCESSED_DIR"])
+        x.name.split("_")[1] for x in os.scandir(app.config["PROCESSED_DIR"])
     ]
     notes_files = [x.name for x in os.scandir(app.config["IMG_DIR"])]
 
@@ -555,13 +555,23 @@ def deletetalk():
 @app.route("/talks_products.csv", methods=["GET"])
 def talks_products():
     """ CSV download of talks products for import into the GB website """
-    talks = Talk.query.all()
-    return render_template(
-        "talks_products.csv",
-        talks=talks,
-        gb_short_year=app.config["GB_SHORT_YEAR"]
-    )
 
+    import pyexcel as pe
+    import io
+    from flask import make_response
+
+    talks = [[t.title, 
+              t.description, 
+              t.speaker, 
+              "GB" + app.config["GB_SHORT_YEAR"] + "-" + talk.id 
+              ] for t in Talk.query.all()]
+    sheet = pe.Sheet(talks)
+    io = io.StringIO()
+    sheet.save_to_memory("csv", io)
+    output = make_response(io.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=export.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output
 
 
 @app.route("/logout")

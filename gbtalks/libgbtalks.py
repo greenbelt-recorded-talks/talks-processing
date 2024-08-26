@@ -36,11 +36,11 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
             app.config["TALKS_DIRS"][file_type]["directory"]
             + "/GB"
             + app.config["GB_SHORT_YEAR"]
-            + " "
+            + "_"
             + str(talk_id).zfill(3)
-            + " "
+            + "_"
             + title[:120].translate(character_mapping)
-            + " - "
+            + "_"
             + speaker[:120].translate(character_mapping)
             + ".mp3"
         )
@@ -61,7 +61,7 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
             + "/gb"
             + str(app.config["GB_SHORT_YEAR"])
             + "-"
-            + talk_id
+            + str(talk_id).zfill(3)
             + "mp3.mp3"
         )
 
