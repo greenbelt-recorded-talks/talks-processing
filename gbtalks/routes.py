@@ -552,6 +552,46 @@ def deletetalk():
     return redirect(url_for(source_path))
 
 
+@app.route("/talks_archive.csv", methods=["GET"])
+def talks_archive():
+    """ CSV download of talks products for import into the GB website """
+
+    import pyexcel as pe
+    import io
+    from flask import make_response
+
+    talks = [["Title", "Description", "Talk ID", "Talk Variation ID", "Media", "Price", "Virtual", "Downloadable", "Shipping Class", "MP3 Filename", "MP3 URL", "Speakers", "Festival", "Date and Time", "Panel", "Venue", "Categories", "Talks Category", "Talks Category2", "Talks Category3", "Parental Advisory", "Explicit Content", "Copyright", "Technical"]]
+
+    for t in Talk.query.all():
+        talks.append([
+            t.title, 
+            t.description, 
+            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3),
+            "", "", "", "", "", "", 
+            get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
+            "/home/greenbeltorg/digital_downloads/" + get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
+            t.speaker,
+            "20" + app.config["GB_SHORT_YEAR"],
+            t.start_time,
+            "No",
+            t.venue,
+            "Talks",
+            "","","",
+            "Yes" if t.has_distressing_content_warning_sticker else "",
+            "Yes" if t.has_explicit_warning_sticker else "",
+            "Yes" if t.has_copyright_removal_sticker else "",
+            "Yes" if t.has_technical_issues_sticker else ""
+        ])
+
+    sheet = pe.Sheet(talks)
+    io = io.StringIO()
+    sheet.save_to_memory("csv", io)
+    output = make_response(io.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=talks_archive.csv"
+    output.headers["Content-type"] = "text/csv"
+    return output
+
+
 @app.route("/talks_products.csv", methods=["GET"])
 def talks_products():
     """ CSV download of talks products for import into the GB website """
@@ -560,18 +600,59 @@ def talks_products():
     import io
     from flask import make_response
 
-    talks = [[t.title, 
-              t.description, 
-              t.speaker, 
-              "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(talk.id).zfill(3),
-              "", "", "", "", "", "", 
-              
-              ] for t in Talk.query.all()]
+    talks = [["Title", "Description", "Talk ID", "Talk Variation ID", "Media", "Price", "Virtual", "Downloadable", "Shipping Class", "MP3 Filename", "MP3 URL", "Speakers", "Festival", "Date and Time", "Panel", "Venue", "Categories", "Talks Category", "Talks Category2", "Talks Category3", "Parental Advisory", "Explicit Content", "Copyright", "Technical"]]
+
+    for t in Talk.query.all():
+        talks.append([
+            t.title,
+            t.description,
+            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3),
+            "", "", "", "", "", "",
+            get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
+            "/home/greenbeltorg/digital_downloads/" + get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
+            t.speaker,
+            "20" + app.config["GB_SHORT_YEAR"],
+            t.start_time,
+            "No",
+            t.venue,
+            "Talks",
+            "","","",
+            "Yes" if t.has_distressing_content_warning_sticker else "",
+            "Yes" if t.has_explicit_warning_sticker else "",
+            "Yes" if t.has_copyright_removal_sticker else "",
+            "Yes" if t.has_technical_issues_sticker else ""
+        ])
+        talks.append(
+        [
+            "", "",
+            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3) + "-DL",
+            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3),
+            "download",
+            3,
+            "yes", "yes",
+            "",
+            get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
+            "/home/greenbeltorg/digital_downloads/" + get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
+            "", "", "", "", "", "", "", "", "", "", ""
+        ])
+        talks.append(
+        [
+            "", "",
+            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3) + "-MS",
+            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3),
+            "memory-stick",
+            3,
+            "", "",
+            "memory-stick"
+            "","",
+            "", "", "", "", "", "", "", "", "", "", ""
+        ])
+
     sheet = pe.Sheet(talks)
     io = io.StringIO()
     sheet.save_to_memory("csv", io)
     output = make_response(io.getvalue())
-    output.headers["Content-Disposition"] = "attachment; filename=export.csv"
+    output.headers["Content-Disposition"] = "attachment; filename=talks_products.csv"
     output.headers["Content-type"] = "text/csv"
     return output
 
