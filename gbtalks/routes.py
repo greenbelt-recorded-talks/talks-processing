@@ -563,7 +563,9 @@ def talks_products():
     talks = [[t.title, 
               t.description, 
               t.speaker, 
-              "GB" + app.config["GB_SHORT_YEAR"] + "-" + talk.id 
+              "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(talk.id).zfill(3),
+              "", "", "", "", "", "", 
+              
               ] for t in Talk.query.all()]
     sheet = pe.Sheet(talks)
     io = io.StringIO()
