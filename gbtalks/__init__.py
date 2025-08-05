@@ -65,5 +65,9 @@ def create_app():
 
         # Create tables for our models
         db.create_all()
+        
+        # Initialize default rota settings
+        from .models import RotaSettings
+        RotaSettings.initialize_defaults()
 
         return app

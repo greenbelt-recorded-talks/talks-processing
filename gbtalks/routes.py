@@ -161,8 +161,10 @@ def edit_talk():
 @current_user_is_team_leader
 def setup():
     """Various setup functions"""
-
-    return render_template("setup.html")
+    
+    from .models import RotaSettings
+    rota_settings = RotaSettings.get_all_settings()
+    return render_template("setup.html", rota_settings=rota_settings)
 
 
 @app.route("/put_alltalks_pdf", methods=["POST"])
@@ -243,6 +245,42 @@ def update_festival_date():
     except Exception as e:
         flash(f"Error updating festival date: {str(e)}")
         return redirect(url_for("setup"))
+    
+    return redirect(url_for("setup"))
+
+
+@app.route("/update_rota_settings", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def update_rota_settings():
+    """Update rota configuration settings"""
+    
+    from .models import RotaSettings
+    
+    try:
+        # Get all current settings to validate against
+        current_settings = RotaSettings.get_all_settings()
+        
+        updated_count = 0
+        for key in current_settings.keys():
+            if key in request.form:
+                new_value = request.form.get(key)
+                if new_value and new_value.isdigit():
+                    current_value = RotaSettings.get_value(key)
+                    if int(new_value) != current_value:
+                        RotaSettings.set_value(key, int(new_value))
+                        updated_count += 1
+                else:
+                    flash(f"Invalid value for {key}: must be a positive integer")
+                    return redirect(url_for("setup"))
+        
+        if updated_count > 0:
+            flash(f"Updated {updated_count} rota setting(s). Changes will apply to new rota generations.")
+        else:
+            flash("No changes were made to rota settings.")
+            
+    except Exception as e:
+        flash(f"Error updating rota settings: {str(e)}")
     
     return redirect(url_for("setup"))
 

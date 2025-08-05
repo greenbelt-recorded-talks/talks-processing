@@ -67,6 +67,33 @@ The date must be a Friday in late August (August 15th or later).
 <div class="uk-card uk-card-default uk-card-body">
 
 {% filter markdown %}
+### Rota Settings
+
+Configure the variables that control how the automatic rota generation works. Changes take effect immediately for new rota generations.
+
+{% endfilter %}
+
+        <form action="update_rota_settings" method=post>
+            {% for key, setting in rota_settings.items() %}
+            <div class="uk-margin">
+                <label class="uk-form-label" for="{{ key }}">{{ setting.description }}</label>
+                <div class="uk-form-controls">
+                    <input class="uk-input" type="number" id="{{ key }}" name="{{ key }}" 
+                           value="{{ setting.value }}" min="1" required>
+                    <span class="uk-text-small uk-text-muted">{{ setting.unit }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            <button class="uk-button uk-button-primary">Update Rota Settings</button>
+        </form>
+
+</div>
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
 ### Upload Icon
 
 The icon is used as the cover image for MP3 files. It must be a square PNG, recommended 300x300 pixels. 

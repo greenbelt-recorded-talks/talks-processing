@@ -8,14 +8,11 @@ from flask import (
 )
 from datetime import datetime, timedelta
 from flask import current_app as app
-from gbtalks.models import db, Talk, Recorder
-
-shift_length = 3
-break_between_shifts = 2
-minimum_time_between_talks = 20
+from gbtalks.models import db, Talk, Recorder, RotaSettings
 
 def talk_would_clash(recorder, talk):
-    # A talk clashes if it starts while the recorder is currently recording, or within 20 mins of another talk ending
+    # A talk clashes if it starts while the recorder is currently recording, or within the configured gap
+    minimum_time_between_talks = RotaSettings.get_value('minimum_time_between_talks', 20)  # Default: 20 minutes
 
 # Examples:
 # Recorder has existing talk at 16:00. Candidate talk is at 17:00.
@@ -46,9 +43,9 @@ def talk_would_clash(recorder, talk):
 
 
 def recorder_is_maxed_out_for_day(recorder, talk):
-    # A normal shift is 3 hours - assume 2 talks to account for gaps. This algorithm only works if people do max 2 shifts per day!
-
-    candidates_max_talks = recorder.max_shifts_per_day * 2
+    # Maximum talks per day = max shifts per day * max talks per shift
+    max_talks_per_shift = RotaSettings.get_value('max_talks_per_shift', 2)  # Default: 2 talks per shift maximum
+    candidates_max_talks = recorder.max_shifts_per_day * max_talks_per_shift
     candidates_talks_on_this_day = 0
     for candidates_talk in recorder.talks:
         if candidates_talk.start_time.day == talk.start_time.day:
@@ -75,8 +72,11 @@ def recorder_shifts_exceeded(recorder, candidate_talk):
 def talk_would_break_shift_pattern(recorder, candidate_talk):
     # make sure that if this talk is assigned, we don't violate any of the shift rules
     # - prepare the list of talks that would result if this talk were allocated
-    # - check that there are no more 3h groups containing talks than the candidate is allowed shifts
-    # - check that the 3h groups are more than 3h apart
+    # - check that there are no more shift_length groups containing talks than the candidate is allowed shifts
+    # - check that the shift groups are more than break_between_shifts apart
+    
+    shift_length = RotaSettings.get_value('shift_length', 3)  # Default: 3 hours
+    break_between_shifts = RotaSettings.get_value('break_between_shifts', 2)  # Default: 2 hours
 
     # Make a list of what the candidate's day would look like if the talk was assigned
     talks_on_this_day_if_talk_assigned = []
@@ -185,7 +185,8 @@ def find_recorder_for_talk(talk):
             if talk_would_clash(candidate_recorder, talk):
                 continue
 
-            # Move on if the talk starts less than 3h after the recorders' last talk ended
+            # Move on if the talk starts less than the required break after the recorders' last talk ended
+            break_between_shifts = RotaSettings.get_value('break_between_shifts', 2)  # Default: 2 hours
             if talk.start_time < candidate_recorders_last_talk.end_time + timedelta(
                 hours=break_between_shifts
             ):
@@ -230,16 +231,17 @@ def rota():
         assigned_recorder = find_recorder_for_talk(talk)
 
         if assigned_recorder is not None:
-            # If there are any other talks in the same venue starting within 2h, assign them to the same recorder
+            # If there are any other talks in the same venue starting within the configured window, assign them to the same recorder
+            same_venue_assignment_window = RotaSettings.get_value('same_venue_assignment_window', 3)  # Default: 3 hours
             for future_talk in Talk.query.filter(
                 Talk.start_time > talk.end_time,
-                Talk.start_time <= talk.start_time + timedelta(hours=shift_length - 1),
+                Talk.start_time <= talk.start_time + timedelta(hours=same_venue_assignment_window - 1),
                 Talk.venue == talk.venue,
                 Talk.is_priority == True,
             ).order_by(Talk.start_time):
                 if (
                     future_talk.start_time
-                    < talk.start_time + timedelta(hours=shift_length - 1)
+                    < talk.start_time + timedelta(hours=same_venue_assignment_window - 1)
                     and talk_would_break_shift_pattern(assigned_recorder, future_talk)
                     is False
                     and talk_would_clash(assigned_recorder, future_talk) is False
@@ -264,25 +266,27 @@ def rota():
         # If we've got this far, find a recorder for the talk
         assigned_recorder = find_recorder_for_talk(talk)
 
-        # If there is an unallocated talk starting 20-60 minutes later anywhere on site, and assigning it wouldn't exceed shift limits, assign it
+        # If there is an unallocated talk starting after minimum gap within search window, and assigning it wouldn't exceed shift limits, assign it
         if assigned_recorder is not None:
+            additional_talk_search_window = RotaSettings.get_value('additional_talk_search_window', 1)  # Default: 1 hour
+            additional_talk_minimum_gap = RotaSettings.get_value('additional_talk_minimum_gap', 20)  # Default: 20 minutes
             for future_talk in (
                 Talk.query.filter(
                     Talk.start_time > talk.end_time,
-                    Talk.start_time <= talk.end_time + timedelta(hours=1),
+                    Talk.start_time <= talk.end_time + timedelta(hours=additional_talk_search_window),
                     Talk.recorded_by == None,
                 )
                 .order_by(Talk.start_time)
                 .all()
             ):
                 if (
-                    future_talk.start_time < talk.end_time + timedelta(hours=1)
-                    and future_talk.start_time > talk.end_time + timedelta(minutes=20)
+                    future_talk.start_time < talk.end_time + timedelta(hours=additional_talk_search_window)
+                    and future_talk.start_time > talk.end_time + timedelta(minutes=additional_talk_minimum_gap)
                     and talk_would_break_shift_pattern(assigned_recorder, future_talk)
                     is False
                     and talk_would_clash(assigned_recorder, future_talk) is False
                 ):
-                    assign_talk_to_recorder(assigned_recorder, talk)
+                    assign_talk_to_recorder(assigned_recorder, future_talk)
 
     return render_template("rota.html")
 
