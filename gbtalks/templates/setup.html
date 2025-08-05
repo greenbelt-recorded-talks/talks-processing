@@ -43,6 +43,30 @@ Uploading a file here will replace the existing one.
 <div class="uk-card uk-card-default uk-card-body">
 
 {% filter markdown %}
+### Festival Date
+
+Configure the Friday date when Greenbelt Festival starts. This affects file naming, metadata, and year calculations throughout the system.
+
+**Current Festival Date:** {{ config.GB_FRIDAY }}  
+**Current Short Year:** {{ config.GB_SHORT_YEAR }}
+
+The date must be a Friday in late August (August 15th or later).
+
+{% endfilter %}
+
+        <form action="update_festival_date" method=post>
+                <label for=festival_date>Festival Friday Date (YYYY-MM-DD)</label>
+                <input name=festival_date type=date id=festival_date value="{{ config.GB_FRIDAY }}" required>
+                <button>Update Festival Date</button>
+        </form>
+
+</div>
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
 ### Upload Icon
 
 The icon is used as the cover image for MP3 files. It must be a square PNG, recommended 300x300 pixels. 

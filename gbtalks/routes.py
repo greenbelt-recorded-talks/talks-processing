@@ -184,6 +184,69 @@ def put_alltalks_pdf():
     return redirect(url_for("setup"))
 
 
+@app.route("/update_festival_date", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def update_festival_date():
+    """Update the festival Friday date in .env file"""
+    
+    festival_date = request.form.get("festival_date")
+    
+    if not festival_date:
+        flash("No date provided!")
+        return redirect(url_for("setup"))
+    
+    try:
+        # Parse the date
+        date_obj = datetime.strptime(festival_date, "%Y-%m-%d").date()
+        
+        # Validate it's a Friday
+        if date_obj.weekday() != 4:  # 4 = Friday (Monday is 0)
+            flash("Date must be a Friday!")
+            return redirect(url_for("setup"))
+        
+        # Validate it's in late August (15th or later)
+        if date_obj.month != 8 or date_obj.day < 15:
+            flash("Date must be in late August (August 15th or later)!")
+            return redirect(url_for("setup"))
+            
+        # Update the .env file
+        project_folder = os.path.expanduser('~/talks-processing')
+        env_path = os.path.join(project_folder, '.env')
+        
+        # Read existing .env file or create new content
+        env_lines = []
+        if os.path.exists(env_path):
+            with open(env_path, 'r') as f:
+                env_lines = f.readlines()
+        
+        # Update or add GB_FRIDAY line
+        gb_friday_updated = False
+        for i, line in enumerate(env_lines):
+            if line.startswith('GB_FRIDAY='):
+                env_lines[i] = f'GB_FRIDAY={festival_date}\n'
+                gb_friday_updated = True
+                break
+        
+        if not gb_friday_updated:
+            env_lines.append(f'GB_FRIDAY={festival_date}\n')
+        
+        # Write back to .env file
+        with open(env_path, 'w') as f:
+            f.writelines(env_lines)
+            
+        flash(f"Festival date updated to {festival_date}. Restart the application for changes to take effect.")
+        
+    except ValueError:
+        flash("Invalid date format!")
+        return redirect(url_for("setup"))
+    except Exception as e:
+        flash(f"Error updating festival date: {str(e)}")
+        return redirect(url_for("setup"))
+    
+    return redirect(url_for("setup"))
+
+
 @app.route("/create_alltalks_gold", methods=["POST"])
 @login_required
 @current_user_is_team_leader

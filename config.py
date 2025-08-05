@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 class Config:
     """Set Flask configuration vars from .env file."""
@@ -37,8 +38,14 @@ class Config:
             }
     }
 
-    # Greenbelt
-    GB_FRIDAY = "2024-08-23"
+    # Greenbelt - Default to Friday of August Bank Holiday weekend of current year
+    current_year = datetime.now().year
+    # August bank holiday is last Monday of August, so Friday is 3 days before
+    august_last_monday = datetime(current_year, 8, 31)
+    while august_last_monday.weekday() != 0:  # Find last Monday
+        august_last_monday = august_last_monday.replace(day=august_last_monday.day - 1)
+    default_gb_friday = august_last_monday.replace(day=august_last_monday.day - 3)
+    GB_FRIDAY = os.getenv("GB_FRIDAY", default_gb_friday.strftime("%Y-%m-%d"))
     GB_SHORT_YEAR = GB_FRIDAY[2:4]
 
     # Login
