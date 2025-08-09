@@ -170,7 +170,7 @@ def setup():
     except Exception as e:
         app.logger.error(f"Error loading rota settings: {e}")
         rota_settings = {}
-        flash("Warning: Could not load rota settings. Database may need to be recreated.")
+        flash("Warning: Could not load rota settings. Database may need to be recreated.", "warning")
     
     return render_template("setup.html", rota_settings=rota_settings)
 
@@ -182,7 +182,7 @@ def put_alltalks_pdf():
     """Upload the all talks PDF to the USB gold copy"""
 
     if "file" not in request.files:
-        flash("No file supplied!")
+        flash("No file supplied!", "error")
         return redirect(url_for("setup"))
 
     file = request.files["file"]
@@ -203,7 +203,7 @@ def update_festival_date():
     festival_date = request.form.get("festival_date")
     
     if not festival_date:
-        flash("No date provided!")
+        flash("No date provided!", "error")
         return redirect(url_for("setup"))
     
     try:
@@ -212,12 +212,12 @@ def update_festival_date():
         
         # Validate it's a Friday
         if date_obj.weekday() != 4:  # 4 = Friday (Monday is 0)
-            flash("Date must be a Friday!")
+            flash("Date must be a Friday!", "error")
             return redirect(url_for("setup"))
         
         # Validate it's in late August (15th or later)
         if date_obj.month != 8 or date_obj.day < 15:
-            flash("Date must be in late August (August 15th or later)!")
+            flash("Date must be in late August (August 15th or later)!", "error")
             return redirect(url_for("setup"))
             
         # Update the .env file
@@ -245,13 +245,13 @@ def update_festival_date():
         with open(env_path, 'w') as f:
             f.writelines(env_lines)
             
-        flash(f"Festival date updated to {festival_date}. Restart the application for changes to take effect.")
+        flash(f"Festival date updated to {festival_date}. Restart the application for changes to take effect.", "success")
         
     except ValueError:
-        flash("Invalid date format!")
+        flash("Invalid date format!", "error")
         return redirect(url_for("setup"))
     except Exception as e:
-        flash(f"Error updating festival date: {str(e)}")
+        flash(f"Error updating festival date: {str(e)}", "error")
         return redirect(url_for("setup"))
     
     return redirect(url_for("setup"))
@@ -278,7 +278,7 @@ def update_rota_settings():
                     
                     # Special validation for max_shifts_per_day_limit
                     if key == 'max_shifts_per_day_limit' and new_value_int > 2:
-                        flash(f"Maximum shifts per day cannot exceed 2")
+                        flash(f"Maximum shifts per day cannot exceed 2", "error")
                         return redirect(url_for("setup"))
                     
                     current_value = RotaSettings.get_value(key)
@@ -286,16 +286,16 @@ def update_rota_settings():
                         RotaSettings.set_value(key, new_value_int)
                         updated_count += 1
                 else:
-                    flash(f"Invalid value for {key}: must be a positive integer")
+                    flash(f"Invalid value for {key}: must be a positive integer", "error")
                     return redirect(url_for("setup"))
         
         if updated_count > 0:
-            flash(f"Updated {updated_count} rota setting(s). Changes will apply to new rota generations.")
+            flash(f"Updated {updated_count} rota setting(s). Changes will apply to new rota generations.", "success")
         else:
-            flash("No changes were made to rota settings.")
+            flash("No changes were made to rota settings.", "info")
             
     except Exception as e:
-        flash(f"Error updating rota settings: {str(e)}")
+        flash(f"Error updating rota settings: {str(e)}", "error")
     
     return redirect(url_for("setup"))
 
