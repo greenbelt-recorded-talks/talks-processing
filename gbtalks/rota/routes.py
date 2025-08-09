@@ -301,7 +301,23 @@ def rota():
         additional_talks_count = Talk.query.filter(Talk.is_priority == False).count()
         assigned_additional_talks = Talk.query.filter(Talk.is_priority == False, Talk.recorded_by != None).count()
         
-        flash(f"Rota generation completed! Assigned {assigned_priority_talks}/{priority_talks_count} priority talks and {assigned_additional_talks}/{additional_talks_count} additional talks.", "success")
+        # Check if all talks were allocated
+        unallocated_priority = priority_talks_count - assigned_priority_talks
+        unallocated_additional = additional_talks_count - assigned_additional_talks
+        
+        base_message = f"Rota generation completed! Assigned {assigned_priority_talks}/{priority_talks_count} priority talks and {assigned_additional_talks}/{additional_talks_count} additional talks."
+        
+        if unallocated_priority > 0 or unallocated_additional > 0:
+            warning_parts = []
+            if unallocated_priority > 0:
+                warning_parts.append(f"{unallocated_priority} priority talk{'s' if unallocated_priority != 1 else ''}")
+            if unallocated_additional > 0:
+                warning_parts.append(f"{unallocated_additional} additional talk{'s' if unallocated_additional != 1 else ''}")
+            
+            warning_message = f" WARNING: {' and '.join(warning_parts)} could not be allocated - check recorder availability and rota settings."
+            flash(base_message + warning_message, "warning")
+        else:
+            flash(base_message + " All talks successfully allocated!", "success")
 
     return render_template("rota.html")
 
