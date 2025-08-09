@@ -117,7 +117,7 @@ class RotaSettings(db.Model):
             'break_between_shifts': (2, 'Minimum break required between shifts', 'hours'),
             'minimum_time_between_talks': (20, 'Minimum gap between consecutive talks', 'minutes'),
             'max_talks_per_shift': (2, 'Maximum number of talks per shift', 'talks'),
-            'max_shifts_per_day_limit': (2, 'Maximum shifts per day (cannot exceed 2)', 'shifts'),
+            'max_shifts_per_day_limit': (2, 'Maximum shifts per day (cannot exceed 3)', 'shifts'),
             'same_venue_assignment_window': (3, 'Time window to assign same-venue talks to same recorder', 'hours'),
             'additional_talk_search_window': (1, 'Time window to search for additional talks to fill shifts', 'hours'),
             'additional_talk_minimum_gap': (20, 'Minimum gap before considering additional talks', 'minutes'),

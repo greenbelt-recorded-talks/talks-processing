@@ -115,41 +115,44 @@ def talk_would_break_shift_pattern(recorder, candidate_talk):
         ].start_time + timedelta(hours=shift_length):
             talks_in_first_shift.append(talk)
 
-    # The second shift is all talks that start in a period that starts a minimum of 3h after the end of the last talk of the first shift, and lasts for 3h.
-
-    talks_in_second_shift = []
+    # Build shifts dynamically based on max_shifts_per_day_limit
     max_shifts_per_day_limit = RotaSettings.get_value('max_shifts_per_day_limit', 2)
-    if recorder.max_shifts_per_day >= 2 and max_shifts_per_day_limit >= 2 and len(
-        talks_on_this_day_if_talk_assigned
-    ) > len(talks_in_first_shift):
-        # Consider the second shift to start at the start of the first talk after the end of the first shift
-        # Note that len() deals with the zero-offset of the array index
-        second_shift_start_time = talks_on_this_day_if_talk_assigned[
-            len(talks_in_first_shift)
-        ].start_time
+    max_allowed_shifts = min(recorder.max_shifts_per_day, max_shifts_per_day_limit)
+    
+    all_shifts = [talks_in_first_shift]
+    remaining_talks = talks_on_this_day_if_talk_assigned[len(talks_in_first_shift):]
+    
+    # Build additional shifts up to the maximum allowed
+    for shift_num in range(2, max_allowed_shifts + 1):
+        if not remaining_talks:
+            break
+            
+        # Find the start time for this shift (first remaining talk)
+        shift_start_time = remaining_talks[0].start_time
+        
+        # Check if this shift starts with adequate break after previous shift
+        previous_shift = all_shifts[-1]
+        if previous_shift and shift_start_time < previous_shift[-1].end_time + timedelta(hours=break_between_shifts):
+            return True  # Violates break rules
+        
+        # Collect talks for this shift
+        current_shift = []
+        for talk in remaining_talks[:]:  # Copy list to avoid modification during iteration
+            if shift_start_time <= talk.start_time <= shift_start_time + timedelta(hours=shift_length - 1):
+                current_shift.append(talk)
+                remaining_talks.remove(talk)
+        
+        if current_shift:
+            all_shifts.append(current_shift)
+        else:
+            break
 
-        # If the second shift would start less than break_between_shifts hours after the end of the first shift, fail
-        if second_shift_start_time < talks_in_first_shift[-1].end_time + timedelta(
-            hours=break_between_shifts
-        ):
-            return True
-
-        for talk in talks_on_this_day_if_talk_assigned:
-            if (
-                second_shift_start_time
-                <= talk.start_time
-                <= second_shift_start_time + timedelta(hours=shift_length - 1)
-            ):
-                talks_in_second_shift.append(talk)
-
-    # If there are more talks in the list than were allowed by the shift rules, then the list violates the rules
-
-    if len(talks_on_this_day_if_talk_assigned) == len(talks_in_first_shift) + len(
-        talks_in_second_shift
-    ):
-        return False
+    # Check if all talks are accounted for in shifts
+    total_talks_in_shifts = sum(len(shift) for shift in all_shifts)
+    if len(talks_on_this_day_if_talk_assigned) == total_talks_in_shifts:
+        return False  # All talks fit within shift rules
     else:
-        return True
+        return True  # Some talks don't fit, violates rules
 
 
 def assign_talk_to_recorder(recorder, talk):

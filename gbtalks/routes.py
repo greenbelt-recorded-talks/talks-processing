@@ -277,8 +277,8 @@ def update_rota_settings():
                     new_value_int = int(new_value)
                     
                     # Special validation for max_shifts_per_day_limit
-                    if key == 'max_shifts_per_day_limit' and new_value_int > 2:
-                        flash(f"Maximum shifts per day cannot exceed 2", "error")
+                    if key == 'max_shifts_per_day_limit' and new_value_int > 3:
+                        flash(f"Maximum shifts per day cannot exceed 3", "error")
                         return redirect(url_for("setup"))
                     
                     current_value = RotaSettings.get_value(key)
