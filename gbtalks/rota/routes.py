@@ -117,7 +117,8 @@ def talk_would_break_shift_pattern(recorder, candidate_talk):
     # The second shift is all talks that start in a period that starts a minimum of 3h after the end of the last talk of the first shift, and lasts for 3h.
 
     talks_in_second_shift = []
-    if recorder.max_shifts_per_day == 2 and len(
+    max_shifts_per_day_limit = RotaSettings.get_value('max_shifts_per_day_limit', 2)
+    if recorder.max_shifts_per_day >= 2 and max_shifts_per_day_limit >= 2 and len(
         talks_on_this_day_if_talk_assigned
     ) > len(talks_in_first_shift):
         # Consider the second shift to start at the start of the first talk after the end of the first shift

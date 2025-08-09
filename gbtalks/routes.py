@@ -274,9 +274,16 @@ def update_rota_settings():
             if key in request.form:
                 new_value = request.form.get(key)
                 if new_value and new_value.isdigit():
+                    new_value_int = int(new_value)
+                    
+                    # Special validation for max_shifts_per_day_limit
+                    if key == 'max_shifts_per_day_limit' and new_value_int > 2:
+                        flash(f"Maximum shifts per day cannot exceed 2")
+                        return redirect(url_for("setup"))
+                    
                     current_value = RotaSettings.get_value(key)
-                    if int(new_value) != current_value:
-                        RotaSettings.set_value(key, int(new_value))
+                    if new_value_int != current_value:
+                        RotaSettings.set_value(key, new_value_int)
                         updated_count += 1
                 else:
                     flash(f"Invalid value for {key}: must be a positive integer")
