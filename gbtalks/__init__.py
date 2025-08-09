@@ -25,6 +25,8 @@ def register_commands(app):
 
     app.cli.add_command(commands.convert_talks)
     app.cli.add_command(commands.create_db)
+    app.cli.add_command(commands.migrate_db)
+    app.cli.add_command(commands.migration_status)
 
 
 def setup_login(app):

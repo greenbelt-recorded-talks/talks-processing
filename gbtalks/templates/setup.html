@@ -73,6 +73,7 @@ Configure the variables that control how the automatic rota generation works. Ch
 
 {% endfilter %}
 
+        {% if rota_settings %}
         <form action="update_rota_settings" method=post>
             {% for key, setting in rota_settings.items() %}
             <div class="uk-margin">
@@ -86,6 +87,9 @@ Configure the variables that control how the automatic rota generation works. Ch
             {% endfor %}
             <button class="uk-button uk-button-primary">Update Rota Settings</button>
         </form>
+        {% else %}
+        <p class="uk-text-warning">Rota settings are not available. The database may need to be recreated with <code>flask createdb</code>.</p>
+        {% endif %}
 
 </div>
 

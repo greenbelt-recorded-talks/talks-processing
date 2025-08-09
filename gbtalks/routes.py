@@ -162,8 +162,16 @@ def edit_talk():
 def setup():
     """Various setup functions"""
     
-    from .models import RotaSettings
-    rota_settings = RotaSettings.get_all_settings()
+    try:
+        from .models import RotaSettings
+        # Ensure defaults are initialized
+        RotaSettings.initialize_defaults()
+        rota_settings = RotaSettings.get_all_settings()
+    except Exception as e:
+        app.logger.error(f"Error loading rota settings: {e}")
+        rota_settings = {}
+        flash("Warning: Could not load rota settings. Database may need to be recreated.")
+    
     return render_template("setup.html", rota_settings=rota_settings)
 
 

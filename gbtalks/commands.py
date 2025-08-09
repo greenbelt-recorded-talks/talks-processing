@@ -197,3 +197,197 @@ def create_db():
     db.create_all()
     db.session.commit()
     print("Database tables created")
+
+
+class Migration:
+    """
+    Simple migration system for incremental database updates
+    
+    Each migration should:
+    - Have a unique version (format: NNN_descriptive_name)
+    - Include a clear description of what it does
+    - Provide an up_func that applies the changes
+    - Optionally provide a down_func for rollbacks
+    """
+    
+    def __init__(self, version, description, up_func, down_func=None, notes=None):
+        self.version = version
+        self.description = description
+        self.up_func = up_func
+        self.down_func = down_func
+        self.notes = notes  # Additional documentation for complex migrations
+    
+    def apply(self):
+        """Apply this migration"""
+        print(f"Applying migration {self.version}: {self.description}")
+        self.up_func()
+        self._record_migration()
+    
+    def rollback(self):
+        """Rollback this migration"""
+        if self.down_func:
+            print(f"Rolling back migration {self.version}: {self.description}")
+            self.down_func()
+            self._remove_migration_record()
+        else:
+            raise Exception(f"Migration {self.version} has no rollback function")
+    
+    def _record_migration(self):
+        """Record that this migration has been applied"""
+        from sqlalchemy import text
+        db.engine.execute(text(
+            "INSERT OR REPLACE INTO schema_migrations (version, applied_at) VALUES (:version, datetime('now'))"
+        ), version=self.version)
+    
+    def _remove_migration_record(self):
+        """Remove migration record"""
+        from sqlalchemy import text
+        db.engine.execute(text("DELETE FROM schema_migrations WHERE version = :version"), version=self.version)
+
+
+def ensure_migrations_table():
+    """Ensure the schema_migrations table exists"""
+    from sqlalchemy import text
+    db.engine.execute(text("""
+        CREATE TABLE IF NOT EXISTS schema_migrations (
+            version TEXT PRIMARY KEY,
+            applied_at TEXT NOT NULL
+        )
+    """))
+
+
+def get_applied_migrations():
+    """Get list of applied migration versions"""
+    try:
+        from sqlalchemy import text
+        result = db.engine.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
+        return {row[0] for row in result}
+    except:
+        return set()
+
+
+def create_rota_settings_table():
+    """Migration: Create rota_settings table"""
+    from .models import RotaSettings
+    RotaSettings.__table__.create(db.engine, checkfirst=True)
+    RotaSettings.initialize_defaults()
+
+
+# Define all migrations here
+# 
+# Migration Naming Convention:
+# - Use format: NNN_descriptive_name (e.g., 001_create_rota_settings)
+# - Always increment version numbers sequentially
+# - Use descriptive names that explain what the migration does
+#
+# Documentation Requirements:
+# - Always include a clear description
+# - Add notes for complex migrations that affect multiple tables or data
+# - Consider adding rollback functions for reversible operations
+# - Document any manual steps required before/after migration
+#
+MIGRATIONS = [
+    Migration(
+        version="001_create_rota_settings",
+        description="Create rota_settings table with default configuration",
+        up_func=create_rota_settings_table,
+        notes=(
+            "Adds configurable rota generation settings to replace hardcoded values. "
+            "Creates 7 default settings: shift_length, break_between_shifts, "
+            "minimum_time_between_talks, max_talks_per_shift, same_venue_assignment_window, "
+            "additional_talk_search_window, and additional_talk_minimum_gap. "
+            "No existing data is affected."
+        )
+    ),
+    
+    # Template for future migrations:
+    # Migration(
+    #     version="002_descriptive_name",
+    #     description="Brief description of what this migration does",
+    #     up_func=your_migration_function,
+    #     down_func=your_rollback_function,  # Optional
+    #     notes=(
+    #         "Detailed explanation of the migration including: "
+    #         "- What tables/columns are affected "
+    #         "- Any data transformations "
+    #         "- Potential impact on existing functionality "
+    #         "- Manual steps required before/after running migration"
+    #     )
+    # ),
+]
+
+
+@click.command(name="migrate")
+@with_appcontext
+def migrate_db():
+    """Apply pending database migrations"""
+    
+    print("Checking for pending migrations...")
+    
+    try:
+        # Ensure migrations table exists
+        ensure_migrations_table()
+        
+        # Get applied migrations
+        applied = get_applied_migrations()
+        
+        # Find pending migrations
+        pending = [m for m in MIGRATIONS if m.version not in applied]
+        
+        if not pending:
+            print("✓ No pending migrations")
+            return
+        
+        print(f"Found {len(pending)} pending migration(s)")
+        
+        # Apply each pending migration
+        for migration in pending:
+            try:
+                migration.apply()
+                print(f"✓ Applied {migration.version}")
+            except Exception as e:
+                print(f"✗ Failed to apply {migration.version}: {e}")
+                db.session.rollback()
+                raise
+        
+        db.session.commit()
+        print(f"Successfully applied {len(pending)} migration(s)!")
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Migration failed: {e}")
+        raise
+
+
+@click.command(name="migration-status")
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed migration information")
+@with_appcontext
+def migration_status(verbose):
+    """Show migration status and documentation"""
+    
+    try:
+        ensure_migrations_table()
+        applied = get_applied_migrations()
+        
+        print("Migration Status:")
+        print("=" * 70)
+        
+        for migration in MIGRATIONS:
+            status = "✓ Applied" if migration.version in applied else "○ Pending"
+            print(f"\n{status} {migration.version}")
+            print(f"    Description: {migration.description}")
+            
+            if verbose and migration.notes:
+                print(f"    Notes: {migration.notes}")
+            
+            if verbose:
+                has_rollback = "Yes" if migration.down_func else "No"
+                print(f"    Rollback available: {has_rollback}")
+        
+        print(f"\nSummary: {len(applied)}/{len(MIGRATIONS)} migrations applied")
+        
+        if not verbose:
+            print("\nUse --verbose for detailed information about each migration")
+        
+    except Exception as e:
+        print(f"Error checking migration status: {e}")
