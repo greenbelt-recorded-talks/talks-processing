@@ -16,8 +16,8 @@
 There is no way to update the online rota with manual changes, apart from by directly editing the database. If you need to do this, speak to Rob. 
 </p>
 
-<form method=post>
-	<button>Create New Rota</button>
+<form method=post onsubmit="return confirm('Are you sure you want to create a new rota? This will clear all existing assignments and cannot be undone.')">
+	<button class="uk-button uk-button-primary">Create New Rota</button>
 </form>
 
 </div>

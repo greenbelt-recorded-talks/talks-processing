@@ -5,6 +5,7 @@ from flask import (
     redirect,
     url_for,
     render_template,
+    flash,
 )
 from datetime import datetime, timedelta
 from flask import current_app as app
@@ -213,6 +214,7 @@ def rota():
 
     if request.method == "POST":
         # If we've been asked to make a new rota, clear out the old one
+        flash("Starting rota generation...")
         clear_rota()
 
     talks = Talk.query.filter(Talk.is_priority == True).order_by(Talk.start_time)
@@ -288,6 +290,16 @@ def rota():
                     and talk_would_clash(assigned_recorder, future_talk) is False
                 ):
                     assign_talk_to_recorder(assigned_recorder, future_talk)
+
+    # Add completion message if this was a POST request (rota generation)
+    if request.method == "POST":
+        priority_talks_count = Talk.query.filter(Talk.is_priority == True).count()
+        assigned_priority_talks = Talk.query.filter(Talk.is_priority == True, Talk.recorded_by != None).count()
+        
+        additional_talks_count = Talk.query.filter(Talk.is_priority == False).count()
+        assigned_additional_talks = Talk.query.filter(Talk.is_priority == False, Talk.recorded_by != None).count()
+        
+        flash(f"Rota generation completed! Assigned {assigned_priority_talks}/{priority_talks_count} priority talks and {assigned_additional_talks}/{additional_talks_count} additional talks.")
 
     return render_template("rota.html")
 
