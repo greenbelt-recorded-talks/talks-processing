@@ -43,21 +43,21 @@ Uploading a file here will replace the existing one.
 <div class="uk-card uk-card-default uk-card-body">
 
 {% filter markdown %}
-### Festival Date
+### Festival Year
 
-Configure the Friday date when Greenbelt Festival starts. This affects file naming, metadata, and year calculations throughout the system.
+Configure the year when Greenbelt Festival takes place. The system automatically calculates the Friday before the UK Summer Bank Holiday (last Monday in August) for that year.
 
 **Current Festival Date:** {{ config.GB_FRIDAY }}  
 **Current Short Year:** {{ config.GB_SHORT_YEAR }}
 
-The date must be a Friday in late August (August 15th or later).
+The Friday date is automatically calculated based on the UK Summer Bank Holiday.
 
 {% endfilter %}
 
-        <form action="update_festival_date" method=post>
-                <label for=festival_date>Festival Friday Date (YYYY-MM-DD)</label>
-                <input name=festival_date type=date id=festival_date value="{{ config.GB_FRIDAY }}" required>
-                <button>Update Festival Date</button>
+        <form action="update_festival_year" method=post>
+                <label for=festival_year>Festival Year</label>
+                <input name=festival_year type=number id=festival_year value="{{ config.GB_FRIDAY[:4] }}" min="{{ current_year }}" max="{{ current_year + 10 }}" required>
+                <button>Update Festival Year</button>
         </form>
 
 </div>

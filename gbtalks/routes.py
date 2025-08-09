@@ -28,6 +28,22 @@ from .libgbtalks import (
     gb_time_to_datetime
 )
 
+
+def calculate_greenbelt_friday(year):
+    """
+    Calculate the Friday before the UK Summer Bank Holiday (last Monday in August).
+    Greenbelt Festival traditionally starts on this Friday.
+    """
+    # Find last Monday in August (Aug 31 - weekday gives us the Monday)
+    last_day_of_august = datetime(year, 8, 31)
+    weekday = last_day_of_august.weekday()  # 0=Monday, 1=Tuesday, etc.
+    last_monday = last_day_of_august - timedelta(days=weekday)
+    
+    # Go back 3 days from that Monday to get the Friday before
+    greenbelt_friday = last_monday - timedelta(days=3)
+    
+    return greenbelt_friday
+
 # current_user is a proxy for the current user
 current_user = LocalProxy(lambda: _get_user())
 
@@ -172,7 +188,7 @@ def setup():
         rota_settings = {}
         flash("Warning: Could not load rota settings. Database may need to be recreated.", "warning")
     
-    return render_template("setup.html", rota_settings=rota_settings)
+    return render_template("setup.html", rota_settings=rota_settings, current_year=datetime.now().year)
 
 
 @app.route("/put_alltalks_pdf", methods=["POST"])
@@ -194,31 +210,31 @@ def put_alltalks_pdf():
     return redirect(url_for("setup"))
 
 
-@app.route("/update_festival_date", methods=["POST"])
+@app.route("/update_festival_year", methods=["POST"])
 @login_required
 @current_user_is_team_leader
-def update_festival_date():
-    """Update the festival Friday date in .env file"""
+def update_festival_year():
+    """Update the festival year and calculate the Friday date automatically"""
     
-    festival_date = request.form.get("festival_date")
+    festival_year = request.form.get("festival_year")
     
-    if not festival_date:
-        flash("No date provided!", "error")
+    if not festival_year:
+        flash("No year provided!", "error")
         return redirect(url_for("setup"))
     
     try:
-        # Parse the date
-        date_obj = datetime.strptime(festival_date, "%Y-%m-%d").date()
+        # Parse and validate the year
+        year = int(festival_year)
         
-        # Validate it's a Friday
-        if date_obj.weekday() != 4:  # 4 = Friday (Monday is 0)
-            flash("Date must be a Friday!", "error")
+        # Validate reasonable year range (current year to 10 years in future)
+        current_year = datetime.now().year
+        if year < current_year or year > current_year + 10:
+            flash(f"Year must be between {current_year} and {current_year + 10}!", "error")
             return redirect(url_for("setup"))
         
-        # Validate it's in late August (15th or later)
-        if date_obj.month != 8 or date_obj.day < 15:
-            flash("Date must be in late August (August 15th or later)!", "error")
-            return redirect(url_for("setup"))
+        # Calculate the Greenbelt Friday for this year
+        gb_friday = calculate_greenbelt_friday(year)
+        festival_date = gb_friday.strftime("%Y-%m-%d")
             
         # Update the .env file
         project_folder = os.path.expanduser('~/talks-processing')
@@ -245,13 +261,13 @@ def update_festival_date():
         with open(env_path, 'w') as f:
             f.writelines(env_lines)
             
-        flash(f"Festival date updated to {festival_date}. Restart the application for changes to take effect.", "success")
+        flash(f"Festival year set to {year}. Calculated Friday date: {festival_date}. Restart the application for changes to take effect.", "success")
         
     except ValueError:
-        flash("Invalid date format!", "error")
+        flash("Invalid year format!", "error")
         return redirect(url_for("setup"))
     except Exception as e:
-        flash(f"Error updating festival date: {str(e)}", "error")
+        flash(f"Error updating festival year: {str(e)}", "error")
         return redirect(url_for("setup"))
     
     return redirect(url_for("setup"))
