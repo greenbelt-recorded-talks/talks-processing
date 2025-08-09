@@ -214,7 +214,6 @@ def rota():
 
     if request.method == "POST":
         # If we've been asked to make a new rota, clear out the old one
-        flash("Starting rota generation...", "info")
         clear_rota()
 
     talks = Talk.query.filter(Talk.is_priority == True).order_by(Talk.start_time)

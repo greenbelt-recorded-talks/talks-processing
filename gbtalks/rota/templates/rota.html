@@ -16,9 +16,37 @@
 There is no way to update the online rota with manual changes, apart from by directly editing the database. If you need to do this, speak to Rob. 
 </p>
 
-<form method=post onsubmit="return confirm('Are you sure you want to create a new rota? This will clear all existing assignments and cannot be undone.')">
-	<button class="uk-button uk-button-primary">Create New Rota</button>
+<form method=post onsubmit="return confirmAndStartRota(this)">
+	<button class="uk-button uk-button-primary" id="rotaButton">Create New Rota</button>
 </form>
+
+<div id="rotaProgress" class="uk-alert-primary" uk-alert style="display: none;">
+    <div class="uk-flex uk-flex-middle">
+        <div uk-spinner="ratio: 0.8" class="uk-margin-small-right"></div>
+        <p class="uk-margin-remove">Generating rota... This may take a few moments.</p>
+    </div>
+</div>
+
+<script>
+function confirmAndStartRota(form) {
+    if (confirm('Are you sure you want to create a new rota? This will clear all existing assignments and cannot be undone.')) {
+        // Show progress indicator
+        document.getElementById('rotaProgress').style.display = 'block';
+        
+        // Disable button and change text
+        const button = document.getElementById('rotaButton');
+        button.disabled = true;
+        button.innerHTML = 'Generating...';
+        button.className = 'uk-button uk-button-secondary';
+        
+        // Scroll to progress indicator
+        document.getElementById('rotaProgress').scrollIntoView({ behavior: 'smooth' });
+        
+        return true; // Allow form submission
+    }
+    return false; // Cancel submission
+}
+</script>
 
 </div>
 
