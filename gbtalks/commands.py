@@ -235,33 +235,37 @@ class Migration:
     def _record_migration(self):
         """Record that this migration has been applied"""
         from sqlalchemy import text
-        db.engine.execute(text(
-            "INSERT OR REPLACE INTO schema_migrations (version, applied_at) VALUES (:version, datetime('now'))"
-        ), version=self.version)
+        with db.engine.begin() as conn:
+            conn.execute(text(
+                "INSERT OR REPLACE INTO schema_migrations (version, applied_at) VALUES (:version, datetime('now'))"
+            ), {"version": self.version})
     
     def _remove_migration_record(self):
         """Remove migration record"""
         from sqlalchemy import text
-        db.engine.execute(text("DELETE FROM schema_migrations WHERE version = :version"), version=self.version)
+        with db.engine.begin() as conn:
+            conn.execute(text("DELETE FROM schema_migrations WHERE version = :version"), {"version": self.version})
 
 
 def ensure_migrations_table():
     """Ensure the schema_migrations table exists"""
     from sqlalchemy import text
-    db.engine.execute(text("""
-        CREATE TABLE IF NOT EXISTS schema_migrations (
-            version TEXT PRIMARY KEY,
-            applied_at TEXT NOT NULL
-        )
-    """))
+    with db.engine.begin() as conn:
+        conn.execute(text("""
+            CREATE TABLE IF NOT EXISTS schema_migrations (
+                version TEXT PRIMARY KEY,
+                applied_at TEXT NOT NULL
+            )
+        """))
 
 
 def get_applied_migrations():
     """Get list of applied migration versions"""
     try:
         from sqlalchemy import text
-        result = db.engine.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
-        return {row[0] for row in result}
+        with db.engine.connect() as conn:
+            result = conn.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
+            return {row[0] for row in result}
     except:
         return set()
 
@@ -275,17 +279,18 @@ def create_rota_settings_table():
 
 def add_recorder_time_constraints():
     """Migration: Add earliest_start_time and latest_end_time columns to recorders table"""
-    # Add the new columns to the recorders table using raw SQL
-    import sqlalchemy as sa
+    from sqlalchemy import text
     
     try:
         # For SQLite, use ALTER TABLE to add columns
-        db.engine.execute('ALTER TABLE recorders ADD COLUMN earliest_start_time TIME')
+        with db.engine.begin() as conn:
+            conn.execute(text('ALTER TABLE recorders ADD COLUMN earliest_start_time TIME'))
     except Exception as e:
         print(f"Note: earliest_start_time column may already exist: {e}")
     
     try:
-        db.engine.execute('ALTER TABLE recorders ADD COLUMN latest_end_time TIME')
+        with db.engine.begin() as conn:
+            conn.execute(text('ALTER TABLE recorders ADD COLUMN latest_end_time TIME'))
     except Exception as e:
         print(f"Note: latest_end_time column may already exist: {e}")
 
