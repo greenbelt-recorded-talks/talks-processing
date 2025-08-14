@@ -23,15 +23,13 @@
 		<td>{{ time_slot.strftime("%H:%M") }}</td>
 		{% for recorder in recorders %}
 		{% set talk_data = rota_data[day]['grid'][time_slot][recorder.name] %}
-		{% if not talk_data or not talk_data.get('skip_render') %}
-		<td{% if talk_data and talk_data.get('rowspan', 1) > 1 %} rowspan="{{ talk_data['rowspan'] }}"{% endif %}>
-			{% if talk_data and not talk_data.get('skip_render') %}
+		<td style="background-color: {% if talk_data %}#90EE90{% else %}white{% endif %};">
+			{% if talk_data %}
 			<div class="{% if talk_data['is_priority'] %}priority_talk{% endif %}">
 				{{ talk_data['talk_id'] }}
 			</div>
 			{% endif %}
 		</td>
-		{% endif %}
 		{% endfor %}
 	</tr>
 	{% endfor %}

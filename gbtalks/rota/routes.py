@@ -380,47 +380,36 @@ def rota_by_recorder():
         if not day_talks:
             continue
         
-        # Get all unique start times for this day (these will be our time slots)
-        unique_times = sorted(set(t.start_time for t in day_talks))
+        # Get all unique start and end times for this day
+        all_times = set()
+        for talk in day_talks:
+            all_times.add(talk.start_time)
+            all_times.add(talk.end_time)
+        
+        # Sort all times to create our time slots
+        sorted_times = sorted(all_times)
         
         rota_data[day] = {
-            'times': unique_times,
+            'times': sorted_times,
             'grid': {}
         }
         
         # Initialize grid for each time slot
-        for time_slot in unique_times:
+        for time_slot in sorted_times:
             rota_data[day]['grid'][time_slot] = {recorder.name: None for recorder in recorders}
         
-        # Fill in the talks and calculate rowspan for talks that span multiple time slots
-        for talk in day_talks:
-            if talk.recorded_by:
-                # Calculate how many time slots this talk spans
-                rowspan = 1
-                for i, time_slot in enumerate(unique_times):
-                    if time_slot == talk.start_time:
-                        # Count subsequent time slots that this talk overlaps
-                        for j in range(i + 1, len(unique_times)):
-                            if unique_times[j] < talk.end_time:
-                                rowspan += 1
-                            else:
-                                break
-                        break
-                
-                rota_data[day]['grid'][talk.start_time][talk.recorded_by.name] = {
-                    'talk_id': talk.id,
-                    'end_time': talk.end_time,
-                    'is_priority': talk.is_priority,
-                    'rowspan': rowspan
-                }
-                
-                # Mark subsequent time slots as occupied by this talk (to skip rendering)
-                for i, time_slot in enumerate(unique_times):
-                    if time_slot == talk.start_time:
-                        for j in range(i + 1, min(i + rowspan, len(unique_times))):
-                            rota_data[day]['grid'][unique_times[j]][talk.recorded_by.name] = {
-                                'skip_render': True
-                            }
-                        break
+        # For each time slot, check which talks are active (started but not yet ended)
+        for time_slot in sorted_times:
+            for talk in day_talks:
+                if talk.recorded_by and talk.start_time <= time_slot < talk.end_time:
+                    # This talk is active at this time slot
+                    rota_data[day]['grid'][time_slot][talk.recorded_by.name] = {
+                        'talk_id': talk.id,
+                        'start_time': talk.start_time,
+                        'end_time': talk.end_time,
+                        'is_priority': talk.is_priority,
+                        'is_start': time_slot == talk.start_time,
+                        'is_end': time_slot == talk.end_time
+                    }
 
     return render_template("rota_by_recorder.html", rota_data=rota_data, recorders=recorders, days=days)
