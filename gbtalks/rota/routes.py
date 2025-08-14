@@ -14,7 +14,7 @@ from sqlalchemy.orm import joinedload
 
 def talk_would_clash(recorder, talk, settings_cache=None):
     # A talk clashes if it starts while the recorder is currently recording, or within the configured gap
-    minimum_time_between_talks = settings_cache.get('minimum_time_between_talks', 20) if settings_cache else RotaSettings.get_value('minimum_time_between_talks', 20)
+    minimum_time_between_talks = settings_cache['minimum_time_between_talks'] if settings_cache else RotaSettings.get_value('minimum_time_between_talks', 20)
 
 # Examples:
 # Recorder has existing talk at 16:00. Candidate talk is at 17:00.
@@ -46,7 +46,7 @@ def talk_would_clash(recorder, talk, settings_cache=None):
 
 def recorder_is_maxed_out_for_day(recorder, talk, settings_cache=None):
     # Maximum talks per day = max shifts per day * max talks per shift
-    max_talks_per_shift = settings_cache.get('max_talks_per_shift', 2) if settings_cache else RotaSettings.get_value('max_talks_per_shift', 2)
+    max_talks_per_shift = settings_cache['max_talks_per_shift'] if settings_cache else RotaSettings.get_value('max_talks_per_shift', 2)
     candidates_max_talks = recorder.max_shifts_per_day * max_talks_per_shift
     candidates_talks_on_this_day = 0
     for candidates_talk in recorder.talks:
@@ -77,8 +77,8 @@ def talk_would_break_shift_pattern(recorder, candidate_talk, settings_cache=None
     # - check that there are no more shift_length groups containing talks than the candidate is allowed shifts
     # - check that the shift groups are more than break_between_shifts apart
     
-    shift_length = settings_cache.get('shift_length', 3) if settings_cache else RotaSettings.get_value('shift_length', 3)
-    break_between_shifts = settings_cache.get('break_between_shifts', 2) if settings_cache else RotaSettings.get_value('break_between_shifts', 2)
+    shift_length = settings_cache['shift_length'] if settings_cache else RotaSettings.get_value('shift_length', 3)
+    break_between_shifts = settings_cache['break_between_shifts'] if settings_cache else RotaSettings.get_value('break_between_shifts', 2)
 
     # Make a list of what the candidate's day would look like if the talk was assigned
     talks_on_this_day_if_talk_assigned = []
@@ -117,7 +117,7 @@ def talk_would_break_shift_pattern(recorder, candidate_talk, settings_cache=None
             talks_in_first_shift.append(talk)
 
     # Build shifts dynamically based on max_shifts_per_day_limit
-    max_shifts_per_day_limit = settings_cache.get('max_shifts_per_day_limit', 2) if settings_cache else RotaSettings.get_value('max_shifts_per_day_limit', 2)
+    max_shifts_per_day_limit = settings_cache['max_shifts_per_day_limit'] if settings_cache else RotaSettings.get_value('max_shifts_per_day_limit', 2)
     max_allowed_shifts = min(recorder.max_shifts_per_day, max_shifts_per_day_limit)
     
     all_shifts = [talks_in_first_shift]
@@ -204,7 +204,7 @@ def find_recorder_for_talk(talk, settings_cache=None):
                 continue
 
             # Move on if the talk starts less than the required break after the recorders' last talk ended
-            break_between_shifts = settings_cache.get('break_between_shifts', 2) if settings_cache else RotaSettings.get_value('break_between_shifts', 2)
+            break_between_shifts = settings_cache['break_between_shifts'] if settings_cache else RotaSettings.get_value('break_between_shifts', 2)
             if talk.start_time < candidate_recorders_last_talk.end_time + timedelta(
                 hours=break_between_shifts
             ):
@@ -265,7 +265,7 @@ def rota():
 
         if assigned_recorder is not None:
             # If there are any other talks in the same venue starting within the configured window, assign them to the same recorder
-            same_venue_assignment_window = rota_settings_cache.get('same_venue_assignment_window', 3)
+            same_venue_assignment_window = rota_settings_cache['same_venue_assignment_window'] if rota_settings_cache else RotaSettings.get_value('same_venue_assignment_window', 3)
             for future_talk in Talk.query.filter(
                 Talk.start_time > talk.end_time,
                 Talk.start_time <= talk.start_time + timedelta(hours=same_venue_assignment_window - 1),
@@ -301,8 +301,8 @@ def rota():
 
         # If there is an unallocated talk starting after minimum gap within search window, and assigning it wouldn't exceed shift limits, assign it
         if assigned_recorder is not None:
-            additional_talk_search_window = rota_settings_cache.get('additional_talk_search_window', 1)
-            additional_talk_minimum_gap = rota_settings_cache.get('additional_talk_minimum_gap', 20)
+            additional_talk_search_window = rota_settings_cache['additional_talk_search_window'] if rota_settings_cache else RotaSettings.get_value('additional_talk_search_window', 1)
+            additional_talk_minimum_gap = rota_settings_cache['additional_talk_minimum_gap'] if rota_settings_cache else RotaSettings.get_value('additional_talk_minimum_gap', 20)
             for future_talk in (
                 Talk.query.filter(
                     Talk.start_time > talk.end_time,
