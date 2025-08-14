@@ -390,10 +390,12 @@ def recorders():
 @login_required
 @current_user_is_team_leader
 def update_recorder_shifts():
-    """Update a recorder's max shifts per day"""
+    """Update a recorder's max shifts per day and time constraints"""
     
     recorder_name = request.form.get("recorder_name")
     max_shifts_per_day = request.form.get("max_shifts_per_day")
+    earliest_start_time = request.form.get("earliest_start_time")
+    latest_end_time = request.form.get("latest_end_time")
     
     if not recorder_name or not max_shifts_per_day:
         flash("Missing recorder name or shifts value", "error")
@@ -411,11 +413,60 @@ def update_recorder_shifts():
             flash(f"Recorder '{recorder_name}' not found", "error")
             return redirect(url_for("recorders"))
         
-        old_value = recorder.max_shifts_per_day
+        # Handle time constraint updates
+        from datetime import time
+        
+        # Parse earliest start time
+        earliest_time_obj = None
+        if earliest_start_time and earliest_start_time.strip():
+            try:
+                time_parts = earliest_start_time.split(":")
+                earliest_time_obj = time(int(time_parts[0]), int(time_parts[1]))
+            except (ValueError, IndexError):
+                flash("Invalid earliest start time format", "error")
+                return redirect(url_for("recorders"))
+        
+        # Parse latest end time
+        latest_time_obj = None
+        if latest_end_time and latest_end_time.strip():
+            try:
+                time_parts = latest_end_time.split(":")
+                latest_time_obj = time(int(time_parts[0]), int(time_parts[1]))
+            except (ValueError, IndexError):
+                flash("Invalid latest end time format", "error")
+                return redirect(url_for("recorders"))
+        
+        # Validate time constraint logic
+        if earliest_time_obj and latest_time_obj and earliest_time_obj >= latest_time_obj:
+            flash("Earliest start time must be before latest end time", "error")
+            return redirect(url_for("recorders"))
+        
+        # Update recorder fields
+        old_shifts = recorder.max_shifts_per_day
+        old_earliest = recorder.earliest_start_time
+        old_latest = recorder.latest_end_time
+        
         recorder.max_shifts_per_day = max_shifts_value
+        recorder.earliest_start_time = earliest_time_obj
+        recorder.latest_end_time = latest_time_obj
+        
         db.session.commit()
         
-        flash(f"Updated {recorder_name}'s max shifts from {old_value} to {max_shifts_value} per day", "success")
+        # Build success message
+        changes = []
+        if old_shifts != max_shifts_value:
+            changes.append(f"max shifts from {old_shifts} to {max_shifts_value}")
+        if old_earliest != earliest_time_obj:
+            earliest_str = earliest_time_obj.strftime('%H:%M') if earliest_time_obj else 'no constraint'
+            changes.append(f"earliest start time to {earliest_str}")
+        if old_latest != latest_time_obj:
+            latest_str = latest_time_obj.strftime('%H:%M') if latest_time_obj else 'no constraint'
+            changes.append(f"latest end time to {latest_str}")
+        
+        if changes:
+            flash(f"Updated {recorder_name}'s {', '.join(changes)}", "success")
+        else:
+            flash(f"No changes made to {recorder_name}", "info")
         
     except ValueError:
         flash("Invalid number format for max shifts per day", "error")

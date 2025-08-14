@@ -273,6 +273,22 @@ def create_rota_settings_table():
     RotaSettings.initialize_defaults()
 
 
+def add_recorder_time_constraints():
+    """Migration: Add earliest_start_time and latest_end_time columns to recorders table"""
+    # Add the new columns to the recorders table
+    try:
+        db.engine.execute('ALTER TABLE recorders ADD COLUMN earliest_start_time TIME')
+    except Exception:
+        pass  # Column might already exist
+    
+    try:
+        db.engine.execute('ALTER TABLE recorders ADD COLUMN latest_end_time TIME')
+    except Exception:
+        pass  # Column might already exist
+    
+    db.session.commit()
+
+
 # Define all migrations here
 # 
 # Migration Naming Convention:
@@ -297,6 +313,20 @@ MIGRATIONS = [
             "minimum_time_between_talks, max_talks_per_shift, same_venue_assignment_window, "
             "additional_talk_search_window, and additional_talk_minimum_gap. "
             "No existing data is affected."
+        )
+    ),
+    
+    Migration(
+        version="002_add_recorder_time_constraints",
+        description="Add earliest_start_time and latest_end_time fields to recorders",
+        up_func=add_recorder_time_constraints,
+        notes=(
+            "Adds optional time constraint fields to recorders table: "
+            "- earliest_start_time: Earliest time a recorder can start recording (nullable) "
+            "- latest_end_time: Latest time a recorder needs to finish by (nullable) "
+            "These fields allow recorders to specify availability windows. "
+            "Existing recorders will have NULL values (no constraints). "
+            "Rota generation will respect these constraints when assigning talks."
         )
     ),
     

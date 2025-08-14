@@ -57,6 +57,8 @@ class Recorder(db.Model):
 
     name = db.Column(db.String, primary_key=True)
     max_shifts_per_day = db.Column(db.Integer)
+    earliest_start_time = db.Column(db.Time, nullable=True)
+    latest_end_time = db.Column(db.Time, nullable=True)
 
     talks = db.relationship("Talk", backref="recorded_by", order_by="Talk.start_time")
 

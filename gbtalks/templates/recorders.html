@@ -50,8 +50,24 @@ There is no way to specify which days a recorder is available for. If two people
 
 <form method="post" action="{{ url_for('update_recorder_shifts') }}" style="display: inline-block; margin-bottom: 10px;">
     <input type="hidden" name="recorder_name" value="{{ recorder.name }}">
-    <label for="max_shifts_{{ recorder.name }}">Max shifts per day:</label>
-    <input type="number" name="max_shifts_per_day" id="max_shifts_{{ recorder.name }}" value="{{ recorder.max_shifts_per_day }}" min="1" max="3" style="width: 60px; text-align: center;">
+    
+    <div style="margin-bottom: 5px;">
+        <label for="max_shifts_{{ recorder.name }}">Max shifts per day:</label>
+        <input type="number" name="max_shifts_per_day" id="max_shifts_{{ recorder.name }}" value="{{ recorder.max_shifts_per_day }}" min="1" max="3" style="width: 60px; text-align: center;">
+    </div>
+    
+    <div style="margin-bottom: 5px;">
+        <label for="earliest_start_{{ recorder.name }}">Earliest start time:</label>
+        <input type="time" name="earliest_start_time" id="earliest_start_{{ recorder.name }}" value="{% if recorder.earliest_start_time %}{{ recorder.earliest_start_time.strftime('%H:%M') }}{% endif %}" style="width: 100px;">
+        <small style="color: #666;">(leave blank if no constraint)</small>
+    </div>
+    
+    <div style="margin-bottom: 5px;">
+        <label for="latest_end_{{ recorder.name }}">Latest end time:</label>
+        <input type="time" name="latest_end_time" id="latest_end_{{ recorder.name }}" value="{% if recorder.latest_end_time %}{{ recorder.latest_end_time.strftime('%H:%M') }}{% endif %}" style="width: 100px;">
+        <small style="color: #666;">(leave blank if no constraint)</small>
+    </div>
+    
     <button type="submit" class="uk-button uk-button-primary uk-button-small">Update</button>
 </form>
 

@@ -182,6 +182,15 @@ def find_recorder_for_talk(talk):
         recorders.sort(key=lambda x: len(x.talks))
         candidate_recorder = recorders.pop(0)
 
+        # Check time constraints first (applies to all recorders, regardless of existing talks)
+        # Move on if talk starts before recorder's earliest start time
+        if candidate_recorder.earliest_start_time and talk.start_time.time() < candidate_recorder.earliest_start_time:
+            continue
+            
+        # Move on if talk ends after recorder's latest end time
+        if candidate_recorder.latest_end_time and talk.end_time.time() > candidate_recorder.latest_end_time:
+            continue
+
         # Do some checks that only make sense if the recorder already has some talks assigned
         if candidate_recorder.talks:
             candidate_recorders_last_talk = candidate_recorder.talks[-1]
