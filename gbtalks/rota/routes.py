@@ -10,6 +10,7 @@ from flask import (
 from datetime import datetime, timedelta
 from flask import current_app as app
 from gbtalks.models import db, Talk, Recorder, RotaSettings
+from sqlalchemy.orm import joinedload
 
 def talk_would_clash(recorder, talk, settings_cache=None):
     # A talk clashes if it starts while the recorder is currently recording, or within the configured gap
@@ -175,11 +176,14 @@ def clear_rota():
 
 
 def find_recorder_for_talk(talk, settings_cache=None):
-    recorders = Recorder.query.all()
+    # Eager load recorder talks to avoid N+1 queries
+    recorders = Recorder.query.options(joinedload(Recorder.talks)).all()
+    
+    # Sort recorders once by current talk count, then maintain order by removing candidates
+    recorders.sort(key=lambda x: len(x.talks))
 
     while talk.recorded_by is None and len(recorders)>0:
         # Pick the recorder with fewest talks first, consider them a candidate
-        recorders.sort(key=lambda x: len(x.talks))
         candidate_recorder = recorders.pop(0)
 
         # Check time constraints first (applies to all recorders, regardless of existing talks)
