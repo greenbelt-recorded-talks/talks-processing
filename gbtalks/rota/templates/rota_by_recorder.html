@@ -1,0 +1,44 @@
+<!-- UIkit CSS -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/uikit@3.14.3/dist/css/uikit.min.css" />
+
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='rotastyle.css') }}">
+
+{% block content %}
+
+{% for day in days %}
+
+<h1>{{ day }}</h1>
+
+<table>
+	<tr>
+		<th>Time</th>
+		{% for recorder in recorders %}
+		<th>{{ recorder.name }}</th>
+		{% endfor %}
+	</tr>
+
+	{% for time_slot in rota_data[day]['times'] %}
+	<tr>
+		<td>{{ time_slot.strftime("%H:%M") }}</td>
+		{% for recorder in recorders %}
+		{% set talk_data = rota_data[day]['grid'][time_slot][recorder.name] %}
+		{% if not talk_data or not talk_data.get('skip_render') %}
+		<td{% if talk_data and talk_data.get('rowspan', 1) > 1 %} rowspan="{{ talk_data['rowspan'] }}"{% endif %}>
+			{% if talk_data and not talk_data.get('skip_render') %}
+			<div class="{% if talk_data['is_priority'] %}priority_talk{% endif %}">
+				{{ talk_data['talk_id'] }}
+			</div>
+			{% endif %}
+		</td>
+		{% endif %}
+		{% endfor %}
+	</tr>
+	{% endfor %}
+
+</table>
+<div class="pagebreak"> </div>
+
+{% endfor %}
+
+{% endblock %}
