@@ -228,6 +228,9 @@ def find_recorder_for_talk(talk, settings_cache=None):
 def rota():
     """Define a rota"""
 
+    # Initialize cache as None for GET requests
+    rota_settings_cache = None
+    
     if request.method == "POST":
         # If we've been asked to make a new rota, clear out the old one
         clear_rota()
@@ -258,7 +261,7 @@ def rota():
             continue
 
         # If we've got this far, find a recorder for the talk
-        assigned_recorder = find_recorder_for_talk(talk, rota_settings_cache if request.method == "POST" else None)
+        assigned_recorder = find_recorder_for_talk(talk, rota_settings_cache)
 
         if assigned_recorder is not None:
             # If there are any other talks in the same venue starting within the configured window, assign them to the same recorder
@@ -294,7 +297,7 @@ def rota():
             continue
 
         # If we've got this far, find a recorder for the talk
-        assigned_recorder = find_recorder_for_talk(talk, rota_settings_cache if request.method == "POST" else None)
+        assigned_recorder = find_recorder_for_talk(talk, rota_settings_cache)
 
         # If there is an unallocated talk starting after minimum gap within search window, and assigning it wouldn't exceed shift limits, assign it
         if assigned_recorder is not None:
