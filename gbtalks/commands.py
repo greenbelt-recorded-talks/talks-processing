@@ -275,18 +275,19 @@ def create_rota_settings_table():
 
 def add_recorder_time_constraints():
     """Migration: Add earliest_start_time and latest_end_time columns to recorders table"""
-    # Add the new columns to the recorders table
+    # Add the new columns to the recorders table using raw SQL
+    import sqlalchemy as sa
+    
     try:
+        # For SQLite, use ALTER TABLE to add columns
         db.engine.execute('ALTER TABLE recorders ADD COLUMN earliest_start_time TIME')
-    except Exception:
-        pass  # Column might already exist
+    except Exception as e:
+        print(f"Note: earliest_start_time column may already exist: {e}")
     
     try:
         db.engine.execute('ALTER TABLE recorders ADD COLUMN latest_end_time TIME')
-    except Exception:
-        pass  # Column might already exist
-    
-    db.session.commit()
+    except Exception as e:
+        print(f"Note: latest_end_time column may already exist: {e}")
 
 
 # Define all migrations here
