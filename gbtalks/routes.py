@@ -386,6 +386,46 @@ def recorders():
     return render_template("recorders.html", recorders=recorders)
 
 
+@app.route("/update_recorder_shifts", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def update_recorder_shifts():
+    """Update a recorder's max shifts per day"""
+    
+    recorder_name = request.form.get("recorder_name")
+    max_shifts_per_day = request.form.get("max_shifts_per_day")
+    
+    if not recorder_name or not max_shifts_per_day:
+        flash("Missing recorder name or shifts value", "error")
+        return redirect(url_for("recorders"))
+    
+    try:
+        max_shifts_value = int(max_shifts_per_day)
+        
+        if max_shifts_value < 1 or max_shifts_value > 3:
+            flash("Max shifts per day must be between 1 and 3", "error")
+            return redirect(url_for("recorders"))
+        
+        recorder = Recorder.query.filter_by(name=recorder_name).first()
+        if not recorder:
+            flash(f"Recorder '{recorder_name}' not found", "error")
+            return redirect(url_for("recorders"))
+        
+        old_value = recorder.max_shifts_per_day
+        recorder.max_shifts_per_day = max_shifts_value
+        db.session.commit()
+        
+        flash(f"Updated {recorder_name}'s max shifts from {old_value} to {max_shifts_value} per day", "success")
+        
+    except ValueError:
+        flash("Invalid number format for max shifts per day", "error")
+    except Exception as e:
+        flash(f"Error updating recorder: {str(e)}", "error")
+        db.session.rollback()
+    
+    return redirect(url_for("recorders"))
+
+
 @app.route("/front_desk", methods=["GET", "POST"])
 @login_required
 @current_user_is_team_leader
