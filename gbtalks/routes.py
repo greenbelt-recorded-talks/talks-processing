@@ -795,7 +795,7 @@ def talks_archive():
             "/home/greenbeltorg/digital_downloads/" + get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
             t.speaker,
             "20" + app.config["GB_SHORT_YEAR"],
-            t.start_time,
+            t.start_time.strftime("%A %d %B %Y, %I:%M %p"),
             "No",
             t.venue,
             "Talks",
@@ -835,7 +835,7 @@ def talks_products():
             "/home/greenbeltorg/digital_downloads/" + get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
             t.speaker,
             "20" + app.config["GB_SHORT_YEAR"],
-            t.start_time,
+            t.start_time.strftime("%A %d %B %Y, %I:%M %p"),
             "No",
             t.venue,
             "Talks",
@@ -869,7 +869,7 @@ def talks_products():
             "memory-stick"
             "","",
             "", "", "", "", "", "", "", "", "", "", ""
-        ])
+            ])
 
     sheet = pe.Sheet(talks)
     io = io.StringIO()
