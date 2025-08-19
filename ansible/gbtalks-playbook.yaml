@@ -16,6 +16,7 @@
           - iotop
           - curl
           - nmap
+          - npm
           - python3.12-venv
           - gcc
           - python3-dev
@@ -35,19 +36,19 @@
   hosts: localhost
   become_user: root
   become: true
-
   tasks:
     - name: Mask unnecessary services
       ansible.builtin.systemd_service:
-        name: 
-          - udisks2
-          - bluetooth
-          - sleep.target
-          - suspend.target
-          - hibernate.target
-          - hybrid-sleep.target
+        name: "{{ item }}"
         enabled: false
         masked: yes
+      loop:
+        - udisks2
+        - bluetooth
+        - sleep.target
+        - suspend.target
+        - hibernate.target
+        - hybrid-sleep.target
 
 
 - name: Set up the gbtalks user
