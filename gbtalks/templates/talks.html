@@ -130,6 +130,12 @@
 		</div>
 		<hr />
 
+		<div class="uk-container">
+			<span class="uk-text-default uk-text-bold">Assigned Recorder:</span>
+			<span class="uk-text-default">{{ talk.recorder_name or 'None' }}</span>
+		</div>
+		<hr />
+
 		<span class="uk-text-default uk-text-bold"> <a href="{{ url_for("edit_talk", talk_id=talk.id) }}">Edit</a> | Delete </span>
 
 </div>

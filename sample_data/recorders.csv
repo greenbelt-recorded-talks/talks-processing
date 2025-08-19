@@ -1,0 +1,11 @@
+name,max_shifts_per_day,earliest_start_time,latest_end_time
+Alice Brown,2,09:00:00,18:00:00
+Bob Smith,3,08:00:00,22:00:00
+Carol Davis,2,10:00:00,16:00:00
+David Wilson,2,09:00:00,20:00:00
+Emma Taylor,3,08:30:00,19:00:00
+Frank Johnson,2,11:00:00,17:00:00
+Grace Lee,2,09:30:00,21:00:00
+Henry Miller,3,08:00:00,18:30:00
+Isabel Garcia,2,10:30:00,19:30:00
+Jack Thompson,2,09:00:00,17:30:00

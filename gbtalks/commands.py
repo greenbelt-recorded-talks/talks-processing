@@ -2,6 +2,8 @@ import threading
 import os
 import json
 import subprocess
+import csv
+from datetime import datetime
 import click
 from flask import current_app as app
 from flask.cli import with_appcontext
@@ -427,3 +429,116 @@ def migration_status(verbose):
         
     except Exception as e:
         print(f"Error checking migration status: {e}")
+
+
+@click.command(name="load-sample-data")
+@click.argument("table", type=click.Choice(["talks", "recorders", "editors"], case_sensitive=False))
+@click.option("--clear", is_flag=True, help="Clear existing data before loading")
+@with_appcontext
+def load_sample_data(table, clear):
+    """Load sample data from CSV files into specified table"""
+    
+    sample_data_dir = os.path.join(os.path.dirname(app.root_path), "sample_data")
+    csv_file = os.path.join(sample_data_dir, f"{table.lower()}.csv")
+    
+    if not os.path.exists(csv_file):
+        print(f"Error: Sample data file not found: {csv_file}")
+        return
+    
+    try:
+        if clear:
+            print(f"Clearing existing {table} data...")
+            if table.lower() == "talks":
+                Talk.query.delete()
+            elif table.lower() == "recorders":
+                Recorder.query.delete()
+            elif table.lower() == "editors":
+                Editor.query.delete()
+            db.session.commit()
+        
+        print(f"Loading sample {table} data from {csv_file}...")
+        
+        with open(csv_file, 'r', newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            count = 0
+            
+            for row in reader:
+                if table.lower() == "talks":
+                    # Convert string values to appropriate types
+                    talk_data = {
+                        'id': int(row['id']),
+                        'title': row['title'],
+                        'description': row['description'],
+                        'speaker': row['speaker'],
+                        'day': row['day'],
+                        'start_time': datetime.strptime(row['start_time'], '%Y-%m-%d %H:%M:%S'),
+                        'end_time': datetime.strptime(row['end_time'], '%Y-%m-%d %H:%M:%S'),
+                        'venue': row['venue'],
+                        'is_priority': bool(int(row['is_priority'])),
+                        'is_rotaed': bool(int(row['is_rotaed'])),
+                        'is_cleared': bool(int(row['is_cleared'])),
+                        'has_explicit_warning_sticker': bool(int(row['has_explicit_warning_sticker'])),
+                        'has_distressing_content_warning_sticker': bool(int(row['has_distressing_content_warning_sticker'])),
+                        'has_technical_issues_sticker': bool(int(row['has_technical_issues_sticker'])),
+                        'has_copyright_removal_sticker': bool(int(row['has_copyright_removal_sticker'])),
+                        'recorder_name': row['recorder_name'] if row['recorder_name'] else None,
+                        'editor_name': row['editor_name'] if row['editor_name'] else None
+                    }
+                    
+                    # Check if talk already exists
+                    existing_talk = Talk.query.filter_by(id=talk_data['id']).first()
+                    if existing_talk:
+                        print(f"Talk ID {talk_data['id']} already exists, skipping...")
+                        continue
+                        
+                    talk = Talk(**talk_data)
+                    db.session.add(talk)
+                    
+                elif table.lower() == "recorders":
+                    # Convert time strings to time objects
+                    from datetime import time
+                    earliest_start = None
+                    latest_end = None
+                    
+                    if row['earliest_start_time']:
+                        earliest_start = datetime.strptime(row['earliest_start_time'], '%H:%M:%S').time()
+                    if row['latest_end_time']:
+                        latest_end = datetime.strptime(row['latest_end_time'], '%H:%M:%S').time()
+                    
+                    recorder_data = {
+                        'name': row['name'],
+                        'max_shifts_per_day': int(row['max_shifts_per_day']),
+                        'earliest_start_time': earliest_start,
+                        'latest_end_time': latest_end
+                    }
+                    
+                    # Check if recorder already exists
+                    existing_recorder = Recorder.query.filter_by(name=recorder_data['name']).first()
+                    if existing_recorder:
+                        print(f"Recorder {recorder_data['name']} already exists, skipping...")
+                        continue
+                        
+                    recorder = Recorder(**recorder_data)
+                    db.session.add(recorder)
+                    
+                elif table.lower() == "editors":
+                    editor_data = {'name': row['name']}
+                    
+                    # Check if editor already exists
+                    existing_editor = Editor.query.filter_by(name=editor_data['name']).first()
+                    if existing_editor:
+                        print(f"Editor {editor_data['name']} already exists, skipping...")
+                        continue
+                        
+                    editor = Editor(**editor_data)
+                    db.session.add(editor)
+                
+                count += 1
+        
+        db.session.commit()
+        print(f"Successfully loaded {count} {table} records!")
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error loading sample data: {e}")
+        raise
