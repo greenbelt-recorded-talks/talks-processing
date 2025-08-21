@@ -27,6 +27,7 @@ def register_commands(app):
     app.cli.add_command(commands.create_db)
     app.cli.add_command(commands.migrate_db)
     app.cli.add_command(commands.migration_status)
+    app.cli.add_command(commands.load_sample_data)
 
 
 def setup_login(app):

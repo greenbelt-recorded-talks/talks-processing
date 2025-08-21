@@ -36,6 +36,70 @@ There is no way to specify which days a recorder is available for. If two people
 <hr class="uk-divider-icon">
 
 <div class="uk-card uk-card-body uk-card-default">
+{% filter markdown %}
+## Swap Recorder Assignments
+
+Select two talks to swap their assigned recorders. Both talks must have recorders assigned.
+{% endfilter %}
+
+<form method="post" action="{{ url_for('swap_recorder_assignments') }}" onsubmit="return confirmSwap()">
+    <div class="uk-grid-small" uk-grid>
+        <div class="uk-width-1-2">
+            <label class="uk-form-label" for="talk1">First Talk:</label>
+            <select class="uk-select" name="talk1" id="talk1" required>
+                <option value="">Select a talk...</option>
+                {% for talk in all_talks %}
+                    {% if talk.recorder_name %}
+                        <option value="{{ talk.id }}">
+                            [{{ talk.recorder_name }}] {{ talk.id }} - {{ talk.day }} {{ talk.start_time.strftime('%H:%M') }} - {{ talk.title[:30] }}{% if talk.title|length > 30 %}...{% endif %}
+                        </option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        <div class="uk-width-1-2">
+            <label class="uk-form-label" for="talk2">Second Talk:</label>
+            <select class="uk-select" name="talk2" id="talk2" required>
+                <option value="">Select a talk...</option>
+                {% for talk in all_talks %}
+                    {% if talk.recorder_name %}
+                        <option value="{{ talk.id }}">
+                            [{{ talk.recorder_name }}] {{ talk.id }} - {{ talk.day }} {{ talk.start_time.strftime('%H:%M') }} - {{ talk.title[:30] }}{% if talk.title|length > 30 %}...{% endif %}
+                        </option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+    <div class="uk-margin">
+        <button type="submit" class="uk-button uk-button-primary">Swap Assignments</button>
+    </div>
+</form>
+
+<script>
+function confirmSwap() {
+    var talk1Select = document.getElementById('talk1');
+    var talk2Select = document.getElementById('talk2');
+    
+    if (talk1Select.value === talk2Select.value) {
+        alert('Please select two different talks.');
+        return false;
+    }
+    
+    var talk1Text = talk1Select.options[talk1Select.selectedIndex].text;
+    var talk2Text = talk2Select.options[talk2Select.selectedIndex].text;
+    
+    return confirm('Are you sure you want to swap the recorder assignments between:\n\n' + 
+                   'Talk 1: ' + talk1Text + '\n' + 
+                   'Talk 2: ' + talk2Text + '\n\n' + 
+                   'This action cannot be undone.');
+}
+</script>
+
+</div>
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-body uk-card-default">
 
 {% filter markdown %}
 ## Recorders Schedule

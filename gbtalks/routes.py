@@ -383,7 +383,8 @@ def recorders():
         return redirect(url_for("recorders"))
 
     recorders = Recorder.query.all()
-    return render_template("recorders.html", recorders=recorders)
+    all_talks = Talk.query.order_by(Talk.start_time).all()
+    return render_template("recorders.html", recorders=recorders, all_talks=all_talks)
 
 
 @app.route("/update_recorder_shifts", methods=["POST"])
@@ -475,6 +476,91 @@ def update_recorder_shifts():
         db.session.rollback()
     
     return redirect(url_for("recorders"))
+
+
+@app.route("/swap_recorder_assignments", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def swap_recorder_assignments():
+    """Swap recorder assignments between two talks"""
+    
+    talk1_id = request.form.get("talk1")
+    talk2_id = request.form.get("talk2")
+    
+    if not talk1_id or not talk2_id:
+        flash("Please select both talks", "error")
+        return redirect(url_for("recorders"))
+    
+    if talk1_id == talk2_id:
+        flash("Please select two different talks", "error")
+        return redirect(url_for("recorders"))
+    
+    try:
+        talk1 = Talk.query.get(int(talk1_id))
+        talk2 = Talk.query.get(int(talk2_id))
+        
+        if not talk1 or not talk2:
+            flash("One or both talks not found", "error")
+            return redirect(url_for("recorders"))
+        
+        if not talk1.recorder_name or not talk2.recorder_name:
+            flash("Both talks must have assigned recorders", "error")
+            return redirect(url_for("recorders"))
+        
+        # Get the recorders
+        recorder1 = Recorder.query.filter_by(name=talk1.recorder_name).first()
+        recorder2 = Recorder.query.filter_by(name=talk2.recorder_name).first()
+        
+        if not recorder1 or not recorder2:
+            flash("One or both assigned recorders not found", "error")
+            return redirect(url_for("recorders"))
+        
+        # Validate no timing clashes would occur after swap
+        clash_error = check_swap_clashes(talk1, talk2, recorder1, recorder2)
+        if clash_error:
+            flash(clash_error, "error")
+            return redirect(url_for("recorders"))
+        
+        # Perform the swap
+        talk1.recorder_name = recorder2.name
+        talk2.recorder_name = recorder1.name
+        
+        db.session.commit()
+        
+        flash(f"Successfully swapped recorder assignments: {recorder1.name} ↔ {recorder2.name}", "success")
+        
+    except ValueError:
+        flash("Invalid talk IDs", "error")
+    except Exception as e:
+        flash(f"Error swapping assignments: {str(e)}", "error")
+        db.session.rollback()
+    
+    return redirect(url_for("recorders"))
+
+
+def check_swap_clashes(talk1, talk2, recorder1, recorder2):
+    """Check if swapping the recorder assignments would create timing clashes"""
+    
+    # Get all other talks for each recorder (excluding the talk being swapped)
+    recorder1_other_talks = [t for t in recorder1.talks if t.id != talk1.id]
+    recorder2_other_talks = [t for t in recorder2.talks if t.id != talk2.id]
+    
+    # Check if talk2 would clash with recorder1's other talks
+    for other_talk in recorder1_other_talks:
+        if talks_overlap(talk2, other_talk):
+            return f"Cannot swap: Talk {talk2.id} would clash with {recorder1.name}'s existing Talk {other_talk.id}"
+    
+    # Check if talk1 would clash with recorder2's other talks  
+    for other_talk in recorder2_other_talks:
+        if talks_overlap(talk1, other_talk):
+            return f"Cannot swap: Talk {talk1.id} would clash with {recorder2.name}'s existing Talk {other_talk.id}"
+    
+    return None
+
+
+def talks_overlap(talk_a, talk_b):
+    """Check if two talks have overlapping time periods"""
+    return (talk_a.start_time < talk_b.end_time and talk_b.start_time < talk_a.end_time)
 
 
 @app.route("/front_desk", methods=["GET", "POST"])
