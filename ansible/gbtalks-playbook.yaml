@@ -23,6 +23,7 @@
           - libpcre3
           - libpcre3-dev
           - smartmontools
+          - sqlite3
           - wodim
         state: latest
     - name: Create the gbtalks user
