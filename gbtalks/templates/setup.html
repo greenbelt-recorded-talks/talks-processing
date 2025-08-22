@@ -4,6 +4,37 @@
 
 <h1 class="uk-heading-line uk-text-center"><span>Setup</span></h1>
 
+<div class="uk-card uk-card-default uk-card-body">
+    <div class="uk-grid-small uk-flex-middle" uk-grid>
+        <div class="uk-width-expand">
+            <h3 class="uk-margin-remove">System Health Check</h3>
+        </div>
+        <div>
+            <a href="{{ url_for('health_check_page') }}" class="uk-button uk-button-small uk-button-default">View Details</a>
+        </div>
+    </div>
+    
+    {% if health_check.overall_status == 'healthy' %}
+        <div class="uk-alert-success uk-margin-small-top" uk-alert>
+            <p class="uk-margin-remove"><strong>✓ System Status: HEALTHY</strong></p>
+        </div>
+    {% elif health_check.overall_status == 'warning' %}
+        <div class="uk-alert-warning uk-margin-small-top" uk-alert>
+            <p class="uk-margin-remove"><strong>⚠ System Status: WARNING</strong> - Some non-critical issues detected</p>
+        </div>
+    {% else %}
+        <div class="uk-alert-danger uk-margin-small-top" uk-alert>
+            <p class="uk-margin-remove"><strong>✗ System Status: ERROR</strong> - Critical issues detected</p>
+        </div>
+    {% endif %}
+    
+    <p class="uk-text-small uk-text-muted uk-margin-small-top">
+        Last checked: {{ health_check.checked_at }} | 
+        <a href="{{ url_for('health_check_page') }}" class="uk-link-muted">View detailed report</a>
+    </p>
+</div>
+
+<hr class="uk-divider-icon">
 
 <div class="uk-card uk-card-default uk-card-body">
 {% filter markdown %}

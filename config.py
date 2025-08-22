@@ -17,7 +17,6 @@ class Config:
     UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/storage/uploads")
     PROCESSED_DIR = os.getenv("PROCESSED_DIR", "/storage/processed")
     CD_DIR = os.getenv("CD_DIR", "/storage/cds")
-    TOP_TAIL_DIR = os.getenv("TOP_TAIL_DIR", "/home/gbtalks/top_tail")
     IMG_DIR = os.getenv("IMG_DIR", "/storage/images")
     USB_GOLD_DIR = os.getenv("USB_GOLD_DIR", "/usb_gold")
     WEB_MP3_DIR = os.getenv("WEB_MP3_DIR", "/storage/web_mp3s")

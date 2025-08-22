@@ -172,11 +172,232 @@ def edit_talk():
         return redirect(url_for("talks") + "#talk_" +  talk_id)
 
 
+def perform_health_check():
+    """Perform a comprehensive health check of the system with detailed information"""
+    
+    health_status = {
+        "directories": [],
+        "files": [],
+        "system_info": [],
+        "overall_status": "healthy",
+        "checked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+    
+    # Add system information
+    import platform
+    health_status["system_info"] = [
+        {"key": "Python Version", "value": platform.python_version()},
+        {"key": "Platform", "value": platform.platform()},
+        {"key": "Current Working Directory", "value": os.getcwd()},
+        {"key": "Flask App Name", "value": app.name}
+    ]
+    
+    # Define required directories and their purposes
+    required_dirs = {
+        "UPLOAD_DIR": {
+            "purpose": "File uploads (raw recordings, edited files, top/tail audio)",
+            "critical": True,
+            "used_by": ["Front Desk uploads", "Audio processing", "File management"]
+        },
+        "PROCESSED_DIR": {
+            "purpose": "Final processed MP3 files ready for distribution",
+            "critical": True, 
+            "used_by": ["Audio processing pipeline", "CD creation", "Web downloads"]
+        },
+        "CD_DIR": {
+            "purpose": "CD preparation files (WAV segments for burning)",
+            "critical": False,
+            "used_by": ["CD burning process"]
+        },
+        "IMG_DIR": {
+            "purpose": "Images, cover art, and recorder notes photos", 
+            "critical": True,
+            "used_by": ["MP3 metadata", "Recorder notes", "Cover art"]
+        },
+        "USB_GOLD_DIR": {
+            "purpose": "USB gold master files for duplication",
+            "critical": False,
+            "used_by": ["USB duplication process", "All talks PDF storage"]
+        },
+        "WEB_MP3_DIR": {
+            "purpose": "Web-ready MP3 files for online access",
+            "critical": False,
+            "used_by": ["Web downloads", "Online streaming"]
+        }
+    }
+    
+    # Check directories with detailed information
+    for dir_key, dir_info in required_dirs.items():
+        dir_path = app.config.get(dir_key, "")
+        status = {
+            "name": dir_key,
+            "path": dir_path,
+            "purpose": dir_info["purpose"],
+            "critical": dir_info["critical"],
+            "used_by": dir_info["used_by"],
+            "exists": False,
+            "is_directory": False,
+            "readable": False,
+            "writable": False,
+            "file_count": 0,
+            "total_size": "Unknown",
+            "permissions": "Unknown",
+            "status": "error",
+            "issues": []
+        }
+        
+        if not dir_path:
+            status["issues"].append("Directory path not configured")
+        elif os.path.exists(dir_path):
+            status["exists"] = True
+            status["is_directory"] = os.path.isdir(dir_path)
+            
+            if status["is_directory"]:
+                status["readable"] = os.access(dir_path, os.R_OK)
+                status["writable"] = os.access(dir_path, os.W_OK)
+                
+                # Get permissions in octal format
+                try:
+                    stat_info = os.stat(dir_path)
+                    status["permissions"] = oct(stat_info.st_mode)[-3:]
+                except:
+                    status["permissions"] = "Unknown"
+                
+                # Count files and calculate size
+                try:
+                    files = list(os.scandir(dir_path))
+                    status["file_count"] = len([f for f in files if f.is_file()])
+                    
+                    total_size = sum(f.stat().st_size for f in files if f.is_file())
+                    if total_size > 1024**3:  # GB
+                        status["total_size"] = f"{total_size / 1024**3:.1f} GB"
+                    elif total_size > 1024**2:  # MB
+                        status["total_size"] = f"{total_size / 1024**2:.1f} MB"
+                    elif total_size > 1024:  # KB
+                        status["total_size"] = f"{total_size / 1024:.1f} KB"
+                    else:
+                        status["total_size"] = f"{total_size} bytes"
+                except Exception as e:
+                    status["issues"].append(f"Could not scan directory: {e}")
+                
+                # Determine status
+                if status["readable"] and status["writable"]:
+                    status["status"] = "healthy"
+                elif status["readable"]:
+                    status["status"] = "warning"
+                    status["issues"].append("Directory is not writable")
+                else:
+                    status["status"] = "error"
+                    status["issues"].append("Directory is not readable")
+            else:
+                status["status"] = "error"
+                status["issues"].append("Path exists but is not a directory")
+        else:
+            status["status"] = "error"
+            status["issues"].append("Directory does not exist")
+        
+        # Update overall status based on critical directories
+        if status["status"] == "error" and status["critical"]:
+            health_status["overall_status"] = "error"
+        elif status["status"] in ["error", "warning"] and health_status["overall_status"] == "healthy":
+            health_status["overall_status"] = "warning" if not status["critical"] else "error"
+            
+        health_status["directories"].append(status)
+    
+    # Define critical files with detailed information
+    critical_files = [
+        {
+            "name": "top.mp3", 
+            "path": os.path.join(app.config["UPLOAD_DIR"], "top.mp3"),
+            "purpose": "Audio segment played at the start of each processed talk",
+            "critical": True,
+            "used_by": ["Audio processing pipeline"],
+            "expected_type": "MP3 audio file"
+        },
+        {
+            "name": "tail.mp3",
+            "path": os.path.join(app.config["UPLOAD_DIR"], "tail.mp3"), 
+            "purpose": "Audio segment played at the end of each processed talk",
+            "critical": True,
+            "used_by": ["Audio processing pipeline"],
+            "expected_type": "MP3 audio file"
+        },
+        {
+            "name": "alltalksicon.png",
+            "path": os.path.join(app.config["IMG_DIR"], "alltalksicon.png"),
+            "purpose": "Cover art embedded in all processed MP3 files",
+            "critical": True,
+            "used_by": ["Audio processing pipeline", "MP3 metadata"],
+            "expected_type": "PNG image file (recommended 300x300px)"
+        }
+    ]
+    
+    # Check critical files with detailed information
+    for file_info in critical_files:
+        file_status = {
+            "name": file_info["name"],
+            "path": file_info["path"],
+            "purpose": file_info["purpose"],
+            "critical": file_info["critical"],
+            "used_by": file_info["used_by"],
+            "expected_type": file_info["expected_type"],
+            "exists": False,
+            "readable": False,
+            "file_size": "Unknown",
+            "last_modified": "Unknown",
+            "permissions": "Unknown",
+            "status": "error",
+            "found_at": None,
+            "issues": []
+        }
+        
+        check_path = file_info["path"]
+        if os.path.exists(check_path) and os.path.isfile(check_path):
+            file_status["exists"] = True
+            file_status["readable"] = os.access(check_path, os.R_OK)
+            file_status["found_at"] = check_path
+            
+            # Get file details
+            try:
+                stat_info = os.stat(check_path)
+                file_size = stat_info.st_size
+                if file_size > 1024**2:  # MB
+                    file_status["file_size"] = f"{file_size / 1024**2:.1f} MB"
+                elif file_size > 1024:  # KB
+                    file_status["file_size"] = f"{file_size / 1024:.1f} KB"
+                else:
+                    file_status["file_size"] = f"{file_size} bytes"
+                
+                file_status["last_modified"] = datetime.fromtimestamp(stat_info.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
+                file_status["permissions"] = oct(stat_info.st_mode)[-3:]
+            except Exception as e:
+                file_status["issues"].append(f"Could not read file details: {e}")
+            
+            file_status["status"] = "healthy" if file_status["readable"] else "warning"
+            if not file_status["readable"]:
+                file_status["issues"].append("File is not readable")
+        else:
+            file_status["issues"].append("File not found")
+        
+        # Update overall status
+        if file_status["status"] == "error" and file_status["critical"]:
+            health_status["overall_status"] = "error"
+        elif file_status["status"] in ["error", "warning"] and health_status["overall_status"] == "healthy":
+            health_status["overall_status"] = "warning" if not file_status["critical"] else "error"
+            
+        health_status["files"].append(file_status)
+    
+    return health_status
+
+
 @app.route("/setup", methods=["GET"])
 @login_required
 @current_user_is_team_leader
 def setup():
     """Various setup functions"""
+    
+    # Perform comprehensive health check
+    health_check = perform_health_check()
     
     try:
         from .models import RotaSettings
@@ -188,7 +409,21 @@ def setup():
         rota_settings = {}
         flash("Warning: Could not load rota settings. Database may need to be recreated.", "warning")
     
-    return render_template("setup.html", rota_settings=rota_settings, current_year=datetime.now().year)
+    return render_template("setup.html", 
+                         rota_settings=rota_settings, 
+                         current_year=datetime.now().year,
+                         health_check=health_check)
+
+
+@app.route("/health", methods=["GET"])
+@login_required
+@current_user_is_team_leader
+def health_check_page():
+    """Detailed system health check page"""
+    
+    health_check = perform_health_check()
+    
+    return render_template("health_check.html", health_check=health_check)
 
 
 @app.route("/put_alltalks_pdf", methods=["POST"])

@@ -1,0 +1,170 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<h1 class="uk-heading-line uk-text-center"><span>System Health Check</span></h1>
+
+<div class="uk-card uk-card-default uk-card-body">
+    {% if health_check.overall_status == 'healthy' %}
+        <div class="uk-alert-success" uk-alert>
+            <p><strong>✓ System Status: HEALTHY</strong></p>
+            <p>All critical components are functioning properly.</p>
+        </div>
+    {% elif health_check.overall_status == 'warning' %}
+        <div class="uk-alert-warning" uk-alert>
+            <p><strong>⚠ System Status: WARNING</strong></p>
+            <p>Some non-critical issues detected. Review details below.</p>
+        </div>
+    {% else %}
+        <div class="uk-alert-danger" uk-alert>
+            <p><strong>✗ System Status: ERROR</strong></p>
+            <p>Critical issues detected that may prevent normal operation.</p>
+        </div>
+    {% endif %}
+    
+    <p class="uk-text-small uk-text-muted">Last checked: {{ health_check.checked_at }}</p>
+    
+    <!-- System Information -->
+    <details class="uk-margin">
+        <summary class="uk-text-bold">System Information</summary>
+        <div class="uk-margin-small-top">
+            <dl class="uk-description-list uk-description-list-divider">
+                {% for info in health_check.system_info %}
+                <dt>{{ info.key }}</dt>
+                <dd class="uk-text-small">{{ info.value }}</dd>
+                {% endfor %}
+            </dl>
+        </div>
+    </details>
+    
+    <!-- Directory Status -->
+    <details class="uk-margin" open>
+        <summary class="uk-text-bold">Directory Status</summary>
+        <div class="uk-margin-small-top">
+            {% for dir in health_check.directories %}
+            <div class="uk-card uk-card-small uk-margin-small
+                {% if dir.status == 'healthy' %}uk-card-primary{% elif dir.status == 'warning' %}uk-card-secondary{% else %}uk-card-danger{% endif %}">
+                <div class="uk-card-header uk-padding-small">
+                    <div class="uk-grid-small uk-flex-middle" uk-grid>
+                        <div class="uk-width-expand">
+                            <h4 class="uk-margin-remove">
+                                {{ dir.name }}
+                                {% if dir.critical %}<span class="uk-badge uk-margin-small-left">CRITICAL</span>{% endif %}
+                            </h4>
+                            <p class="uk-text-small uk-margin-remove">{{ dir.purpose }}</p>
+                        </div>
+                        <div>
+                            {% if dir.status == 'healthy' %}
+                                <span class="uk-label uk-label-success">✓ OK</span>
+                            {% elif dir.status == 'warning' %}
+                                <span class="uk-label uk-label-warning">⚠ WARN</span>
+                            {% else %}
+                                <span class="uk-label uk-label-danger">✗ ERROR</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="uk-card-body uk-padding-small">
+                    <dl class="uk-description-list uk-description-list-divider uk-text-small">
+                        <dt>Path</dt>
+                        <dd><code>{{ dir.path }}</code></dd>
+                        <dt>Exists</dt>
+                        <dd>{% if dir.exists %}✓ Yes{% else %}✗ No{% endif %}</dd>
+                        {% if dir.exists %}
+                        <dt>Permissions</dt>
+                        <dd>
+                            {{ dir.permissions }} 
+                            ({% if dir.readable %}R{% else %}-{% endif %}{% if dir.writable %}W{% else %}-{% endif %})
+                        </dd>
+                        <dt>Content</dt>
+                        <dd>{{ dir.file_count }} files, {{ dir.total_size }}</dd>
+                        {% endif %}
+                        <dt>Used By</dt>
+                        <dd>{{ dir.used_by|join(', ') }}</dd>
+                        {% if dir.issues %}
+                        <dt>Issues</dt>
+                        <dd>
+                            <ul class="uk-list uk-list-bullet uk-margin-small">
+                                {% for issue in dir.issues %}
+                                <li>{{ issue }}</li>
+                                {% endfor %}
+                            </ul>
+                        </dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    
+    <!-- File Status -->
+    <details class="uk-margin" open>
+        <summary class="uk-text-bold">Critical Files Status</summary>
+        <div class="uk-margin-small-top">
+            {% for file in health_check.files %}
+            <div class="uk-card uk-card-small uk-margin-small
+                {% if file.status == 'healthy' %}uk-card-primary{% elif file.status == 'warning' %}uk-card-secondary{% else %}uk-card-danger{% endif %}">
+                <div class="uk-card-header uk-padding-small">
+                    <div class="uk-grid-small uk-flex-middle" uk-grid>
+                        <div class="uk-width-expand">
+                            <h4 class="uk-margin-remove">
+                                {{ file.name }}
+                                {% if file.critical %}<span class="uk-badge uk-margin-small-left">CRITICAL</span>{% endif %}
+                            </h4>
+                            <p class="uk-text-small uk-margin-remove">{{ file.purpose }}</p>
+                        </div>
+                        <div>
+                            {% if file.status == 'healthy' %}
+                                <span class="uk-label uk-label-success">✓ OK</span>
+                            {% elif file.status == 'warning' %}
+                                <span class="uk-label uk-label-warning">⚠ WARN</span>
+                            {% else %}
+                                <span class="uk-label uk-label-danger">✗ ERROR</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="uk-card-body uk-padding-small">
+                    <dl class="uk-description-list uk-description-list-divider uk-text-small">
+                        <dt>Expected Path</dt>
+                        <dd><code>{{ file.path }}</code></dd>
+                        <dt>Expected Type</dt>
+                        <dd>{{ file.expected_type }}</dd>
+                        <dt>Exists</dt>
+                        <dd>{% if file.exists %}✓ Yes{% else %}✗ No{% endif %}</dd>
+                        {% if file.exists %}
+                        <dt>Found At</dt>
+                        <dd><code>{{ file.found_at }}</code></dd>
+                        <dt>File Size</dt>
+                        <dd>{{ file.file_size }}</dd>
+                        <dt>Last Modified</dt>
+                        <dd>{{ file.last_modified }}</dd>
+                        <dt>Permissions</dt>
+                        <dd>{{ file.permissions }} {% if file.readable %}(Readable){% else %}(Not Readable){% endif %}</dd>
+                        {% endif %}
+                        <dt>Used By</dt>
+                        <dd>{{ file.used_by|join(', ') }}</dd>
+                        {% if file.issues %}
+                        <dt>Issues</dt>
+                        <dd>
+                            <ul class="uk-list uk-list-bullet uk-margin-small">
+                                {% for issue in file.issues %}
+                                <li>{{ issue }}</li>
+                                {% endfor %}
+                            </ul>
+                        </dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </details>
+    
+    <div class="uk-margin-large-top uk-text-center">
+        <a href="{{ url_for('setup') }}" class="uk-button uk-button-secondary">← Back to Setup</a>
+    </div>
+</div>
+
+{% endblock %}

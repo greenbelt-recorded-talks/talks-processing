@@ -42,8 +42,8 @@ def get_cd_dir_for_talk(talk):
 
 
 def process_talk(talk_id):
-    top = AudioSegment.from_file(app.config["TOP_TAIL_DIR"] + "/" + "top.mp3")
-    tail = AudioSegment.from_file(app.config["TOP_TAIL_DIR"] + "/" + "tail.mp3")
+    top = AudioSegment.from_file(os.path.join(app.config["UPLOAD_DIR"], "top.mp3"))
+    tail = AudioSegment.from_file(os.path.join(app.config["UPLOAD_DIR"], "tail.mp3"))
 
     talk = db.session.get(Talk, talk_id)
 
