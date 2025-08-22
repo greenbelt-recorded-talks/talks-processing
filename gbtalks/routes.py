@@ -1517,91 +1517,93 @@ def complete_chunked_upload():
         import threading
         
         def reassemble_file():
-            try:
-                # Write status: starting
-                with open(reassembly_status_file, 'w') as f:
-                    f.write("starting")
-                
-                # Verify all chunks exist before starting
-                missing_chunks = []
-                for chunk_num in range(metadata['total_chunks']):
-                    chunk_path = os.path.join(chunk_dir, f"chunk_{chunk_num}")
-                    if not os.path.exists(chunk_path):
-                        missing_chunks.append(chunk_num)
-                
-                if missing_chunks:
-                    error_msg = f"Missing chunks: {missing_chunks}"
+            # Create Flask application context for background thread
+            with app.app_context():
+                try:
+                    # Write status: starting
                     with open(reassembly_status_file, 'w') as f:
-                        f.write(f"error:{error_msg}")
-                    app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
-                    return
-                
-                # Write status: reassembling
-                with open(reassembly_status_file, 'w') as f:
-                    f.write("reassembling")
-                
-                # Reassemble chunks
-                app.logger.info(f"Starting reassembly for talk {talk_id}: {final_path}")
-                bytes_written = 0
-                
-                with open(final_path, 'wb') as output_file:
+                        f.write("starting")
+                    
+                    # Verify all chunks exist before starting
+                    missing_chunks = []
                     for chunk_num in range(metadata['total_chunks']):
                         chunk_path = os.path.join(chunk_dir, f"chunk_{chunk_num}")
-                        try:
-                            with open(chunk_path, 'rb') as chunk_file:
-                                chunk_data = chunk_file.read()
-                                output_file.write(chunk_data)
-                                bytes_written += len(chunk_data)
-                        except Exception as e:
-                            error_msg = f"Error reading chunk {chunk_num}: {str(e)}"
-                            with open(reassembly_status_file, 'w') as f:
-                                f.write(f"error:{error_msg}")
-                            app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
-                            # Clean up partial file
-                            if os.path.exists(final_path):
-                                os.remove(final_path)
-                            return
-                
-                # Verify file size
-                if bytes_written != expected_file_size:
-                    error_msg = f"File size mismatch: expected {expected_file_size}, got {bytes_written}"
+                        if not os.path.exists(chunk_path):
+                            missing_chunks.append(chunk_num)
+                    
+                    if missing_chunks:
+                        error_msg = f"Missing chunks: {missing_chunks}"
+                        with open(reassembly_status_file, 'w') as f:
+                            f.write(f"error:{error_msg}")
+                        app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                        return
+                    
+                    # Write status: reassembling
                     with open(reassembly_status_file, 'w') as f:
-                        f.write(f"error:{error_msg}")
-                    app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
-                    # Clean up incorrect file
-                    if os.path.exists(final_path):
-                        os.remove(final_path)
-                    return
-                
-                # Write status: success
-                with open(reassembly_status_file, 'w') as f:
-                    f.write("success")
-                
-                app.logger.info(f"Reassembly completed for talk {talk_id}: {final_path} ({bytes_written} bytes)")
-                
-                # Start video processing if needed
-                if file_type == "raw" and is_video:
-                    raw_audio_path = get_path_for_file(talk_id, file_type, talk_title, talk_speaker)
-                    extract_audio_from_video_async(final_path, raw_audio_path)
-                
-                # Clean up chunks only after successful reassembly
-                import shutil
-                shutil.rmtree(chunk_dir)
-                
-            except Exception as e:
-                error_msg = f"Unexpected error during reassembly: {str(e)}"
-                try:
+                        f.write("reassembling")
+                    
+                    # Reassemble chunks
+                    app.logger.info(f"Starting reassembly for talk {talk_id}: {final_path}")
+                    bytes_written = 0
+                    
+                    with open(final_path, 'wb') as output_file:
+                        for chunk_num in range(metadata['total_chunks']):
+                            chunk_path = os.path.join(chunk_dir, f"chunk_{chunk_num}")
+                            try:
+                                with open(chunk_path, 'rb') as chunk_file:
+                                    chunk_data = chunk_file.read()
+                                    output_file.write(chunk_data)
+                                    bytes_written += len(chunk_data)
+                            except Exception as e:
+                                error_msg = f"Error reading chunk {chunk_num}: {str(e)}"
+                                with open(reassembly_status_file, 'w') as f:
+                                    f.write(f"error:{error_msg}")
+                                app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                                # Clean up partial file
+                                if os.path.exists(final_path):
+                                    os.remove(final_path)
+                                return
+                    
+                    # Verify file size
+                    if bytes_written != expected_file_size:
+                        error_msg = f"File size mismatch: expected {expected_file_size}, got {bytes_written}"
+                        with open(reassembly_status_file, 'w') as f:
+                            f.write(f"error:{error_msg}")
+                        app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                        # Clean up incorrect file
+                        if os.path.exists(final_path):
+                            os.remove(final_path)
+                        return
+                    
+                    # Write status: success
                     with open(reassembly_status_file, 'w') as f:
-                        f.write(f"error:{error_msg}")
-                except:
-                    pass
-                app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
-                # Clean up partial file
-                if os.path.exists(final_path):
+                        f.write("success")
+                    
+                    app.logger.info(f"Reassembly completed for talk {talk_id}: {final_path} ({bytes_written} bytes)")
+                    
+                    # Start video processing if needed
+                    if file_type == "raw" and is_video:
+                        raw_audio_path = get_path_for_file(talk_id, file_type, talk_title, talk_speaker)
+                        extract_audio_from_video_async(final_path, raw_audio_path)
+                    
+                    # Clean up chunks only after successful reassembly
+                    import shutil
+                    shutil.rmtree(chunk_dir)
+                    
+                except Exception as e:
+                    error_msg = f"Unexpected error during reassembly: {str(e)}"
                     try:
-                        os.remove(final_path)
+                        with open(reassembly_status_file, 'w') as f:
+                            f.write(f"error:{error_msg}")
                     except:
                         pass
+                    app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                    # Clean up partial file
+                    if os.path.exists(final_path):
+                        try:
+                            os.remove(final_path)
+                        except:
+                            pass
         
         # Start reassembly in background
         reassembly_thread = threading.Thread(target=reassemble_file)
