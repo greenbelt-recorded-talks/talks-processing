@@ -379,30 +379,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 throw new Error(data.error);
             }
             
-            showStatus(statusDiv, '✓ Upload completed successfully!', 'success');
+            showStatus(statusDiv, '✓ Upload completed. Reassembling file...', 'info');
             
-            // Check if this started video processing
-            const fileName = fileInput.files[0].name.toLowerCase();
-            const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.mov') || 
-                           fileName.endsWith('.avi') || fileName.endsWith('.mkv');
-            
-            if (isVideo) {
-                showStatus(statusDiv, '✓ Upload completed. Starting video processing...', 'success');
-                // Start polling for video processing status
-                setTimeout(() => startVideoStatusPolling(talkId, statusDiv), 2000);
+            // Start monitoring reassembly status
+            if (data.upload_session_id) {
+                startReassemblyStatusPolling(data.upload_session_id, talkId, statusDiv, fileInput, form, button, buttonText, spinner);
             } else {
-                // Clear the file input and hide form for non-video uploads
-                fileInput.value = '';
-                setTimeout(() => {
-                    form.style.display = 'none';
-                    statusDiv.innerHTML = '<span class="uk-text-success">✓ File uploaded</span>';
-                }, 2000);
+                // Fallback if no session ID
+                showStatus(statusDiv, '✓ Upload completed successfully!', 'success');
+                // Re-enable button
+                buttonText.style.display = 'inline';
+                spinner.style.display = 'none';
+                button.disabled = false;
             }
-            
-            // Re-enable button
-            buttonText.style.display = 'inline';
-            spinner.style.display = 'none';
-            button.disabled = false;
         })
         .catch(error => {
             console.error('Failed to complete upload:', error);
@@ -427,6 +416,97 @@ document.addEventListener('DOMContentLoaded', function() {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
     
+    function startReassemblyStatusPolling(sessionId, talkId, statusDiv, fileInput, form, button, buttonText, spinner) {
+        let pollCount = 0;
+        const maxPolls = 120; // Poll for up to 10 minutes (5 second intervals)
+        
+        const pollReassemblyStatus = () => {
+            pollCount++;
+            
+            if (pollCount > maxPolls) {
+                showStatus(statusDiv, 'File reassembly is taking longer than expected. Please check manually.', 'warning');
+                // Re-enable button
+                buttonText.style.display = 'inline';
+                spinner.style.display = 'none';
+                button.disabled = false;
+                return;
+            }
+            
+            fetch(`/check_reassembly_status?session_id=${sessionId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        showStatus(statusDiv, `Reassembly status check failed: ${data.error}`, 'error');
+                        // Re-enable button
+                        buttonText.style.display = 'inline';
+                        spinner.style.display = 'none';
+                        button.disabled = false;
+                        return;
+                    }
+                    
+                    switch(data.status) {
+                        case 'not_started':
+                        case 'starting':
+                        case 'reassembling':
+                            showStatus(statusDiv, data.message, 'info');
+                            setTimeout(pollReassemblyStatus, 5000); // Poll every 5 seconds
+                            break;
+                            
+                        case 'completed':
+                            showStatus(statusDiv, '✓ File reassembly completed!', 'success');
+                            
+                            // Check if this started video processing
+                            const fileName = fileInput.files[0].name.toLowerCase();
+                            const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.mov') || 
+                                           fileName.endsWith('.avi') || fileName.endsWith('.mkv');
+                            
+                            if (isVideo) {
+                                showStatus(statusDiv, '✓ File reassembled. Starting video processing...', 'success');
+                                // Start polling for video processing status
+                                setTimeout(() => startVideoStatusPolling(talkId, statusDiv), 2000);
+                            } else {
+                                // Clear the file input and hide form for non-video uploads
+                                fileInput.value = '';
+                                setTimeout(() => {
+                                    form.style.display = 'none';
+                                    statusDiv.innerHTML = '<span class="uk-text-success">✓ File uploaded and processed</span>';
+                                }, 2000);
+                            }
+                            
+                            // Re-enable button
+                            buttonText.style.display = 'inline';
+                            spinner.style.display = 'none';
+                            button.disabled = false;
+                            break;
+                            
+                        case 'error':
+                            showStatus(statusDiv, `❌ ${data.message}`, 'error');
+                            // Re-enable button
+                            buttonText.style.display = 'inline';
+                            spinner.style.display = 'none';
+                            button.disabled = false;
+                            break;
+                            
+                        default:
+                            showStatus(statusDiv, `Unknown reassembly status: ${data.status}`, 'warning');
+                            setTimeout(pollReassemblyStatus, 5000);
+                            break;
+                    }
+                })
+                .catch(error => {
+                    console.error('Reassembly status check error:', error);
+                    showStatus(statusDiv, 'Unable to check reassembly status. Please refresh the page.', 'error');
+                    // Re-enable button
+                    buttonText.style.display = 'inline';
+                    spinner.style.display = 'none';
+                    button.disabled = false;
+                });
+        };
+        
+        // Start polling after a brief delay
+        setTimeout(pollReassemblyStatus, 2000);
+    }
+    
     function checkOngoingUploads() {
         console.log('Checking for ongoing uploads...');
         fetch('/check_ongoing_uploads')
@@ -449,6 +529,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         } else if (upload.type === 'chunked_upload' && upload.talk_id) {
                             console.log(`Showing chunked upload warning for talk ${upload.talk_id}`);
                             showUploadWarning(upload.talk_id, `Chunked upload in progress: ${upload.progress_percent}% complete (${upload.chunks_received}/${upload.total_chunks} chunks). Please wait for it to complete.`);
+                        } else if (upload.type === 'reassembly' && upload.talk_id) {
+                            console.log(`Showing reassembly warning for talk ${upload.talk_id}`);
+                            showUploadWarning(upload.talk_id, `File reassembly in progress for this talk. Please wait for it to complete before uploading another file.`);
                         } else if (upload.type === 'upload') {
                             if (upload.talk_id) {
                                 // Show specific warning for the talk being uploaded

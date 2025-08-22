@@ -1280,6 +1280,24 @@ def check_ongoing_uploads():
                             'file_name': metadata.get('file_name', 'Unknown'),
                             'session_id': session_id
                         }
+                    else:
+                        # Check if reassembly is in progress
+                        reassembly_status_file = os.path.join(chunk_dir, "reassembly.status")
+                        if os.path.exists(reassembly_status_file):
+                            try:
+                                with open(reassembly_status_file, 'r') as f:
+                                    reassembly_status = f.read().strip()
+                                
+                                if reassembly_status in ['starting', 'reassembling']:
+                                    ongoing_uploads[f"reassembly_{session_id}"] = {
+                                        'type': 'reassembly',
+                                        'talk_id': talk_id,
+                                        'status': reassembly_status,
+                                        'file_name': metadata.get('file_name', 'Unknown'),
+                                        'session_id': session_id
+                                    }
+                            except:
+                                pass
             except:
                 continue
         
@@ -1472,44 +1490,118 @@ def complete_chunked_upload():
                 "error": f"Missing chunks: {metadata['total_chunks'] - len(metadata['chunks_received'])} chunks not received"
             })
         
+        # Get talk info before background thread (while we have database context)
+        talk_id = metadata['talk_id']
+        file_type = metadata['file_type']
+        file_extension = metadata['file_extension']
+        is_video = metadata['is_video']
+        expected_file_size = metadata['file_size']
+        
+        talk = Talk.query.get(talk_id)
+        if not talk:
+            return jsonify({"success": False, "error": f"Talk {talk_id} not found"})
+        
+        talk_title = talk.title
+        talk_speaker = talk.speaker
+        
+        # Determine final file path
+        if file_type == "raw" and is_video:
+            final_path = get_path_for_video_file(talk_id, file_extension)
+        else:
+            final_path = get_path_for_file(talk_id, file_type, talk_title, talk_speaker)
+        
+        # Create status file for tracking reassembly
+        reassembly_status_file = os.path.join(chunk_dir, "reassembly.status")
+        
         # Reassemble file in background thread
         import threading
         
         def reassemble_file():
             try:
-                talk_id = metadata['talk_id']
-                file_type = metadata['file_type']
-                file_extension = metadata['file_extension']
-                is_video = metadata['is_video']
+                # Write status: starting
+                with open(reassembly_status_file, 'w') as f:
+                    f.write("starting")
                 
-                talk = Talk.query.get(talk_id)
+                # Verify all chunks exist before starting
+                missing_chunks = []
+                for chunk_num in range(metadata['total_chunks']):
+                    chunk_path = os.path.join(chunk_dir, f"chunk_{chunk_num}")
+                    if not os.path.exists(chunk_path):
+                        missing_chunks.append(chunk_num)
                 
-                # Determine final file path
-                if file_type == "raw" and is_video:
-                    final_path = get_path_for_video_file(talk_id, file_extension)
-                else:
-                    final_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+                if missing_chunks:
+                    error_msg = f"Missing chunks: {missing_chunks}"
+                    with open(reassembly_status_file, 'w') as f:
+                        f.write(f"error:{error_msg}")
+                    app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                    return
+                
+                # Write status: reassembling
+                with open(reassembly_status_file, 'w') as f:
+                    f.write("reassembling")
                 
                 # Reassemble chunks
+                app.logger.info(f"Starting reassembly for talk {talk_id}: {final_path}")
+                bytes_written = 0
+                
                 with open(final_path, 'wb') as output_file:
                     for chunk_num in range(metadata['total_chunks']):
                         chunk_path = os.path.join(chunk_dir, f"chunk_{chunk_num}")
-                        with open(chunk_path, 'rb') as chunk_file:
-                            output_file.write(chunk_file.read())
+                        try:
+                            with open(chunk_path, 'rb') as chunk_file:
+                                chunk_data = chunk_file.read()
+                                output_file.write(chunk_data)
+                                bytes_written += len(chunk_data)
+                        except Exception as e:
+                            error_msg = f"Error reading chunk {chunk_num}: {str(e)}"
+                            with open(reassembly_status_file, 'w') as f:
+                                f.write(f"error:{error_msg}")
+                            app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                            # Clean up partial file
+                            if os.path.exists(final_path):
+                                os.remove(final_path)
+                            return
                 
-                # Clean up chunks
-                import shutil
-                shutil.rmtree(chunk_dir)
+                # Verify file size
+                if bytes_written != expected_file_size:
+                    error_msg = f"File size mismatch: expected {expected_file_size}, got {bytes_written}"
+                    with open(reassembly_status_file, 'w') as f:
+                        f.write(f"error:{error_msg}")
+                    app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                    # Clean up incorrect file
+                    if os.path.exists(final_path):
+                        os.remove(final_path)
+                    return
+                
+                # Write status: success
+                with open(reassembly_status_file, 'w') as f:
+                    f.write("success")
+                
+                app.logger.info(f"Reassembly completed for talk {talk_id}: {final_path} ({bytes_written} bytes)")
                 
                 # Start video processing if needed
                 if file_type == "raw" and is_video:
-                    raw_audio_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+                    raw_audio_path = get_path_for_file(talk_id, file_type, talk_title, talk_speaker)
                     extract_audio_from_video_async(final_path, raw_audio_path)
                 
-                app.logger.info(f"Chunked upload completed for talk {talk_id}: {final_path}")
+                # Clean up chunks only after successful reassembly
+                import shutil
+                shutil.rmtree(chunk_dir)
                 
             except Exception as e:
-                app.logger.error(f"Error reassembling chunks: {str(e)}")
+                error_msg = f"Unexpected error during reassembly: {str(e)}"
+                try:
+                    with open(reassembly_status_file, 'w') as f:
+                        f.write(f"error:{error_msg}")
+                except:
+                    pass
+                app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                # Clean up partial file
+                if os.path.exists(final_path):
+                    try:
+                        os.remove(final_path)
+                    except:
+                        pass
         
         # Start reassembly in background
         reassembly_thread = threading.Thread(target=reassemble_file)
@@ -1518,14 +1610,84 @@ def complete_chunked_upload():
         
         return jsonify({
             "success": True,
-            "message": f"Upload completed successfully. File is being processed.",
+            "message": f"Upload completed successfully. File is being reassembled.",
             "talk_id": metadata['talk_id'],
-            "file_type": metadata['file_type']
+            "file_type": metadata['file_type'],
+            "upload_session_id": upload_session_id
         })
         
     except Exception as e:
         app.logger.error(f"Error in complete_chunked_upload: {str(e)}")
         return jsonify({"success": False, "error": f"Failed to complete upload: {str(e)}"})
+
+
+@app.route("/check_reassembly_status", methods=["GET"])
+@login_required
+@current_user_is_team_leader
+def check_reassembly_status():
+    """Check the status of file reassembly after chunked upload"""
+    
+    upload_session_id = request.args.get("session_id")
+    
+    if not upload_session_id:
+        return jsonify({"success": False, "error": "No session_id provided"})
+    
+    try:
+        chunk_dir = os.path.join("/tmp", f"chunks_{upload_session_id}")
+        reassembly_status_file = os.path.join(chunk_dir, "reassembly.status")
+        
+        if not os.path.exists(reassembly_status_file):
+            # Check if chunk dir exists at all
+            if not os.path.exists(chunk_dir):
+                return jsonify({
+                    "success": True,
+                    "status": "completed",
+                    "message": "Reassembly completed (chunks cleaned up)"
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "status": "not_started",
+                    "message": "Reassembly not yet started"
+                })
+        
+        with open(reassembly_status_file, 'r') as f:
+            status_content = f.read().strip()
+        
+        if status_content == "starting":
+            return jsonify({
+                "success": True,
+                "status": "starting",
+                "message": "Reassembly initializing..."
+            })
+        elif status_content == "reassembling":
+            return jsonify({
+                "success": True,
+                "status": "reassembling",
+                "message": "Reassembling file from chunks..."
+            })
+        elif status_content == "success":
+            return jsonify({
+                "success": True,
+                "status": "completed",
+                "message": "File reassembly completed successfully"
+            })
+        elif status_content.startswith("error:"):
+            error_msg = status_content[6:]  # Remove "error:" prefix
+            return jsonify({
+                "success": True,
+                "status": "error",
+                "message": f"Reassembly failed: {error_msg}"
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "status": "unknown",
+                "message": f"Unknown reassembly status: {status_content}"
+            })
+    
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Error checking reassembly status: {str(e)}"})
 
 
 @app.route("/upload_progress", methods=["GET"])
