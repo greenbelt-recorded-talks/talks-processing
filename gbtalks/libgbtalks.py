@@ -88,7 +88,7 @@ def extract_audio_from_video(video_path, audio_output_path):
     try:
         # Use ffmpeg to extract audio at high quality
         cmd = [
-            'ffmpeg',
+            '/usr/bin/ffmpeg',
             '-i', video_path,
             '-vn',  # No video
             '-acodec', 'libmp3lame',  # MP3 codec
@@ -109,6 +109,88 @@ def extract_audio_from_video(video_path, audio_output_path):
         return False, "FFmpeg not found. Please install ffmpeg."
     except Exception as e:
         return False, f"Error extracting audio: {str(e)}"
+
+
+def extract_audio_from_video_async(video_path, audio_output_path):
+    """Start background audio extraction from video file using ffmpeg"""
+    import threading
+    import os
+    
+    # Create a status file to track progress
+    status_file = audio_output_path + ".status"
+    
+    def background_extraction():
+        try:
+            # Write status: processing
+            with open(status_file, 'w') as f:
+                f.write("processing")
+            
+            # Use ffmpeg to extract audio at high quality
+            cmd = [
+                '/usr/bin/ffmpeg',
+                '-i', video_path,
+                '-vn',  # No video
+                '-acodec', 'libmp3lame',  # MP3 codec
+                '-ab', '320k',  # High bitrate
+                '-ar', '44100',  # 44.1kHz sample rate
+                '-y',  # Overwrite output file
+                audio_output_path
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                # Write status: success
+                with open(status_file, 'w') as f:
+                    f.write("success")
+            else:
+                # Write status: error with message
+                with open(status_file, 'w') as f:
+                    f.write(f"error: FFmpeg error: {result.stderr}")
+                    
+        except FileNotFoundError:
+            with open(status_file, 'w') as f:
+                f.write("error: FFmpeg not found. Please install ffmpeg.")
+        except Exception as e:
+            with open(status_file, 'w') as f:
+                f.write(f"error: Error extracting audio: {str(e)}")
+    
+    # Start background thread
+    thread = threading.Thread(target=background_extraction)
+    thread.daemon = True
+    thread.start()
+    
+    return True, "Audio extraction started in background"
+
+
+def get_video_processing_status(audio_output_path):
+    """Check the status of video processing"""
+    import os
+    
+    status_file = audio_output_path + ".status"
+    
+    if not os.path.exists(status_file):
+        return "not_started", "Processing not started"
+    
+    try:
+        with open(status_file, 'r') as f:
+            status_content = f.read().strip()
+        
+        if status_content == "processing":
+            return "processing", "Audio extraction in progress"
+        elif status_content == "success":
+            # Clean up status file
+            os.remove(status_file)
+            return "completed", "Audio extraction completed successfully"
+        elif status_content.startswith("error:"):
+            error_msg = status_content[6:]  # Remove "error:" prefix
+            # Clean up status file
+            os.remove(status_file)
+            return "error", error_msg
+        else:
+            return "unknown", f"Unknown status: {status_content}"
+    except Exception as e:
+        return "error", f"Error reading status: {str(e)}"
 
 
 def gb_time_to_datetime(day, time):

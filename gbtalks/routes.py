@@ -29,6 +29,8 @@ from .libgbtalks import (
     get_path_for_file, 
     get_path_for_video_file,
     extract_audio_from_video,
+    extract_audio_from_video_async,
+    get_video_processing_status,
     gb_time_to_datetime
 )
 
@@ -1047,16 +1049,16 @@ def uploadtalk():
         uploaded_file_path = os.path.join("/tmp", shortuuid.uuid())
         file.save(uploaded_file_path)
         
-        # Detect file type
-        kind = filetype.guess(uploaded_file_path)
-        if not kind:
-            flash("Unable to determine file type", "error")
-            os.remove(uploaded_file_path)
-            return redirect(url_for(source_path))
-            
-        file_extension = kind.extension
-        is_video = kind.mime.startswith('video/')
-        is_audio = kind.mime.startswith('audio/')
+        # Get file extension from filename
+        original_filename = file.filename.lower()
+        file_extension = original_filename.split('.')[-1] if '.' in original_filename else ''
+        
+        # Determine file type based on extension
+        audio_extensions = ['mp3']
+        video_extensions = ['mp4']
+        
+        is_audio = file_extension in audio_extensions
+        is_video = file_extension in video_extensions
         
         # Only allow video or audio files for raw uploads
         if file_type == "raw" and not (is_video or is_audio):
@@ -1110,17 +1112,17 @@ If you are the nearest team leader, check the contents of the existing file and 
                 video_file_path = get_path_for_video_file(talk_id, file_extension)
                 shutil.move(uploaded_file_path, video_file_path)
                 
-                # Extract audio to RAW file
+                # Start background audio extraction
                 raw_audio_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
-                success, message = extract_audio_from_video(video_file_path, raw_audio_path)
+                success, message = extract_audio_from_video_async(video_file_path, raw_audio_path)
                 
                 if success:
-                    flash(f"Successfully uploaded video file and extracted audio for Talk {talk_id}: {talk.title}", "success")
+                    flash(f"Successfully uploaded video file for Talk {talk_id}: {talk.title}. Audio extraction started in background.", "success")
                 else:
-                    # If audio extraction failed, clean up and report error
+                    # If we can't start background processing, clean up and report error
                     if os.path.exists(video_file_path):
                         os.remove(video_file_path)
-                    flash(f"Failed to extract audio from video: {message}", "error")
+                    flash(f"Failed to start audio extraction: {message}", "error")
                     
             except Exception as e:
                 # Clean up on error
@@ -1136,6 +1138,250 @@ If you are the nearest team leader, check the contents of the existing file and 
         flash("No file selected", "error")
 
     return redirect(url_for(source_path))
+
+
+@app.route("/check_video_status", methods=["GET"])
+@login_required
+@current_user_is_team_leader
+def check_video_status():
+    """Check the status of video processing for a specific talk"""
+    
+    talk_id = request.args.get("talk_id")
+    
+    if not talk_id:
+        return jsonify({"success": False, "error": "No talk_id provided"})
+    
+    talk = Talk.query.get(talk_id)
+    if not talk:
+        return jsonify({"success": False, "error": f"Talk {talk_id} not found"})
+    
+    # Get the expected raw audio path
+    raw_audio_path = get_path_for_file(talk_id, "raw", talk.title, talk.speaker)
+    
+    # Check processing status
+    status, message = get_video_processing_status(raw_audio_path)
+    
+    return jsonify({
+        "success": True,
+        "talk_id": talk_id,
+        "status": status,
+        "message": message,
+        "audio_file_exists": os.path.exists(raw_audio_path)
+    })
+
+
+@app.route("/uploadtalk_streaming", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def uploadtalk_streaming():
+    """Streaming upload endpoint for large files that doesn't block the server"""
+    
+    file_type = request.form.get("file_type")
+    talk_id = request.form.get("talk_id")
+    
+    if not file_type or not talk_id:
+        return jsonify({"success": False, "error": "Missing file_type or talk_id"})
+    
+    if "file" not in request.files:
+        return jsonify({"success": False, "error": "No file provided"})
+    
+    uploaded_file = request.files["file"]
+    
+    if not uploaded_file or not uploaded_file.filename:
+        return jsonify({"success": False, "error": "No file selected"})
+    
+    try:
+        talk = Talk.query.get(talk_id)
+        if not talk:
+            return jsonify({"success": False, "error": f"Talk {talk_id} not found"})
+        
+        # Get file extension from filename
+        original_filename = uploaded_file.filename.lower()
+        file_extension = original_filename.split('.')[-1] if '.' in original_filename else ''
+        
+        # Determine file type based on extension
+        audio_extensions = ['mp3']
+        video_extensions = ['mp4']
+        
+        is_audio = file_extension in audio_extensions
+        is_video = file_extension in video_extensions
+        
+        # Validate file type
+        if file_type == "raw" and not (is_video or is_audio):
+            return jsonify({"success": False, "error": "RAW files must be audio or video files"})
+        elif file_type != "raw" and not is_audio:
+            return jsonify({"success": False, "error": f"{file_type} files must be audio files"})
+        
+        # Create a unique upload session ID
+        upload_session_id = shortuuid.uuid()
+        temp_file_path = os.path.join("/tmp", f"upload_{upload_session_id}")
+        
+        # Stream the file to temporary location without blocking
+        import threading
+        import time
+        
+        def stream_upload():
+            try:
+                # Create upload tracking file
+                upload_status_file = f"{temp_file_path}.status"
+                with open(upload_status_file, 'w') as f:
+                    f.write("uploading")
+                
+                total_size = 0
+                chunk_size = 64 * 1024  # 64KB chunks
+                
+                with open(temp_file_path, 'wb') as output_file:
+                    while True:
+                        chunk = uploaded_file.stream.read(chunk_size)
+                        if not chunk:
+                            break
+                        output_file.write(chunk)
+                        total_size += len(chunk)
+                        
+                        # Update progress periodically
+                        with open(upload_status_file, 'w') as f:
+                            f.write(f"uploading:{total_size}")
+                
+                # File upload complete, now process it
+                with open(upload_status_file, 'w') as f:
+                    f.write("processing")
+                
+                # Check for size collisions
+                for root, dirs, files in os.walk(app.config["UPLOAD_DIR"]):
+                    for name in files:
+                        if name.endswith((".mp3", ".mp4", ".mov", ".avi", ".mkv")):
+                            existing_file_path = os.path.join(root, name)
+                            existing_file_size = os.path.getsize(existing_file_path)
+                            uploaded_file_size = os.path.getsize(temp_file_path)
+                            
+                            if existing_file_size == uploaded_file_size:
+                                with open(upload_status_file, 'w') as f:
+                                    f.write(f"error:File size collision with {existing_file_path}")
+                                return
+                
+                # Move file to final location and start processing
+                if file_type == "raw" and is_video:
+                    # Handle video files
+                    video_file_path = get_path_for_video_file(talk_id, file_extension)
+                    shutil.move(temp_file_path, video_file_path)
+                    
+                    # Start background audio extraction
+                    raw_audio_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+                    success, message = extract_audio_from_video_async(video_file_path, raw_audio_path)
+                    
+                    if success:
+                        with open(upload_status_file, 'w') as f:
+                            f.write("success:Video uploaded, audio extraction started")
+                    else:
+                        # Clean up on failure
+                        if os.path.exists(video_file_path):
+                            os.remove(video_file_path)
+                        with open(upload_status_file, 'w') as f:
+                            f.write(f"error:Failed to start audio extraction: {message}")
+                else:
+                    # Handle regular audio files
+                    target_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+                    shutil.move(temp_file_path, target_path)
+                    
+                    with open(upload_status_file, 'w') as f:
+                        f.write(f"success:Successfully uploaded {file_type} file")
+                        
+            except Exception as e:
+                # Clean up on error
+                if os.path.exists(temp_file_path):
+                    os.remove(temp_file_path)
+                with open(upload_status_file, 'w') as f:
+                    f.write(f"error:Upload failed: {str(e)}")
+        
+        # Start the upload in a background thread
+        upload_thread = threading.Thread(target=stream_upload)
+        upload_thread.daemon = True
+        upload_thread.start()
+        
+        return jsonify({
+            "success": True,
+            "upload_session_id": upload_session_id,
+            "message": "Upload started in background"
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error in uploadtalk_streaming: {str(e)}")
+        return jsonify({"success": False, "error": f"Upload failed: {str(e)}"})
+
+
+@app.route("/upload_progress", methods=["GET"])
+@login_required
+@current_user_is_team_leader
+def upload_progress():
+    """Check the progress of a streaming upload"""
+    
+    upload_session_id = request.args.get("session_id")
+    
+    if not upload_session_id:
+        return jsonify({"success": False, "error": "No session_id provided"})
+    
+    try:
+        temp_file_path = os.path.join("/tmp", f"upload_{upload_session_id}")
+        status_file = f"{temp_file_path}.status"
+        
+        if not os.path.exists(status_file):
+            return jsonify({
+                "success": True,
+                "status": "not_found",
+                "message": "Upload session not found"
+            })
+        
+        with open(status_file, 'r') as f:
+            status_content = f.read().strip()
+        
+        if status_content.startswith("uploading"):
+            if ":" in status_content:
+                bytes_uploaded = int(status_content.split(":")[1])
+                return jsonify({
+                    "success": True,
+                    "status": "uploading",
+                    "bytes_uploaded": bytes_uploaded,
+                    "message": f"Uploading... {bytes_uploaded // (1024*1024)} MB"
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "status": "uploading",
+                    "message": "Upload starting..."
+                })
+        elif status_content == "processing":
+            return jsonify({
+                "success": True,
+                "status": "processing",
+                "message": "Upload complete, processing file..."
+            })
+        elif status_content.startswith("success:"):
+            message = status_content[8:]  # Remove "success:" prefix
+            # Clean up status file
+            os.remove(status_file)
+            return jsonify({
+                "success": True,
+                "status": "completed",
+                "message": message
+            })
+        elif status_content.startswith("error:"):
+            error_msg = status_content[6:]  # Remove "error:" prefix
+            # Clean up status file
+            os.remove(status_file)
+            return jsonify({
+                "success": True,
+                "status": "error",
+                "message": error_msg
+            })
+        else:
+            return jsonify({
+                "success": True,
+                "status": "unknown",
+                "message": f"Unknown status: {status_content}"
+            })
+    
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Error checking progress: {str(e)}"})
 
 
 @app.route("/uploadtalk_ajax", methods=["POST"])
@@ -1160,15 +1406,16 @@ def uploadtalk_ajax():
         uploaded_file_path = os.path.join("/tmp", shortuuid.uuid())
         file.save(uploaded_file_path)
         
-        # Detect file type
-        kind = filetype.guess(uploaded_file_path)
-        if not kind:
-            os.remove(uploaded_file_path)
-            return jsonify({"success": False, "error": "Unable to determine file type"})
-            
-        file_extension = kind.extension
-        is_video = kind.mime.startswith('video/')
-        is_audio = kind.mime.startswith('audio/')
+        # Get file extension from filename
+        original_filename = file.filename.lower()
+        file_extension = original_filename.split('.')[-1] if '.' in original_filename else ''
+        
+        # Determine file type based on extension
+        audio_extensions = ['mp3']
+        video_extensions = ['mp4']
+        
+        is_audio = file_extension in audio_extensions
+        is_video = file_extension in video_extensions
         
         # Only allow video or audio files for raw uploads
         if file_type == "raw" and not (is_video or is_audio):
@@ -1212,20 +1459,20 @@ def uploadtalk_ajax():
             video_file_path = get_path_for_video_file(talk_id, file_extension)
             shutil.move(uploaded_file_path, video_file_path)
             
-            # Extract audio to RAW file
+            # Start background audio extraction
             raw_audio_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
-            success, message = extract_audio_from_video(video_file_path, raw_audio_path)
+            success, message = extract_audio_from_video_async(video_file_path, raw_audio_path)
             
             if success:
                 return jsonify({
                     "success": True, 
-                    "message": f"Successfully uploaded video file and extracted audio for Talk {talk_id}: {talk.title}"
+                    "message": f"Successfully uploaded video file for Talk {talk_id}: {talk.title}. Audio extraction started in background."
                 })
             else:
-                # If audio extraction failed, clean up and report error
+                # If we can't start background processing, clean up and report error
                 if os.path.exists(video_file_path):
                     os.remove(video_file_path)
-                return jsonify({"success": False, "error": f"Failed to extract audio from video: {message}"})
+                return jsonify({"success": False, "error": f"Failed to start audio extraction: {message}"})
         else:
             # Handle regular audio files
             target_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)

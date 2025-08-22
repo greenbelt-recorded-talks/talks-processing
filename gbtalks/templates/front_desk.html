@@ -97,47 +97,288 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('talk_id', talkId);
             formData.append('file_type', fileType);
             
-            // Upload file
-            fetch('/uploadtalk_ajax', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    showStatus(statusDiv, data.message, 'success');
-                    // Clear the file input
-                    fileInput.value = '';
-                    // Optionally hide the form since file is uploaded
-                    setTimeout(() => {
-                        this.style.display = 'none';
-                        statusDiv.innerHTML = '<span class="uk-text-success">✓ File uploaded</span>';
-                    }, 2000);
-                } else {
-                    showStatus(statusDiv, data.error, 'error');
-                }
-            })
-            .catch(error => {
-                console.error('Upload error:', error);
-                showStatus(statusDiv, 'Upload failed. Please try again.', 'error');
-            })
-            .finally(() => {
-                // Hide spinner and re-enable button
-                buttonText.style.display = 'inline';
-                spinner.style.display = 'none';
-                button.disabled = false;
-            });
+            // Check file size to decide upload method
+            const fileSize = fileInput.files[0].size;
+            const fileName = fileInput.files[0].name.toLowerCase();
+            const isLargeFile = fileSize > 250 * 1024 * 1024; // 250MB threshold
+            const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.mov') || 
+                           fileName.endsWith('.avi') || fileName.endsWith('.mkv');
+            
+            if (isLargeFile || isVideo) {
+                // Use streaming upload for large files or videos
+                uploadFileStreaming(formData, talkId, statusDiv, fileInput, this, button, buttonText, spinner);
+            } else {
+                // Use regular upload for small files
+                uploadFileRegular(formData, talkId, statusDiv, fileInput, this, button, buttonText, spinner);
+            }
         });
     });
     
+    function uploadFileRegular(formData, talkId, statusDiv, fileInput, form, button, buttonText, spinner) {
+        // Regular upload for small files
+        fetch('/uploadtalk_ajax', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showStatus(statusDiv, data.message, 'success');
+                
+                // Check if this was a video file upload that started background processing
+                const fileName = fileInput.files[0].name.toLowerCase();
+                const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.mov') || 
+                               fileName.endsWith('.avi') || fileName.endsWith('.mkv');
+                
+                if (isVideo && data.message.includes('background')) {
+                    // Start polling for video processing status
+                    startVideoStatusPolling(talkId, statusDiv);
+                } else {
+                    // Clear the file input for non-video uploads
+                    fileInput.value = '';
+                    // Hide the form since file is uploaded
+                    setTimeout(() => {
+                        form.style.display = 'none';
+                        statusDiv.innerHTML = '<span class="uk-text-success">✓ File uploaded</span>';
+                    }, 2000);
+                }
+            } else {
+                showStatus(statusDiv, data.error, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Upload error:', error);
+            showStatus(statusDiv, 'Upload failed. Please try again.', 'error');
+        })
+        .finally(() => {
+            // Hide spinner and re-enable button
+            buttonText.style.display = 'inline';
+            spinner.style.display = 'none';
+            button.disabled = false;
+        });
+    }
+    
+    function uploadFileStreaming(formData, talkId, statusDiv, fileInput, form, button, buttonText, spinner) {
+        // Streaming upload for large files
+        fetch('/uploadtalk_streaming', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success && data.upload_session_id) {
+                showStatus(statusDiv, 'Upload started...', 'info');
+                
+                // Start polling for upload progress
+                startUploadProgressPolling(data.upload_session_id, talkId, statusDiv, fileInput, form, button, buttonText, spinner);
+            } else {
+                showStatus(statusDiv, data.error || 'Upload failed to start', 'error');
+                // Re-enable button
+                buttonText.style.display = 'inline';
+                spinner.style.display = 'none';
+                button.disabled = false;
+            }
+        })
+        .catch(error => {
+            console.error('Upload error:', error);
+            showStatus(statusDiv, 'Upload failed to start. Please try again.', 'error');
+            // Re-enable button
+            buttonText.style.display = 'inline';
+            spinner.style.display = 'none';
+            button.disabled = false;
+        });
+    }
+    
+    function startUploadProgressPolling(sessionId, talkId, statusDiv, fileInput, form, button, buttonText, spinner) {
+        let pollCount = 0;
+        const maxPolls = 1440; // Poll for up to 2 hours (5 second intervals)
+        
+        const pollProgress = () => {
+            pollCount++;
+            
+            if (pollCount > maxPolls) {
+                showStatus(statusDiv, 'Upload is taking longer than expected. Please check manually.', 'warning');
+                // Re-enable button
+                buttonText.style.display = 'inline';
+                spinner.style.display = 'none';
+                button.disabled = false;
+                return;
+            }
+            
+            fetch(`/upload_progress?session_id=${sessionId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        showStatus(statusDiv, `Progress check failed: ${data.error}`, 'error');
+                        // Re-enable button
+                        buttonText.style.display = 'inline';
+                        spinner.style.display = 'none';
+                        button.disabled = false;
+                        return;
+                    }
+                    
+                    switch(data.status) {
+                        case 'uploading':
+                            showStatus(statusDiv, data.message, 'info');
+                            setTimeout(pollProgress, 5000); // Poll every 5 seconds
+                            break;
+                            
+                        case 'processing':
+                            showStatus(statusDiv, data.message, 'info');
+                            setTimeout(pollProgress, 5000);
+                            break;
+                            
+                        case 'completed':
+                            showStatus(statusDiv, '✓ ' + data.message, 'success');
+                            
+                            // Check if this started video processing
+                            const fileName = fileInput.files[0].name.toLowerCase();
+                            const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.mov') || 
+                                           fileName.endsWith('.avi') || fileName.endsWith('.mkv');
+                            
+                            if (isVideo && data.message.includes('audio extraction')) {
+                                // Start polling for video processing status
+                                startVideoStatusPolling(talkId, statusDiv);
+                            } else {
+                                // Clear the file input and hide form
+                                fileInput.value = '';
+                                setTimeout(() => {
+                                    form.style.display = 'none';
+                                    statusDiv.innerHTML = '<span class="uk-text-success">✓ File uploaded</span>';
+                                }, 2000);
+                            }
+                            
+                            // Re-enable button
+                            buttonText.style.display = 'inline';
+                            spinner.style.display = 'none';
+                            button.disabled = false;
+                            break;
+                            
+                        case 'error':
+                            showStatus(statusDiv, `Upload failed: ${data.message}`, 'error');
+                            // Re-enable button
+                            buttonText.style.display = 'inline';
+                            spinner.style.display = 'none';
+                            button.disabled = false;
+                            break;
+                            
+                        case 'not_found':
+                            showStatus(statusDiv, 'Upload session not found. Please try again.', 'error');
+                            // Re-enable button
+                            buttonText.style.display = 'inline';
+                            spinner.style.display = 'none';
+                            button.disabled = false;
+                            break;
+                            
+                        default:
+                            showStatus(statusDiv, `Unknown upload status: ${data.status}`, 'warning');
+                            setTimeout(pollProgress, 5000);
+                            break;
+                    }
+                })
+                .catch(error => {
+                    console.error('Progress check error:', error);
+                    showStatus(statusDiv, 'Unable to check upload progress. Please refresh the page.', 'error');
+                    // Re-enable button
+                    buttonText.style.display = 'inline';
+                    spinner.style.display = 'none';
+                    button.disabled = false;
+                });
+        };
+        
+        // Start polling after a brief delay
+        setTimeout(pollProgress, 2000);
+    }
+    
     function showStatus(element, message, type) {
-        const alertClass = type === 'error' ? 'uk-alert-danger' : 'uk-alert-success';
+        let alertClass;
+        switch(type) {
+            case 'error':
+                alertClass = 'uk-alert-danger';
+                break;
+            case 'warning':
+                alertClass = 'uk-alert-warning';
+                break;
+            case 'info':
+                alertClass = 'uk-alert-primary';
+                break;
+            case 'success':
+            default:
+                alertClass = 'uk-alert-success';
+                break;
+        }
+        
         element.innerHTML = `
             <div class="uk-alert ${alertClass}" uk-alert>
                 <a class="uk-alert-close" uk-close></a>
                 <p>${message}</p>
             </div>
         `;
+    }
+    
+    function startVideoStatusPolling(talkId, statusDiv) {
+        let pollCount = 0;
+        const maxPolls = 720; // Poll for up to 1 hour (5 second intervals)
+        
+        const pollStatus = () => {
+            pollCount++;
+            
+            if (pollCount > maxPolls) {
+                showStatus(statusDiv, 'Video processing is taking longer than expected. Please check manually.', 'warning');
+                return;
+            }
+            
+            fetch(`/check_video_status?talk_id=${talkId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.success) {
+                        showStatus(statusDiv, `Status check failed: ${data.error}`, 'error');
+                        return;
+                    }
+                    
+                    switch(data.status) {
+                        case 'processing':
+                            showStatus(statusDiv, 
+                                `${data.message} (${Math.floor(pollCount * 5 / 60)}m ${(pollCount * 5) % 60}s)`, 
+                                'info'
+                            );
+                            setTimeout(pollStatus, 5000); // Poll every 5 seconds
+                            break;
+                            
+                        case 'completed':
+                            showStatus(statusDiv, '✓ Video uploaded and audio extracted successfully!', 'success');
+                            // Hide the upload form
+                            setTimeout(() => {
+                                const form = statusDiv.parentNode.querySelector('.upload-form');
+                                if (form) {
+                                    form.style.display = 'none';
+                                    statusDiv.innerHTML = '<span class="uk-text-success">✓ Video processed</span>';
+                                }
+                            }, 2000);
+                            break;
+                            
+                        case 'error':
+                            showStatus(statusDiv, `Video processing failed: ${data.message}`, 'error');
+                            break;
+                            
+                        case 'not_started':
+                            showStatus(statusDiv, 'Video processing not yet started. Please wait...', 'info');
+                            setTimeout(pollStatus, 5000);
+                            break;
+                            
+                        default:
+                            showStatus(statusDiv, `Unknown status: ${data.status}`, 'warning');
+                            break;
+                    }
+                })
+                .catch(error => {
+                    console.error('Status check error:', error);
+                    showStatus(statusDiv, 'Unable to check processing status. Please refresh the page.', 'error');
+                });
+        };
+        
+        // Start polling after a brief delay
+        setTimeout(pollStatus, 2000);
     }
 });
 </script>
