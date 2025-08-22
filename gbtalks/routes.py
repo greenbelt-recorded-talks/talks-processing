@@ -1216,6 +1216,12 @@ def uploadtalk_streaming():
         upload_session_id = shortuuid.uuid()
         temp_file_path = os.path.join("/tmp", f"upload_{upload_session_id}")
         
+        # Read the file data immediately before Flask closes it
+        try:
+            file_data = uploaded_file.read()
+        except Exception as e:
+            return jsonify({"success": False, "error": f"Failed to read uploaded file: {str(e)}"})
+        
         # Stream the file to temporary location without blocking
         import threading
         import time
@@ -1230,17 +1236,20 @@ def uploadtalk_streaming():
                 total_size = 0
                 chunk_size = 64 * 1024  # 64KB chunks
                 
+                # Write the file data in chunks to simulate streaming and allow progress updates
                 with open(temp_file_path, 'wb') as output_file:
-                    while True:
-                        chunk = uploaded_file.stream.read(chunk_size)
-                        if not chunk:
-                            break
+                    for i in range(0, len(file_data), chunk_size):
+                        chunk = file_data[i:i + chunk_size]
                         output_file.write(chunk)
                         total_size += len(chunk)
                         
                         # Update progress periodically
                         with open(upload_status_file, 'w') as f:
                             f.write(f"uploading:talk_id={talk_id}:bytes={total_size}")
+                        
+                        # Small delay to make progress visible for large files
+                        if len(file_data) > 100 * 1024 * 1024:  # Only delay for files > 100MB
+                            time.sleep(0.01)  # 10ms delay per chunk
                 
                 # File upload complete, now process it
                 with open(upload_status_file, 'w') as f:
