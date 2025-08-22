@@ -757,12 +757,12 @@ def uploadtalk():
     source_path = request.referrer.split("/")[-1]
 
     if "file" not in request.files:
-        flash("No file part")
-        return redirect(request.url)
+        flash("No file selected", "error")
+        return redirect(url_for(source_path))
 
     file = request.files["file"]
 
-    if file:
+    if file and file.filename:
         # Save it to /tmp for now
         uploaded_file_path = os.path.join("/tmp", shortuuid.uuid())
         file.save(uploaded_file_path)
@@ -807,6 +807,9 @@ If you are the nearest team leader, check the contents of the existing file and 
                 get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
             ),
         )
+        flash(f"Successfully uploaded {file_type} file for Talk {talk_id}: {talk.title}", "success")
+    else:
+        flash("No file selected", "error")
 
     return redirect(url_for(source_path))
 
@@ -822,12 +825,12 @@ def uploadrecordernotes():
     source_path = request.referrer.split("/")[-1]
 
     if "file" not in request.files:
-        flash("No file!")
-        return redirect(request.url)
+        flash("No file selected", "error")
+        return redirect(url_for(source_path))
 
     file = request.files["file"]
 
-    if file:
+    if file and file.filename:
         kind = filetype.guess(file.read(261))
         if kind.extension == "jpg":
             file.save(
@@ -838,8 +841,12 @@ def uploadrecordernotes():
                 + talk_id
                 + "recorder_notes.jpg"
             )
+            talk = Talk.query.get(talk_id)
+            flash(f"Successfully uploaded recorder notes photo for Talk {talk_id}: {talk.title}", "success")
         else:
-            flash("Must be a JPEG")
+            flash("Must be a JPEG file", "error")
+    else:
+        flash("No file selected", "error")
 
     return redirect(url_for(source_path))
 
