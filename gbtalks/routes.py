@@ -237,14 +237,9 @@ def upload_top_tail():
         file.seek(0)  # Reset file pointer
         
         if kind and kind.extension == "mp3":
-            # Check if the top_tail directory exists
-            if not os.path.exists(app.config["TOP_TAIL_DIR"]):
-                flash(f"Top/tail directory does not exist: {app.config['TOP_TAIL_DIR']}", "error")
-                return redirect(url_for("setup"))
-            
-            # Save the file with the correct name
+            # Save the file with the correct name in the upload directory
             filename = f"{file_type}.mp3"
-            filepath = os.path.join(app.config["TOP_TAIL_DIR"], filename)
+            filepath = os.path.join(app.config["UPLOAD_DIR"], filename)
             file.save(filepath)
             
             flash(f"Successfully uploaded {file_type}.mp3", "success")
