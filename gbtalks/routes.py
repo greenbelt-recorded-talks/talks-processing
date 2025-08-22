@@ -203,10 +203,56 @@ def put_alltalks_pdf():
 
     file = request.files["file"]
 
-    if file:
+    if file and file.filename:
         filename = "GB" + app.config["GB_SHORT_YEAR"] + "-AllTalksIndex.pdf"
         file.save(os.path.join(app.config["USB_GOLD_DIR"], filename))
+        flash("Successfully uploaded All Talks PDF", "success")
+    else:
+        flash("No file selected", "error")
 
+    return redirect(url_for("setup"))
+
+
+@app.route("/upload_top_tail", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def upload_top_tail():
+    """Upload top and tail MP3 files for audio processing"""
+    
+    file_type = request.form.get("file_type")
+    
+    if not file_type or file_type not in ["top", "tail"]:
+        flash("Invalid file type", "error")
+        return redirect(url_for("setup"))
+    
+    if "file" not in request.files:
+        flash("No file selected", "error")
+        return redirect(url_for("setup"))
+    
+    file = request.files["file"]
+    
+    if file and file.filename:
+        # Validate file type
+        kind = filetype.guess(file.read(261))
+        file.seek(0)  # Reset file pointer
+        
+        if kind and kind.extension == "mp3":
+            # Check if the top_tail directory exists
+            if not os.path.exists(app.config["TOP_TAIL_DIR"]):
+                flash(f"Top/tail directory does not exist: {app.config['TOP_TAIL_DIR']}", "error")
+                return redirect(url_for("setup"))
+            
+            # Save the file with the correct name
+            filename = f"{file_type}.mp3"
+            filepath = os.path.join(app.config["TOP_TAIL_DIR"], filename)
+            file.save(filepath)
+            
+            flash(f"Successfully uploaded {file_type}.mp3", "success")
+        else:
+            flash("File must be an MP3", "error")
+    else:
+        flash("No file selected", "error")
+    
     return redirect(url_for("setup"))
 
 

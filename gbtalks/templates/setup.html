@@ -116,6 +116,41 @@ Uploading a file here will replace the existing one.
 
 </div>
 
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+### Upload Top and Tail Audio
+
+These MP3 files are automatically added to the beginning and end of each processed talk. Upload new versions here to replace the existing ones.
+
+The top file plays at the start of each talk, and the tail file plays at the end. Both should be short (typically 5-10 seconds).
+
+{% endfilter %}
+
+        <div class="uk-grid-small uk-child-width-1-2@s" uk-grid>
+            <div>
+                <h4>Top Audio (Intro)</h4>
+                <form action="upload_top_tail" method=post enctype=multipart/form-data>
+                    <label for=top_file>Top MP3 File</label>
+                    <input name=file type=file id=top_file accept=".mp3" required>
+                    <input name=file_type type=hidden value="top">
+                    <button class="uk-button uk-button-primary">Upload Top</button>
+                </form>
+            </div>
+            <div>
+                <h4>Tail Audio (Outro)</h4>
+                <form action="upload_top_tail" method=post enctype=multipart/form-data>
+                    <label for=tail_file>Tail MP3 File</label>
+                    <input name=file type=file id=tail_file accept=".mp3" required>
+                    <input name=file_type type=hidden value="tail">
+                    <button class="uk-button uk-button-primary">Upload Tail</button>
+                </form>
+            </div>
+        </div>
+
+</div>
 
 <hr class="uk-divider-icon">
 
