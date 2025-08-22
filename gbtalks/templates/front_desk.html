@@ -33,12 +33,15 @@ If you have a recorder notes photo, upload this first, as the talk will disappea
         <td>{{ talk.speaker }}</td>
         <td>{{ talk.title }}</td>
 	<td>
-		<form method=post enctype=multipart/form-data name=upload_talk action=uploadtalk>
-                	<input name=file type=file id=file accept=".mp3">
-                        <input name=file_type type=hidden value="raw">
-                        <input name=talk_id type=hidden value="{{talk.id}}">
-                        <button>Upload</button>
+		<form class="upload-form" data-talk-id="{{ talk.id }}" data-file-type="raw">
+                	<input name="file" type="file" accept=".mp3,.mp4,.mov,.avi,.mkv,.m4a,.wav" required>
+                        <button type="submit" class="uk-button uk-button-primary">
+                            <span class="button-text">Upload</span>
+                            <div uk-spinner="ratio: 0.5" class="upload-spinner" style="display: none;"></div>
+                        </button>
                 </form>
+                <div class="upload-status" style="margin-top: 8px;"></div>
+                <small class="uk-text-muted">Supports audio (MP3, WAV, M4A) and video files (MP4, MOV, AVI, MKV)</small>
 	</td>
 	<td>
                 <form method=post enctype=multipart/form-data name=upload_photo action=uploadrecordernotes>
@@ -58,6 +61,86 @@ If you have a recorder notes photo, upload this first, as the talk will disappea
 
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Handle upload form submissions
+    document.querySelectorAll('.upload-form').forEach(form => {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const fileInput = this.querySelector('input[type="file"]');
+            const button = this.querySelector('button');
+            const buttonText = button.querySelector('.button-text');
+            const spinner = button.querySelector('.upload-spinner');
+            const statusDiv = this.parentNode.querySelector('.upload-status');
+            const talkId = this.dataset.talkId;
+            const fileType = this.dataset.fileType;
+            
+            // Check if file is selected
+            if (!fileInput.files.length) {
+                showStatus(statusDiv, 'Please select a file', 'error');
+                return;
+            }
+            
+            // Show spinner and disable button
+            buttonText.style.display = 'none';
+            spinner.style.display = 'inline-block';
+            button.disabled = true;
+            statusDiv.innerHTML = '';
+            
+            // Create FormData
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('talk_id', talkId);
+            formData.append('file_type', fileType);
+            
+            // Upload file
+            fetch('/uploadtalk_ajax', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus(statusDiv, data.message, 'success');
+                    // Clear the file input
+                    fileInput.value = '';
+                    // Optionally hide the form since file is uploaded
+                    setTimeout(() => {
+                        this.style.display = 'none';
+                        statusDiv.innerHTML = '<span class="uk-text-success">✓ File uploaded</span>';
+                    }, 2000);
+                } else {
+                    showStatus(statusDiv, data.error, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                showStatus(statusDiv, 'Upload failed. Please try again.', 'error');
+            })
+            .finally(() => {
+                // Hide spinner and re-enable button
+                buttonText.style.display = 'inline';
+                spinner.style.display = 'none';
+                button.disabled = false;
+            });
+        });
+    });
+    
+    function showStatus(element, message, type) {
+        const alertClass = type === 'error' ? 'uk-alert-danger' : 'uk-alert-success';
+        element.innerHTML = `
+            <div class="uk-alert ${alertClass}" uk-alert>
+                <a class="uk-alert-close" uk-close></a>
+                <p>${message}</p>
+            </div>
+        `;
+    }
+});
+</script>
 {% endblock %}
 
 

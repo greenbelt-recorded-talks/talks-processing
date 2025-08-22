@@ -15,3 +15,39 @@
 		visibility: hidden;
 	}
 }
+
+/* Upload form styling */
+.upload-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.upload-form input[type="file"] {
+    flex: 1;
+    font-size: 12px;
+}
+
+.upload-form button {
+    min-width: 80px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.upload-form button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.upload-status .uk-alert {
+    padding: 8px 12px;
+    margin: 0;
+    font-size: 13px;
+}
+
+.upload-spinner {
+    margin-left: 4px;
+}

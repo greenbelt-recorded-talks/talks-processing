@@ -9,6 +9,7 @@ from flask import (
     render_template,
     send_from_directory,
     send_file,
+    jsonify,
 )
 from datetime import datetime, timedelta
 from flask import current_app as app
@@ -1135,6 +1136,111 @@ If you are the nearest team leader, check the contents of the existing file and 
         flash("No file selected", "error")
 
     return redirect(url_for(source_path))
+
+
+@app.route("/uploadtalk_ajax", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def uploadtalk_ajax():
+    """AJAX endpoint for uploading talk files with JSON response"""
+
+    file_type = request.form.get("file_type")
+    talk_id = request.form.get("talk_id")
+
+    if "file" not in request.files:
+        return jsonify({"success": False, "error": "No file selected"})
+
+    file = request.files["file"]
+
+    if not file or not file.filename:
+        return jsonify({"success": False, "error": "No file selected"})
+
+    try:
+        # Save it to /tmp for now
+        uploaded_file_path = os.path.join("/tmp", shortuuid.uuid())
+        file.save(uploaded_file_path)
+        
+        # Detect file type
+        kind = filetype.guess(uploaded_file_path)
+        if not kind:
+            os.remove(uploaded_file_path)
+            return jsonify({"success": False, "error": "Unable to determine file type"})
+            
+        file_extension = kind.extension
+        is_video = kind.mime.startswith('video/')
+        is_audio = kind.mime.startswith('audio/')
+        
+        # Only allow video or audio files for raw uploads
+        if file_type == "raw" and not (is_video or is_audio):
+            os.remove(uploaded_file_path)
+            return jsonify({"success": False, "error": "RAW files must be audio or video files"})
+        elif file_type != "raw" and not is_audio:
+            os.remove(uploaded_file_path)
+            return jsonify({"success": False, "error": f"{file_type} files must be audio files"})
+        
+        # Check the size, and then see if another file of the same size exists in the relevant directory for the file type, error if so
+        uploaded_file_size = os.path.getsize(uploaded_file_path)
+
+        for root, dirs, files in os.walk(app.config["UPLOAD_DIR"]):
+            for name in files:
+                if name.endswith((".mp3", ".mp4", ".mov", ".avi", ".mkv")):
+                    existing_file_path = os.path.join(root, name)
+                    existing_file_size = os.path.getsize(existing_file_path)
+
+                    if existing_file_size == uploaded_file_size:
+                        app.logger.error(
+                            "File size collision detected: %s has size %s bytes, which is the same as uploaded file %s",
+                            existing_file_path,
+                            existing_file_size,
+                            uploaded_file_path,
+                        )
+                        
+                        os.remove(uploaded_file_path)
+                        return jsonify({
+                            "success": False, 
+                            "error": f"File size collision detected with existing file: {existing_file_path} ({existing_file_size} bytes). This usually means duplicate content."
+                        })
+
+        talk = Talk.query.get(talk_id)
+        if not talk:
+            os.remove(uploaded_file_path)
+            return jsonify({"success": False, "error": f"Talk {talk_id} not found"})
+        
+        # Handle video files for raw uploads
+        if file_type == "raw" and is_video:
+            # Save the video file
+            video_file_path = get_path_for_video_file(talk_id, file_extension)
+            shutil.move(uploaded_file_path, video_file_path)
+            
+            # Extract audio to RAW file
+            raw_audio_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+            success, message = extract_audio_from_video(video_file_path, raw_audio_path)
+            
+            if success:
+                return jsonify({
+                    "success": True, 
+                    "message": f"Successfully uploaded video file and extracted audio for Talk {talk_id}: {talk.title}"
+                })
+            else:
+                # If audio extraction failed, clean up and report error
+                if os.path.exists(video_file_path):
+                    os.remove(video_file_path)
+                return jsonify({"success": False, "error": f"Failed to extract audio from video: {message}"})
+        else:
+            # Handle regular audio files
+            target_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+            shutil.move(uploaded_file_path, target_path)
+            return jsonify({
+                "success": True, 
+                "message": f"Successfully uploaded {file_type} file for Talk {talk_id}: {talk.title}"
+            })
+            
+    except Exception as e:
+        # Clean up on error
+        if 'uploaded_file_path' in locals() and os.path.exists(uploaded_file_path):
+            os.remove(uploaded_file_path)
+        app.logger.error(f"Error in uploadtalk_ajax: {str(e)}")
+        return jsonify({"success": False, "error": f"Error processing file: {str(e)}"})
 
 
 @app.route("/uploadrecordernotes", methods=["POST"])
