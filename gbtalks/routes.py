@@ -1222,10 +1222,10 @@ def uploadtalk_streaming():
         
         def stream_upload():
             try:
-                # Create upload tracking file
+                # Create upload tracking file with talk ID
                 upload_status_file = f"{temp_file_path}.status"
                 with open(upload_status_file, 'w') as f:
-                    f.write("uploading")
+                    f.write(f"uploading:talk_id={talk_id}")
                 
                 total_size = 0
                 chunk_size = 64 * 1024  # 64KB chunks
@@ -1240,11 +1240,11 @@ def uploadtalk_streaming():
                         
                         # Update progress periodically
                         with open(upload_status_file, 'w') as f:
-                            f.write(f"uploading:{total_size}")
+                            f.write(f"uploading:talk_id={talk_id}:bytes={total_size}")
                 
                 # File upload complete, now process it
                 with open(upload_status_file, 'w') as f:
-                    f.write("processing")
+                    f.write(f"processing:talk_id={talk_id}")
                 
                 # Check for size collisions
                 for root, dirs, files in os.walk(app.config["UPLOAD_DIR"]):
@@ -1309,6 +1309,95 @@ def uploadtalk_streaming():
         return jsonify({"success": False, "error": f"Upload failed: {str(e)}"})
 
 
+@app.route("/check_ongoing_uploads", methods=["GET"])
+@login_required
+@current_user_is_team_leader
+def check_ongoing_uploads():
+    """Check for ongoing uploads that might affect the front desk"""
+    
+    try:
+        import glob
+        
+        # Find all upload status files in /tmp
+        upload_status_files = glob.glob("/tmp/upload_*.status")
+        video_status_files = glob.glob(f"{app.config['UPLOAD_DIR']}/*.status")
+        
+        ongoing_uploads = {}
+        
+        # Check upload status files
+        for status_file in upload_status_files:
+            try:
+                with open(status_file, 'r') as f:
+                    status_content = f.read().strip()
+                
+                # Only include active uploads/processing
+                if status_content.startswith(('uploading', 'processing')):
+                    session_id = status_file.split('/')[-1].replace('upload_', '').replace('.status', '')
+                    
+                    # Extract talk_id from status content
+                    talk_id = None
+                    if 'talk_id=' in status_content:
+                        try:
+                            # Parse talk_id from formats like "uploading:talk_id=123" or "uploading:talk_id=123:bytes=456"
+                            for part in status_content.split(':'):
+                                if part.startswith('talk_id='):
+                                    talk_id = int(part.split('=')[1])
+                                    break
+                        except ValueError:
+                            pass
+                    
+                    upload_info = {
+                        'type': 'upload',
+                        'status': status_content.split(':')[0],
+                        'file': status_file,
+                        'session_id': session_id
+                    }
+                    
+                    if talk_id:
+                        upload_info['talk_id'] = talk_id
+                    
+                    ongoing_uploads[f"upload_{session_id}"] = upload_info
+            except:
+                continue
+        
+        # Check video processing status files  
+        for status_file in video_status_files:
+            try:
+                with open(status_file, 'r') as f:
+                    status_content = f.read().strip()
+                
+                if status_content == 'processing':
+                    # Extract talk info from the status file path
+                    # Status files are named like: gb24-001_RAW.mp3.status
+                    base_name = status_file.replace('.status', '')
+                    if '_RAW.mp3' in base_name:
+                        # Extract talk ID
+                        filename = base_name.split('/')[-1]
+                        if filename.startswith('gb') and '-' in filename:
+                            talk_id_part = filename.split('-')[1].split('_')[0]
+                            try:
+                                talk_id = int(talk_id_part)
+                                ongoing_uploads[f"video_{talk_id}"] = {
+                                    'type': 'video_processing', 
+                                    'talk_id': talk_id,
+                                    'status': 'processing',
+                                    'file': status_file
+                                }
+                            except ValueError:
+                                pass
+            except:
+                continue
+        
+        return jsonify({
+            "success": True,
+            "ongoing_uploads": ongoing_uploads,
+            "count": len(ongoing_uploads)
+        })
+        
+    except Exception as e:
+        return jsonify({"success": False, "error": f"Error checking uploads: {str(e)}"})
+
+
 @app.route("/upload_progress", methods=["GET"])
 @login_required
 @current_user_is_team_leader
@@ -1335,8 +1424,19 @@ def upload_progress():
             status_content = f.read().strip()
         
         if status_content.startswith("uploading"):
-            if ":" in status_content:
-                bytes_uploaded = int(status_content.split(":")[1])
+            bytes_uploaded = None
+            
+            # Parse bytes from status content like "uploading:talk_id=123:bytes=456"
+            if 'bytes=' in status_content:
+                try:
+                    for part in status_content.split(':'):
+                        if part.startswith('bytes='):
+                            bytes_uploaded = int(part.split('=')[1])
+                            break
+                except ValueError:
+                    pass
+            
+            if bytes_uploaded is not None:
                 return jsonify({
                     "success": True,
                     "status": "uploading",
@@ -1349,7 +1449,7 @@ def upload_progress():
                     "status": "uploading",
                     "message": "Upload starting..."
                 })
-        elif status_content == "processing":
+        elif status_content.startswith("processing"):
             return jsonify({
                 "success": True,
                 "status": "processing",

@@ -33,6 +33,11 @@ If you have a recorder notes photo, upload this first, as the talk will disappea
         <td>{{ talk.speaker }}</td>
         <td>{{ talk.title }}</td>
 	<td>
+		<div class="upload-warning-{{ talk.id }}" style="display: none; margin-bottom: 8px;">
+			<div class="uk-alert uk-alert-warning" uk-alert>
+				<p><strong>⚠️ Warning:</strong> <span class="warning-message"></span></p>
+			</div>
+		</div>
 		<form class="upload-form" data-talk-id="{{ talk.id }}" data-file-type="raw">
                 	<input name="file" type="file" accept=".mp3,.mp4,.mov,.avi,.mkv,.m4a,.wav" required>
                         <button type="submit" class="uk-button uk-button-primary">
@@ -66,6 +71,12 @@ If you have a recorder notes photo, upload this first, as the talk will disappea
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Check for ongoing uploads when page loads
+    checkOngoingUploads();
+    
+    // Check for ongoing uploads every 30 seconds
+    setInterval(checkOngoingUploads, 30000);
+    
     // Handle upload form submissions
     document.querySelectorAll('.upload-form').forEach(form => {
         form.addEventListener('submit', function(e) {
@@ -379,6 +390,65 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // Start polling after a brief delay
         setTimeout(pollStatus, 2000);
+    }
+    
+    function checkOngoingUploads() {
+        fetch('/check_ongoing_uploads')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Clear all existing warnings first
+                    document.querySelectorAll('[class*="upload-warning-"]').forEach(warning => {
+                        warning.style.display = 'none';
+                    });
+                    
+                    // Show warnings for ongoing uploads
+                    Object.entries(data.ongoing_uploads).forEach(([key, upload]) => {
+                        if (upload.type === 'video_processing' && upload.talk_id) {
+                            showUploadWarning(upload.talk_id, 'Video processing is currently in progress for this talk. Uploading a new file may overwrite the current work.');
+                        } else if (upload.type === 'upload') {
+                            if (upload.talk_id) {
+                                // Show specific warning for the talk being uploaded
+                                if (upload.status === 'uploading') {
+                                    showUploadWarning(upload.talk_id, 'A file upload is currently in progress for this talk. Please wait for it to complete.');
+                                } else if (upload.status === 'processing') {
+                                    showUploadWarning(upload.talk_id, 'File upload completed, processing in progress for this talk. Uploading another file may overwrite the current work.');
+                                }
+                            } else {
+                                // For uploads without specific talk ID, show warning on all talks
+                                document.querySelectorAll('.upload-form').forEach(form => {
+                                    const talkId = form.dataset.talkId;
+                                    showUploadWarning(talkId, 'Another file upload is currently in progress. Please wait for it to complete to avoid conflicts.');
+                                });
+                            }
+                        }
+                    });
+                    
+                    // If there are any ongoing uploads, update the page title
+                    if (data.count > 0) {
+                        if (!document.title.includes('⏳')) {
+                            document.title = '⏳ ' + document.title;
+                        }
+                    } else {
+                        document.title = document.title.replace('⏳ ', '');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error checking ongoing uploads:', error);
+                // Don't show error to user as this is a background check
+            });
+    }
+    
+    function showUploadWarning(talkId, message) {
+        const warningDiv = document.querySelector(`.upload-warning-${talkId}`);
+        if (warningDiv) {
+            const messageSpan = warningDiv.querySelector('.warning-message');
+            if (messageSpan) {
+                messageSpan.textContent = message;
+                warningDiv.style.display = 'block';
+            }
+        }
     }
 });
 </script>
