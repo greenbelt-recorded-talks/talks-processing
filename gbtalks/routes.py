@@ -1331,6 +1331,9 @@ def check_ongoing_uploads():
         upload_status_files = glob.glob("/tmp/upload_*.status")
         video_status_files = glob.glob(f"{app.config['UPLOAD_DIR']}/*.status")
         
+        app.logger.info(f"Found upload status files: {upload_status_files}")
+        app.logger.info(f"Found video status files: {video_status_files}")
+        
         ongoing_uploads = {}
         
         # Check upload status files
@@ -1397,13 +1400,22 @@ def check_ongoing_uploads():
             except:
                 continue
         
-        return jsonify({
+        response_data = {
             "success": True,
             "ongoing_uploads": ongoing_uploads,
-            "count": len(ongoing_uploads)
-        })
+            "count": len(ongoing_uploads),
+            "debug": {
+                "upload_status_files": upload_status_files,
+                "video_status_files": video_status_files,
+                "upload_dir": app.config.get("UPLOAD_DIR", "Not configured")
+            }
+        }
+        
+        app.logger.info(f"Returning ongoing uploads response: {response_data}")
+        return jsonify(response_data)
         
     except Exception as e:
+        app.logger.error(f"Error in check_ongoing_uploads: {str(e)}")
         return jsonify({"success": False, "error": f"Error checking uploads: {str(e)}"})
 
 

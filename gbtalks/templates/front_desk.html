@@ -393,9 +393,11 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function checkOngoingUploads() {
+        console.log('Checking for ongoing uploads...');
         fetch('/check_ongoing_uploads')
             .then(response => response.json())
             .then(data => {
+                console.log('Ongoing uploads response:', data);
                 if (data.success) {
                     // Clear all existing warnings first
                     document.querySelectorAll('[class*="upload-warning-"]').forEach(warning => {
@@ -403,18 +405,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     
                     // Show warnings for ongoing uploads
+                    console.log('Processing ongoing uploads:', data.ongoing_uploads);
                     Object.entries(data.ongoing_uploads).forEach(([key, upload]) => {
+                        console.log(`Processing upload ${key}:`, upload);
                         if (upload.type === 'video_processing' && upload.talk_id) {
+                            console.log(`Showing video processing warning for talk ${upload.talk_id}`);
                             showUploadWarning(upload.talk_id, 'Video processing is currently in progress for this talk. Uploading a new file may overwrite the current work.');
                         } else if (upload.type === 'upload') {
                             if (upload.talk_id) {
                                 // Show specific warning for the talk being uploaded
                                 if (upload.status === 'uploading') {
+                                    console.log(`Showing upload warning for talk ${upload.talk_id}`);
                                     showUploadWarning(upload.talk_id, 'A file upload is currently in progress for this talk. Please wait for it to complete.');
                                 } else if (upload.status === 'processing') {
+                                    console.log(`Showing processing warning for talk ${upload.talk_id}`);
                                     showUploadWarning(upload.talk_id, 'File upload completed, processing in progress for this talk. Uploading another file may overwrite the current work.');
                                 }
                             } else {
+                                console.log('Showing general upload warning on all talks');
                                 // For uploads without specific talk ID, show warning on all talks
                                 document.querySelectorAll('.upload-form').forEach(form => {
                                     const talkId = form.dataset.talkId;
@@ -441,13 +449,19 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     function showUploadWarning(talkId, message) {
+        console.log(`Attempting to show warning for talk ${talkId}: ${message}`);
         const warningDiv = document.querySelector(`.upload-warning-${talkId}`);
+        console.log(`Warning div found:`, warningDiv);
         if (warningDiv) {
             const messageSpan = warningDiv.querySelector('.warning-message');
+            console.log(`Message span found:`, messageSpan);
             if (messageSpan) {
                 messageSpan.textContent = message;
                 warningDiv.style.display = 'block';
+                console.log(`Warning displayed for talk ${talkId}`);
             }
+        } else {
+            console.log(`No warning div found for talk ${talkId}`);
         }
     }
 });
