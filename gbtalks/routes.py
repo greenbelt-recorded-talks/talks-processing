@@ -1170,153 +1170,6 @@ def check_video_status():
     })
 
 
-@app.route("/uploadtalk_streaming", methods=["POST"])
-@login_required
-@current_user_is_team_leader
-def uploadtalk_streaming():
-    """Streaming upload endpoint for large files that doesn't block the server"""
-    
-    file_type = request.form.get("file_type")
-    talk_id = request.form.get("talk_id")
-    
-    if not file_type or not talk_id:
-        return jsonify({"success": False, "error": "Missing file_type or talk_id"})
-    
-    if "file" not in request.files:
-        return jsonify({"success": False, "error": "No file provided"})
-    
-    uploaded_file = request.files["file"]
-    
-    if not uploaded_file or not uploaded_file.filename:
-        return jsonify({"success": False, "error": "No file selected"})
-    
-    try:
-        talk = Talk.query.get(talk_id)
-        if not talk:
-            return jsonify({"success": False, "error": f"Talk {talk_id} not found"})
-        
-        # Get file extension from filename
-        original_filename = uploaded_file.filename.lower()
-        file_extension = original_filename.split('.')[-1] if '.' in original_filename else ''
-        
-        # Determine file type based on extension
-        audio_extensions = ['mp3']
-        video_extensions = ['mp4']
-        
-        is_audio = file_extension in audio_extensions
-        is_video = file_extension in video_extensions
-        
-        # Validate file type
-        if file_type == "raw" and not (is_video or is_audio):
-            return jsonify({"success": False, "error": "RAW files must be audio or video files"})
-        elif file_type != "raw" and not is_audio:
-            return jsonify({"success": False, "error": f"{file_type} files must be audio files"})
-        
-        # Create a unique upload session ID
-        upload_session_id = shortuuid.uuid()
-        temp_file_path = os.path.join("/tmp", f"upload_{upload_session_id}")
-        
-        # Read the file data immediately before Flask closes it
-        try:
-            file_data = uploaded_file.read()
-        except Exception as e:
-            return jsonify({"success": False, "error": f"Failed to read uploaded file: {str(e)}"})
-        
-        # Stream the file to temporary location without blocking
-        import threading
-        import time
-        
-        def stream_upload():
-            try:
-                # Create upload tracking file with talk ID
-                upload_status_file = f"{temp_file_path}.status"
-                with open(upload_status_file, 'w') as f:
-                    f.write(f"uploading:talk_id={talk_id}")
-                
-                total_size = 0
-                chunk_size = 64 * 1024  # 64KB chunks
-                
-                # Write the file data in chunks to simulate streaming and allow progress updates
-                with open(temp_file_path, 'wb') as output_file:
-                    for i in range(0, len(file_data), chunk_size):
-                        chunk = file_data[i:i + chunk_size]
-                        output_file.write(chunk)
-                        total_size += len(chunk)
-                        
-                        # Update progress periodically
-                        with open(upload_status_file, 'w') as f:
-                            f.write(f"uploading:talk_id={talk_id}:bytes={total_size}")
-                        
-                        # Small delay to make progress visible for large files
-                        if len(file_data) > 100 * 1024 * 1024:  # Only delay for files > 100MB
-                            time.sleep(0.01)  # 10ms delay per chunk
-                
-                # File upload complete, now process it
-                with open(upload_status_file, 'w') as f:
-                    f.write(f"processing:talk_id={talk_id}")
-                
-                # Check for size collisions
-                for root, dirs, files in os.walk(app.config["UPLOAD_DIR"]):
-                    for name in files:
-                        if name.endswith((".mp3", ".mp4", ".mov", ".avi", ".mkv")):
-                            existing_file_path = os.path.join(root, name)
-                            existing_file_size = os.path.getsize(existing_file_path)
-                            uploaded_file_size = os.path.getsize(temp_file_path)
-                            
-                            if existing_file_size == uploaded_file_size:
-                                with open(upload_status_file, 'w') as f:
-                                    f.write(f"error:File size collision with {existing_file_path}")
-                                return
-                
-                # Move file to final location and start processing
-                if file_type == "raw" and is_video:
-                    # Handle video files
-                    video_file_path = get_path_for_video_file(talk_id, file_extension)
-                    shutil.move(temp_file_path, video_file_path)
-                    
-                    # Start background audio extraction
-                    raw_audio_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
-                    success, message = extract_audio_from_video_async(video_file_path, raw_audio_path)
-                    
-                    if success:
-                        with open(upload_status_file, 'w') as f:
-                            f.write("success:Video uploaded, audio extraction started")
-                    else:
-                        # Clean up on failure
-                        if os.path.exists(video_file_path):
-                            os.remove(video_file_path)
-                        with open(upload_status_file, 'w') as f:
-                            f.write(f"error:Failed to start audio extraction: {message}")
-                else:
-                    # Handle regular audio files
-                    target_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
-                    shutil.move(temp_file_path, target_path)
-                    
-                    with open(upload_status_file, 'w') as f:
-                        f.write(f"success:Successfully uploaded {file_type} file")
-                        
-            except Exception as e:
-                # Clean up on error
-                if os.path.exists(temp_file_path):
-                    os.remove(temp_file_path)
-                with open(upload_status_file, 'w') as f:
-                    f.write(f"error:Upload failed: {str(e)}")
-        
-        # Start the upload in a background thread
-        upload_thread = threading.Thread(target=stream_upload)
-        upload_thread.daemon = True
-        upload_thread.start()
-        
-        return jsonify({
-            "success": True,
-            "upload_session_id": upload_session_id,
-            "message": "Upload started in background"
-        })
-        
-    except Exception as e:
-        app.logger.error(f"Error in uploadtalk_streaming: {str(e)}")
-        return jsonify({"success": False, "error": f"Upload failed: {str(e)}"})
-
 
 @app.route("/check_ongoing_uploads", methods=["GET"])
 @login_required
@@ -1330,9 +1183,11 @@ def check_ongoing_uploads():
         # Find all upload status files in /tmp
         upload_status_files = glob.glob("/tmp/upload_*.status")
         video_status_files = glob.glob(f"{app.config['UPLOAD_DIR']}/*.status")
+        chunked_upload_dirs = glob.glob("/tmp/chunks_*")
         
         app.logger.info(f"Found upload status files: {upload_status_files}")
         app.logger.info(f"Found video status files: {video_status_files}")
+        app.logger.info(f"Found chunked upload dirs: {chunked_upload_dirs}")
         
         ongoing_uploads = {}
         
@@ -1400,6 +1255,34 @@ def check_ongoing_uploads():
             except:
                 continue
         
+        # Check chunked uploads
+        for chunk_dir in chunked_upload_dirs:
+            try:
+                metadata_file = os.path.join(chunk_dir, "metadata.json")
+                if os.path.exists(metadata_file):
+                    import json
+                    with open(metadata_file, 'r') as f:
+                        metadata = json.load(f)
+                    
+                    session_id = metadata.get('upload_session_id')
+                    talk_id = metadata.get('talk_id')
+                    chunks_received = len(metadata.get('chunks_received', []))
+                    total_chunks = metadata.get('total_chunks', 0)
+                    
+                    if chunks_received < total_chunks:  # Upload still in progress
+                        ongoing_uploads[f"chunked_{session_id}"] = {
+                            'type': 'chunked_upload',
+                            'talk_id': talk_id,
+                            'chunks_received': chunks_received,
+                            'total_chunks': total_chunks,
+                            'progress_percent': round((chunks_received / total_chunks) * 100),
+                            'status': 'uploading',
+                            'file_name': metadata.get('file_name', 'Unknown'),
+                            'session_id': session_id
+                        }
+            except:
+                continue
+        
         response_data = {
             "success": True,
             "ongoing_uploads": ongoing_uploads,
@@ -1417,6 +1300,232 @@ def check_ongoing_uploads():
     except Exception as e:
         app.logger.error(f"Error in check_ongoing_uploads: {str(e)}")
         return jsonify({"success": False, "error": f"Error checking uploads: {str(e)}"})
+
+
+@app.route("/init_chunked_upload", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def init_chunked_upload():
+    """Initialize a chunked upload session"""
+    
+    try:
+        talk_id = request.form.get("talk_id")
+        file_type = request.form.get("file_type")
+        file_name = request.form.get("file_name")
+        file_size = request.form.get("file_size")
+        total_chunks = request.form.get("total_chunks")
+        
+        if not all([talk_id, file_type, file_name, file_size, total_chunks]):
+            return jsonify({"success": False, "error": "Missing required parameters"})
+        
+        talk = Talk.query.get(talk_id)
+        if not talk:
+            return jsonify({"success": False, "error": f"Talk {talk_id} not found"})
+        
+        # Validate file type
+        file_extension = file_name.lower().split('.')[-1] if '.' in file_name else ''
+        audio_extensions = ['mp3', 'wav', 'm4a']
+        video_extensions = ['mp4', 'mov', 'avi', 'mkv']
+        
+        is_audio = file_extension in audio_extensions
+        is_video = file_extension in video_extensions
+        
+        if file_type == "raw" and not (is_video or is_audio):
+            return jsonify({"success": False, "error": "RAW files must be audio or video files"})
+        elif file_type != "raw" and not is_audio:
+            return jsonify({"success": False, "error": f"{file_type} files must be audio files"})
+        
+        # Create upload session
+        upload_session_id = shortuuid.uuid()
+        chunk_dir = os.path.join("/tmp", f"chunks_{upload_session_id}")
+        os.makedirs(chunk_dir, exist_ok=True)
+        
+        # Store upload metadata
+        metadata = {
+            "upload_session_id": upload_session_id,
+            "talk_id": talk_id,
+            "file_type": file_type,
+            "file_name": file_name,
+            "file_size": int(file_size),
+            "total_chunks": int(total_chunks),
+            "file_extension": file_extension,
+            "is_video": is_video,
+            "is_audio": is_audio,
+            "chunks_received": [],
+            "created_at": datetime.now().isoformat()
+        }
+        
+        metadata_file = os.path.join(chunk_dir, "metadata.json")
+        with open(metadata_file, 'w') as f:
+            import json
+            json.dump(metadata, f)
+        
+        # Check for existing chunks (resume capability)
+        existing_chunks = []
+        for i in range(int(total_chunks)):
+            chunk_file = os.path.join(chunk_dir, f"chunk_{i}")
+            if os.path.exists(chunk_file):
+                existing_chunks.append(i)
+        
+        return jsonify({
+            "success": True,
+            "upload_session_id": upload_session_id,
+            "existing_chunks": existing_chunks,
+            "message": f"Upload session initialized. {len(existing_chunks)} chunks already uploaded."
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error in init_chunked_upload: {str(e)}")
+        return jsonify({"success": False, "error": f"Failed to initialize upload: {str(e)}"})
+
+
+@app.route("/upload_chunk", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def upload_chunk():
+    """Upload a single chunk"""
+    
+    try:
+        upload_session_id = request.form.get("upload_session_id")
+        chunk_number = request.form.get("chunk_number")
+        
+        if not upload_session_id or chunk_number is None:
+            return jsonify({"success": False, "error": "Missing upload_session_id or chunk_number"})
+        
+        chunk_number = int(chunk_number)
+        chunk_dir = os.path.join("/tmp", f"chunks_{upload_session_id}")
+        
+        if not os.path.exists(chunk_dir):
+            return jsonify({"success": False, "error": "Upload session not found"})
+        
+        # Load metadata
+        metadata_file = os.path.join(chunk_dir, "metadata.json")
+        if not os.path.exists(metadata_file):
+            return jsonify({"success": False, "error": "Upload session metadata not found"})
+        
+        with open(metadata_file, 'r') as f:
+            import json
+            metadata = json.load(f)
+        
+        # Get the chunk data
+        if 'chunk' not in request.files:
+            return jsonify({"success": False, "error": "No chunk data provided"})
+        
+        chunk_file_obj = request.files['chunk']
+        chunk_path = os.path.join(chunk_dir, f"chunk_{chunk_number}")
+        
+        # Save chunk to disk
+        chunk_file_obj.save(chunk_path)
+        
+        # Update metadata
+        if chunk_number not in metadata['chunks_received']:
+            metadata['chunks_received'].append(chunk_number)
+            metadata['chunks_received'].sort()
+            
+            with open(metadata_file, 'w') as f:
+                json.dump(metadata, f)
+        
+        # Check if all chunks received
+        all_chunks_received = len(metadata['chunks_received']) == metadata['total_chunks']
+        
+        return jsonify({
+            "success": True,
+            "chunk_number": chunk_number,
+            "chunks_received": len(metadata['chunks_received']),
+            "total_chunks": metadata['total_chunks'],
+            "upload_complete": all_chunks_received,
+            "message": f"Chunk {chunk_number} uploaded successfully"
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error in upload_chunk: {str(e)}")
+        return jsonify({"success": False, "error": f"Failed to upload chunk: {str(e)}"})
+
+
+@app.route("/complete_chunked_upload", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def complete_chunked_upload():
+    """Complete a chunked upload by reassembling chunks"""
+    
+    try:
+        upload_session_id = request.form.get("upload_session_id")
+        
+        if not upload_session_id:
+            return jsonify({"success": False, "error": "Missing upload_session_id"})
+        
+        chunk_dir = os.path.join("/tmp", f"chunks_{upload_session_id}")
+        metadata_file = os.path.join(chunk_dir, "metadata.json")
+        
+        if not os.path.exists(metadata_file):
+            return jsonify({"success": False, "error": "Upload session not found"})
+        
+        # Load metadata
+        with open(metadata_file, 'r') as f:
+            import json
+            metadata = json.load(f)
+        
+        # Verify all chunks are present
+        if len(metadata['chunks_received']) != metadata['total_chunks']:
+            return jsonify({
+                "success": False, 
+                "error": f"Missing chunks: {metadata['total_chunks'] - len(metadata['chunks_received'])} chunks not received"
+            })
+        
+        # Reassemble file in background thread
+        import threading
+        
+        def reassemble_file():
+            try:
+                talk_id = metadata['talk_id']
+                file_type = metadata['file_type']
+                file_extension = metadata['file_extension']
+                is_video = metadata['is_video']
+                
+                talk = Talk.query.get(talk_id)
+                
+                # Determine final file path
+                if file_type == "raw" and is_video:
+                    final_path = get_path_for_video_file(talk_id, file_extension)
+                else:
+                    final_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+                
+                # Reassemble chunks
+                with open(final_path, 'wb') as output_file:
+                    for chunk_num in range(metadata['total_chunks']):
+                        chunk_path = os.path.join(chunk_dir, f"chunk_{chunk_num}")
+                        with open(chunk_path, 'rb') as chunk_file:
+                            output_file.write(chunk_file.read())
+                
+                # Clean up chunks
+                import shutil
+                shutil.rmtree(chunk_dir)
+                
+                # Start video processing if needed
+                if file_type == "raw" and is_video:
+                    raw_audio_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+                    extract_audio_from_video_async(final_path, raw_audio_path)
+                
+                app.logger.info(f"Chunked upload completed for talk {talk_id}: {final_path}")
+                
+            except Exception as e:
+                app.logger.error(f"Error reassembling chunks: {str(e)}")
+        
+        # Start reassembly in background
+        reassembly_thread = threading.Thread(target=reassemble_file)
+        reassembly_thread.daemon = True
+        reassembly_thread.start()
+        
+        return jsonify({
+            "success": True,
+            "message": f"Upload completed successfully. File is being processed.",
+            "talk_id": metadata['talk_id'],
+            "file_type": metadata['file_type']
+        })
+        
+    except Exception as e:
+        app.logger.error(f"Error in complete_chunked_upload: {str(e)}")
+        return jsonify({"success": False, "error": f"Failed to complete upload: {str(e)}"})
 
 
 @app.route("/upload_progress", methods=["GET"])

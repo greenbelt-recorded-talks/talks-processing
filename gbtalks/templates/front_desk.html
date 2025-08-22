@@ -109,15 +109,16 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('file_type', fileType);
             
             // Check file size to decide upload method
-            const fileSize = fileInput.files[0].size;
-            const fileName = fileInput.files[0].name.toLowerCase();
+            const file = fileInput.files[0];
+            const fileSize = file.size;
+            const fileName = file.name.toLowerCase();
             const isLargeFile = fileSize > 250 * 1024 * 1024; // 250MB threshold
             const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.mov') || 
                            fileName.endsWith('.avi') || fileName.endsWith('.mkv');
             
             if (isLargeFile || isVideo) {
-                // Use streaming upload for large files or videos
-                uploadFileStreaming(formData, talkId, statusDiv, fileInput, this, button, buttonText, spinner);
+                // Use chunked upload for large files or videos
+                uploadFileChunked(file, talkId, fileType, statusDiv, fileInput, this, button, buttonText, spinner);
             } else {
                 // Use regular upload for small files
                 uploadFileRegular(formData, talkId, statusDiv, fileInput, this, button, buttonText, spinner);
@@ -169,137 +170,6 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
-    function uploadFileStreaming(formData, talkId, statusDiv, fileInput, form, button, buttonText, spinner) {
-        // Streaming upload for large files
-        fetch('/uploadtalk_streaming', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success && data.upload_session_id) {
-                showStatus(statusDiv, 'Upload started...', 'info');
-                
-                // Start polling for upload progress
-                startUploadProgressPolling(data.upload_session_id, talkId, statusDiv, fileInput, form, button, buttonText, spinner);
-            } else {
-                showStatus(statusDiv, data.error || 'Upload failed to start', 'error');
-                // Re-enable button
-                buttonText.style.display = 'inline';
-                spinner.style.display = 'none';
-                button.disabled = false;
-            }
-        })
-        .catch(error => {
-            console.error('Upload error:', error);
-            showStatus(statusDiv, 'Upload failed to start. Please try again.', 'error');
-            // Re-enable button
-            buttonText.style.display = 'inline';
-            spinner.style.display = 'none';
-            button.disabled = false;
-        });
-    }
-    
-    function startUploadProgressPolling(sessionId, talkId, statusDiv, fileInput, form, button, buttonText, spinner) {
-        let pollCount = 0;
-        const maxPolls = 1440; // Poll for up to 2 hours (5 second intervals)
-        
-        const pollProgress = () => {
-            pollCount++;
-            
-            if (pollCount > maxPolls) {
-                showStatus(statusDiv, 'Upload is taking longer than expected. Please check manually.', 'warning');
-                // Re-enable button
-                buttonText.style.display = 'inline';
-                spinner.style.display = 'none';
-                button.disabled = false;
-                return;
-            }
-            
-            fetch(`/upload_progress?session_id=${sessionId}`)
-                .then(response => response.json())
-                .then(data => {
-                    if (!data.success) {
-                        showStatus(statusDiv, `Progress check failed: ${data.error}`, 'error');
-                        // Re-enable button
-                        buttonText.style.display = 'inline';
-                        spinner.style.display = 'none';
-                        button.disabled = false;
-                        return;
-                    }
-                    
-                    switch(data.status) {
-                        case 'uploading':
-                            showStatus(statusDiv, data.message, 'info');
-                            setTimeout(pollProgress, 5000); // Poll every 5 seconds
-                            break;
-                            
-                        case 'processing':
-                            showStatus(statusDiv, data.message, 'info');
-                            setTimeout(pollProgress, 5000);
-                            break;
-                            
-                        case 'completed':
-                            showStatus(statusDiv, '✓ ' + data.message, 'success');
-                            
-                            // Check if this started video processing
-                            const fileName = fileInput.files[0].name.toLowerCase();
-                            const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.mov') || 
-                                           fileName.endsWith('.avi') || fileName.endsWith('.mkv');
-                            
-                            if (isVideo && data.message.includes('audio extraction')) {
-                                // Start polling for video processing status
-                                startVideoStatusPolling(talkId, statusDiv);
-                            } else {
-                                // Clear the file input and hide form
-                                fileInput.value = '';
-                                setTimeout(() => {
-                                    form.style.display = 'none';
-                                    statusDiv.innerHTML = '<span class="uk-text-success">✓ File uploaded</span>';
-                                }, 2000);
-                            }
-                            
-                            // Re-enable button
-                            buttonText.style.display = 'inline';
-                            spinner.style.display = 'none';
-                            button.disabled = false;
-                            break;
-                            
-                        case 'error':
-                            showStatus(statusDiv, `Upload failed: ${data.message}`, 'error');
-                            // Re-enable button
-                            buttonText.style.display = 'inline';
-                            spinner.style.display = 'none';
-                            button.disabled = false;
-                            break;
-                            
-                        case 'not_found':
-                            showStatus(statusDiv, 'Upload session not found. Please try again.', 'error');
-                            // Re-enable button
-                            buttonText.style.display = 'inline';
-                            spinner.style.display = 'none';
-                            button.disabled = false;
-                            break;
-                            
-                        default:
-                            showStatus(statusDiv, `Unknown upload status: ${data.status}`, 'warning');
-                            setTimeout(pollProgress, 5000);
-                            break;
-                    }
-                })
-                .catch(error => {
-                    console.error('Progress check error:', error);
-                    showStatus(statusDiv, 'Unable to check upload progress. Please refresh the page.', 'error');
-                    // Re-enable button
-                    buttonText.style.display = 'inline';
-                    spinner.style.display = 'none';
-                    button.disabled = false;
-                });
-        };
-        
-        // Start polling after a brief delay
-        setTimeout(pollProgress, 2000);
-    }
     
     function showStatus(element, message, type) {
         let alertClass;
@@ -392,6 +262,171 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(pollStatus, 2000);
     }
     
+    function uploadFileChunked(file, talkId, fileType, statusDiv, fileInput, form, button, buttonText, spinner) {
+        const chunkSize = 500 * 1024 * 1024; // 500MB chunks
+        const totalChunks = Math.ceil(file.size / chunkSize);
+        let uploadSessionId = null;
+        let chunksUploaded = 0;
+        
+        console.log(`Starting chunked upload: ${file.name}, ${file.size} bytes, ${totalChunks} chunks`);
+        
+        // Step 1: Initialize upload
+        const initData = new FormData();
+        initData.append('talk_id', talkId);
+        initData.append('file_type', fileType);
+        initData.append('file_name', file.name);
+        initData.append('file_size', file.size);
+        initData.append('total_chunks', totalChunks);
+        
+        showStatus(statusDiv, 'Initializing chunked upload...', 'info');
+        
+        fetch('/init_chunked_upload', {
+            method: 'POST',
+            body: initData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error);
+            }
+            
+            uploadSessionId = data.upload_session_id;
+            const existingChunks = data.existing_chunks || [];
+            chunksUploaded = existingChunks.length;
+            
+            if (existingChunks.length > 0) {
+                showStatus(statusDiv, `Resuming upload: ${existingChunks.length}/${totalChunks} chunks already uploaded`, 'info');
+            }
+            
+            // Step 2: Upload chunks
+            uploadChunksSequentially(file, uploadSessionId, chunkSize, totalChunks, existingChunks, 
+                                   talkId, statusDiv, fileInput, form, button, buttonText, spinner);
+        })
+        .catch(error => {
+            console.error('Failed to initialize chunked upload:', error);
+            showStatus(statusDiv, `Failed to start upload: ${error.message}`, 'error');
+            // Re-enable button
+            buttonText.style.display = 'inline';
+            spinner.style.display = 'none';
+            button.disabled = false;
+        });
+    }
+    
+    async function uploadChunksSequentially(file, uploadSessionId, chunkSize, totalChunks, existingChunks, 
+                                          talkId, statusDiv, fileInput, form, button, buttonText, spinner) {
+        try {
+            for (let chunkNumber = 0; chunkNumber < totalChunks; chunkNumber++) {
+                // Skip chunks that were already uploaded
+                if (existingChunks.includes(chunkNumber)) {
+                    updateChunkProgress(chunkNumber + 1, totalChunks, statusDiv);
+                    continue;
+                }
+                
+                const start = chunkNumber * chunkSize;
+                const end = Math.min(start + chunkSize, file.size);
+                const chunk = file.slice(start, end);
+                
+                const chunkData = new FormData();
+                chunkData.append('upload_session_id', uploadSessionId);
+                chunkData.append('chunk_number', chunkNumber);
+                chunkData.append('chunk', chunk);
+                
+                showStatus(statusDiv, `Uploading chunk ${chunkNumber + 1}/${totalChunks} (${formatBytes(chunk.size)})...`, 'info');
+                
+                const response = await fetch('/upload_chunk', {
+                    method: 'POST',
+                    body: chunkData
+                });
+                
+                const result = await response.json();
+                
+                if (!result.success) {
+                    throw new Error(result.error);
+                }
+                
+                updateChunkProgress(result.chunks_received, totalChunks, statusDiv);
+                
+                // Small delay to prevent overwhelming the server
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            // Step 3: Complete upload
+            completeChunkedUpload(uploadSessionId, talkId, statusDiv, fileInput, form, button, buttonText, spinner);
+            
+        } catch (error) {
+            console.error('Error uploading chunks:', error);
+            showStatus(statusDiv, `Upload failed: ${error.message}`, 'error');
+            // Re-enable button
+            buttonText.style.display = 'inline';
+            spinner.style.display = 'none';
+            button.disabled = false;
+        }
+    }
+    
+    function completeChunkedUpload(uploadSessionId, talkId, statusDiv, fileInput, form, button, buttonText, spinner) {
+        const completeData = new FormData();
+        completeData.append('upload_session_id', uploadSessionId);
+        
+        showStatus(statusDiv, 'Reassembling file...', 'info');
+        
+        fetch('/complete_chunked_upload', {
+            method: 'POST',
+            body: completeData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error);
+            }
+            
+            showStatus(statusDiv, '✓ Upload completed successfully!', 'success');
+            
+            // Check if this started video processing
+            const fileName = fileInput.files[0].name.toLowerCase();
+            const isVideo = fileName.endsWith('.mp4') || fileName.endsWith('.mov') || 
+                           fileName.endsWith('.avi') || fileName.endsWith('.mkv');
+            
+            if (isVideo) {
+                showStatus(statusDiv, '✓ Upload completed. Starting video processing...', 'success');
+                // Start polling for video processing status
+                setTimeout(() => startVideoStatusPolling(talkId, statusDiv), 2000);
+            } else {
+                // Clear the file input and hide form for non-video uploads
+                fileInput.value = '';
+                setTimeout(() => {
+                    form.style.display = 'none';
+                    statusDiv.innerHTML = '<span class="uk-text-success">✓ File uploaded</span>';
+                }, 2000);
+            }
+            
+            // Re-enable button
+            buttonText.style.display = 'inline';
+            spinner.style.display = 'none';
+            button.disabled = false;
+        })
+        .catch(error => {
+            console.error('Failed to complete upload:', error);
+            showStatus(statusDiv, `Failed to complete upload: ${error.message}`, 'error');
+            // Re-enable button
+            buttonText.style.display = 'inline';
+            spinner.style.display = 'none';
+            button.disabled = false;
+        });
+    }
+    
+    function updateChunkProgress(chunksCompleted, totalChunks, statusDiv) {
+        const percentage = Math.round((chunksCompleted / totalChunks) * 100);
+        showStatus(statusDiv, `Upload progress: ${chunksCompleted}/${totalChunks} chunks (${percentage}%)`, 'info');
+    }
+    
+    function formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
     function checkOngoingUploads() {
         console.log('Checking for ongoing uploads...');
         fetch('/check_ongoing_uploads')
@@ -411,6 +446,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (upload.type === 'video_processing' && upload.talk_id) {
                             console.log(`Showing video processing warning for talk ${upload.talk_id}`);
                             showUploadWarning(upload.talk_id, 'Video processing is currently in progress for this talk. Uploading a new file may overwrite the current work.');
+                        } else if (upload.type === 'chunked_upload' && upload.talk_id) {
+                            console.log(`Showing chunked upload warning for talk ${upload.talk_id}`);
+                            showUploadWarning(upload.talk_id, `Chunked upload in progress: ${upload.progress_percent}% complete (${upload.chunks_received}/${upload.total_chunks} chunks). Please wait for it to complete.`);
                         } else if (upload.type === 'upload') {
                             if (upload.talk_id) {
                                 // Show specific warning for the talk being uploaded
