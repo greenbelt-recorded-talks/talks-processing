@@ -1,5 +1,6 @@
 from flask import current_app as app
 from datetime import datetime, timedelta
+import subprocess
 
 # Character mapping table to avoid FAT filesystem character problems
 character_mapping = str.maketrans(
@@ -66,6 +67,48 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
         )
 
     return path
+
+
+def get_path_for_video_file(talk_id, file_extension):
+    """Get the path for storing video files"""
+    path = (
+        app.config["UPLOAD_DIR"]
+        + "/gb"
+        + app.config["GB_FRIDAY"][2:4]
+        + "-"
+        + str(talk_id).zfill(3)
+        + "_VIDEO."
+        + file_extension
+    )
+    return path
+
+
+def extract_audio_from_video(video_path, audio_output_path):
+    """Extract high-quality audio from video file using ffmpeg"""
+    try:
+        # Use ffmpeg to extract audio at high quality
+        cmd = [
+            'ffmpeg',
+            '-i', video_path,
+            '-vn',  # No video
+            '-acodec', 'libmp3lame',  # MP3 codec
+            '-ab', '320k',  # High bitrate
+            '-ar', '44100',  # 44.1kHz sample rate
+            '-y',  # Overwrite output file
+            audio_output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode == 0:
+            return True, "Audio extracted successfully"
+        else:
+            return False, f"FFmpeg error: {result.stderr}"
+            
+    except FileNotFoundError:
+        return False, "FFmpeg not found. Please install ffmpeg."
+    except Exception as e:
+        return False, f"Error extracting audio: {str(e)}"
 
 
 def gb_time_to_datetime(day, time):

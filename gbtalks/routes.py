@@ -23,8 +23,11 @@ import os
 import shutil
 import shortuuid
 import pprint
+import subprocess
 from .libgbtalks import (
     get_path_for_file, 
+    get_path_for_video_file,
+    extract_audio_from_video,
     gb_time_to_datetime
 )
 
@@ -1025,7 +1028,7 @@ def upload_cover_image():
 @login_required
 @current_user_is_team_leader
 def uploadtalk():
-    """Upload a talk file, then redirect back to where you came from"""
+    """Upload a talk file (audio or video), then redirect back to where you came from"""
 
     file_type = request.form.get("file_type")
     talk_id = request.form.get("talk_id")
@@ -1042,12 +1045,34 @@ def uploadtalk():
         # Save it to /tmp for now
         uploaded_file_path = os.path.join("/tmp", shortuuid.uuid())
         file.save(uploaded_file_path)
+        
+        # Detect file type
+        kind = filetype.guess(uploaded_file_path)
+        if not kind:
+            flash("Unable to determine file type", "error")
+            os.remove(uploaded_file_path)
+            return redirect(url_for(source_path))
+            
+        file_extension = kind.extension
+        is_video = kind.mime.startswith('video/')
+        is_audio = kind.mime.startswith('audio/')
+        
+        # Only allow video or audio files for raw uploads
+        if file_type == "raw" and not (is_video or is_audio):
+            flash("RAW files must be audio or video files", "error")
+            os.remove(uploaded_file_path)
+            return redirect(url_for(source_path))
+        elif file_type != "raw" and not is_audio:
+            flash(f"{file_type} files must be audio files", "error")
+            os.remove(uploaded_file_path)
+            return redirect(url_for(source_path))
+        
         # Check the size, and then see if another file of the same size exists in the relevant directory for the file type, error if so
         uploaded_file_size = os.path.getsize(uploaded_file_path)
 
         for root, dirs, files in os.walk(app.config["UPLOAD_DIR"]):
             for name in files:
-                if name.endswith(".mp3"):
+                if name.endswith((".mp3", ".mp4", ".mov", ".avi", ".mkv")):
                     existing_file_path = os.path.join(root, name)
                     existing_file_size = os.path.getsize(existing_file_path)
 
@@ -1075,15 +1100,37 @@ If you are the nearest team leader, check the contents of the existing file and 
 
                         return render_template("error.html", error_text=error_message)
 
-        # If we've made it this far, we're all good - move the file into position
         talk = Talk.query.get(talk_id)
-        shutil.move(
-            uploaded_file_path,
-            os.path.join(
-                get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
-            ),
-        )
-        flash(f"Successfully uploaded {file_type} file for Talk {talk_id}: {talk.title}", "success")
+        
+        # Handle video files for raw uploads
+        if file_type == "raw" and is_video:
+            try:
+                # Save the video file
+                video_file_path = get_path_for_video_file(talk_id, file_extension)
+                shutil.move(uploaded_file_path, video_file_path)
+                
+                # Extract audio to RAW file
+                raw_audio_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+                success, message = extract_audio_from_video(video_file_path, raw_audio_path)
+                
+                if success:
+                    flash(f"Successfully uploaded video file and extracted audio for Talk {talk_id}: {talk.title}", "success")
+                else:
+                    # If audio extraction failed, clean up and report error
+                    if os.path.exists(video_file_path):
+                        os.remove(video_file_path)
+                    flash(f"Failed to extract audio from video: {message}", "error")
+                    
+            except Exception as e:
+                # Clean up on error
+                if os.path.exists(uploaded_file_path):
+                    os.remove(uploaded_file_path)
+                flash(f"Error processing video file: {str(e)}", "error")
+        else:
+            # Handle regular audio files
+            target_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
+            shutil.move(uploaded_file_path, target_path)
+            flash(f"Successfully uploaded {file_type} file for Talk {talk_id}: {talk.title}", "success")
     else:
         flash("No file selected", "error")
 
