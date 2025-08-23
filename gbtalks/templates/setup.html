@@ -189,6 +189,86 @@ The top file plays at the start of each talk, and the tail file plays at the end
 
 {% filter markdown %}
 
+### Add New Talk
+
+Add a single talk to the database. This is useful for adding individual talks that aren't in the main CSV import.
+
+{% endfilter %}
+
+        <form action="add_talk" method="post">
+            <div class="uk-grid-small uk-child-width-1-2@s" uk-grid>
+                <div>
+                    <label class="uk-form-label" for="title">Title</label>
+                    <input class="uk-input" type="text" name="title" id="title" required>
+                </div>
+                <div>
+                    <label class="uk-form-label" for="speaker">Speaker</label>
+                    <input class="uk-input" type="text" name="speaker" id="speaker" required>
+                </div>
+            </div>
+            
+            <div class="uk-margin">
+                <label class="uk-form-label" for="description">Description</label>
+                <textarea class="uk-textarea" name="description" id="description" rows="3"></textarea>
+            </div>
+            
+            <div class="uk-grid-small uk-child-width-1-3@s" uk-grid>
+                <div>
+                    <label class="uk-form-label" for="day">Day</label>
+                    <select class="uk-select" name="day" id="day" required>
+                        <option value="">Select day...</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                        <option value="Sunday">Sunday</option>
+                        <option value="Monday">Monday</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="uk-form-label" for="start_time">Start Time</label>
+                    <input class="uk-input" type="time" name="start_time" id="start_time" required>
+                </div>
+                <div>
+                    <label class="uk-form-label" for="end_time">End Time</label>
+                    <input class="uk-input" type="time" name="end_time" id="end_time" required>
+                </div>
+            </div>
+            
+            <div class="uk-margin">
+                <label class="uk-form-label" for="venue">Venue</label>
+                <input class="uk-input" type="text" name="venue" id="venue" required>
+            </div>
+            
+            <div class="uk-grid-small uk-child-width-1-3@s" uk-grid>
+                <div>
+                    <label class="uk-form-label">
+                        <input class="uk-checkbox" type="checkbox" name="is_priority" value="1"> Priority Talk
+                    </label>
+                </div>
+                <div>
+                    <label class="uk-form-label">
+                        <input class="uk-checkbox" type="checkbox" name="is_rotaed" value="1"> Include in Rota
+                    </label>
+                </div>
+                <div>
+                    <label class="uk-form-label">
+                        <input class="uk-checkbox" type="checkbox" name="is_cleared" value="1"> Cleared for Release
+                    </label>
+                </div>
+            </div>
+            
+            <div class="uk-margin uk-text-center">
+                <button class="uk-button uk-button-primary">Add Talk</button>
+            </div>
+        </form>
+
+</div>
+
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
 ### Replace Talks File
 
 The Talks File is the list of talks. It must be a CSV file (with utf-8 encoding, otherwise accented characters won't work).

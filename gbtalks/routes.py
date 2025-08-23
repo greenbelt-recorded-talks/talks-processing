@@ -602,6 +602,72 @@ def update_rota_settings():
     return redirect(url_for("setup"))
 
 
+@app.route("/add_talk", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def add_talk():
+    """Add a new talk to the database"""
+    
+    try:
+        from .models import Talk
+        from datetime import datetime
+        
+        # Get form data
+        title = request.form.get('title', '').strip()
+        speaker = request.form.get('speaker', '').strip()
+        description = request.form.get('description', '').strip()
+        day = request.form.get('day', '').strip()
+        start_time = request.form.get('start_time', '').strip()
+        end_time = request.form.get('end_time', '').strip()
+        venue = request.form.get('venue', '').strip()
+        
+        # Validate required fields
+        if not all([title, speaker, day, start_time, end_time, venue]):
+            flash("All required fields must be filled out", "error")
+            return redirect(url_for("setup"))
+        
+        # Parse time fields
+        try:
+            start_datetime = datetime.strptime(f"{day} {start_time}", "%A %H:%M")
+            end_datetime = datetime.strptime(f"{day} {end_time}", "%A %H:%M")
+            
+            # Ensure end time is after start time
+            if end_datetime <= start_datetime:
+                flash("End time must be after start time", "error")
+                return redirect(url_for("setup"))
+                
+        except ValueError:
+            flash("Invalid time format", "error")
+            return redirect(url_for("setup"))
+        
+        # Create new talk
+        new_talk = Talk(
+            title=title,
+            speaker=speaker,
+            description=description if description else None,
+            day=day,
+            start_time=start_datetime,
+            end_time=end_datetime,
+            venue=venue,
+            is_priority=bool(request.form.get('is_priority')),
+            is_rotaed=bool(request.form.get('is_rotaed')),
+            is_cleared=bool(request.form.get('is_cleared'))
+        )
+        
+        # Add to database
+        db.session.add(new_talk)
+        db.session.commit()
+        
+        flash(f"Successfully added talk: '{title}' by {speaker}", "success")
+        
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error adding talk: {str(e)}", "error")
+        app.logger.error(f"Error adding talk: {e}")
+    
+    return redirect(url_for("setup"))
+
+
 @app.route("/create_alltalks_gold", methods=["POST"])
 @login_required
 @current_user_is_team_leader
