@@ -2,6 +2,23 @@ from flask import current_app as app
 from datetime import datetime, timedelta
 import subprocess
 
+
+def calculate_greenbelt_friday(year):
+    """
+    Calculate the Friday before the UK Summer Bank Holiday (last Monday in August).
+    Greenbelt Festival traditionally starts on this Friday.
+    """
+    # Find last Monday in August (Aug 31 - weekday gives us the Monday)
+    last_day_of_august = datetime(year, 8, 31)
+    weekday = last_day_of_august.weekday()  # 0=Monday, 1=Tuesday, etc.
+    last_monday = last_day_of_august - timedelta(days=weekday)
+    
+    # Go back 3 days from that Monday to get the Friday before
+    greenbelt_friday = last_monday - timedelta(days=3)
+    
+    return greenbelt_friday
+
+
 # Character mapping table to avoid FAT filesystem character problems
 character_mapping = str.maketrans(
     {

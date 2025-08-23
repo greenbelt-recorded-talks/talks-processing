@@ -196,6 +196,12 @@ Add a single talk to the database. This is useful for adding individual talks th
 {% endfilter %}
 
         <form action="add_talk" method="post">
+            <div class="uk-margin">
+                <label class="uk-form-label" for="talk_id">Talk ID</label>
+                <input class="uk-input" type="number" name="talk_id" id="talk_id" min="1" required>
+                <div class="uk-text-small uk-text-muted">Enter a numeric ID (e.g., 123). This will be used for file naming.</div>
+            </div>
+            
             <div class="uk-grid-small uk-child-width-1-2@s" uk-grid>
                 <div>
                     <label class="uk-form-label" for="title">Title</label>

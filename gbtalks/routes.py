@@ -31,7 +31,8 @@ from .libgbtalks import (
     extract_audio_from_video,
     extract_audio_from_video_async,
     get_video_processing_status,
-    gb_time_to_datetime
+    gb_time_to_datetime,
+    calculate_greenbelt_friday
 )
 
 # Supported file formats for RAW uploads
@@ -39,20 +40,6 @@ SUPPORTED_RAW_AUDIO_EXTENSIONS = ['mp3']
 SUPPORTED_RAW_VIDEO_EXTENSIONS = ['mp4']
 
 
-def calculate_greenbelt_friday(year):
-    """
-    Calculate the Friday before the UK Summer Bank Holiday (last Monday in August).
-    Greenbelt Festival traditionally starts on this Friday.
-    """
-    # Find last Monday in August (Aug 31 - weekday gives us the Monday)
-    last_day_of_august = datetime(year, 8, 31)
-    weekday = last_day_of_august.weekday()  # 0=Monday, 1=Tuesday, etc.
-    last_monday = last_day_of_august - timedelta(days=weekday)
-    
-    # Go back 3 days from that Monday to get the Friday before
-    greenbelt_friday = last_monday - timedelta(days=3)
-    
-    return greenbelt_friday
 
 # current_user is a proxy for the current user
 current_user = LocalProxy(lambda: _get_user())
@@ -613,6 +600,7 @@ def add_talk():
         from datetime import datetime
         
         # Get form data
+        talk_id = request.form.get('talk_id', '').strip()
         title = request.form.get('title', '').strip()
         speaker = request.form.get('speaker', '').strip()
         description = request.form.get('description', '').strip()
@@ -622,8 +610,24 @@ def add_talk():
         venue = request.form.get('venue', '').strip()
         
         # Validate required fields
-        if not all([title, speaker, day, start_time, end_time, venue]):
+        if not all([talk_id, title, speaker, day, start_time, end_time, venue]):
             flash("All required fields must be filled out", "error")
+            return redirect(url_for("setup"))
+        
+        # Validate and convert talk ID
+        try:
+            talk_id = int(talk_id)
+            if talk_id <= 0:
+                flash("Talk ID must be a positive number", "error")
+                return redirect(url_for("setup"))
+        except ValueError:
+            flash("Talk ID must be a valid number", "error")
+            return redirect(url_for("setup"))
+        
+        # Check if talk ID already exists
+        existing_talk = Talk.query.get(talk_id)
+        if existing_talk:
+            flash(f"Talk ID {talk_id} already exists", "error")
             return redirect(url_for("setup"))
         
         # Parse time fields
@@ -642,6 +646,7 @@ def add_talk():
         
         # Create new talk
         new_talk = Talk(
+            id=talk_id,
             title=title,
             speaker=speaker,
             description=description if description else None,
