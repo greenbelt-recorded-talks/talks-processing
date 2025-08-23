@@ -34,6 +34,10 @@ from .libgbtalks import (
     gb_time_to_datetime
 )
 
+# Supported file formats for RAW uploads
+SUPPORTED_RAW_AUDIO_EXTENSIONS = ['mp3']
+SUPPORTED_RAW_VIDEO_EXTENSIONS = ['mp4']
+
 
 def calculate_greenbelt_friday(year):
     """
@@ -875,6 +879,8 @@ def front_desk():
         "front_desk.html",
         talks_to_upload=talks_to_upload,
         raw_talks_available=raw_files,
+        supported_audio_extensions=SUPPORTED_RAW_AUDIO_EXTENSIONS,
+        supported_video_extensions=SUPPORTED_RAW_VIDEO_EXTENSIONS,
     )
 
 
@@ -1054,11 +1060,8 @@ def uploadtalk():
         file_extension = original_filename.split('.')[-1] if '.' in original_filename else ''
         
         # Determine file type based on extension
-        audio_extensions = ['mp3']
-        video_extensions = ['mp4']
-        
-        is_audio = file_extension in audio_extensions
-        is_video = file_extension in video_extensions
+        is_audio = file_extension in SUPPORTED_RAW_AUDIO_EXTENSIONS
+        is_video = file_extension in SUPPORTED_RAW_VIDEO_EXTENSIONS
         
         # Only allow video or audio files for raw uploads
         if file_type == "raw" and not (is_video or is_audio):
@@ -1342,11 +1345,9 @@ def init_chunked_upload():
         
         # Validate file type
         file_extension = file_name.lower().split('.')[-1] if '.' in file_name else ''
-        audio_extensions = ['mp3', 'wav', 'm4a']
-        video_extensions = ['mp4', 'mov', 'avi', 'mkv']
         
-        is_audio = file_extension in audio_extensions
-        is_video = file_extension in video_extensions
+        is_audio = file_extension in SUPPORTED_RAW_AUDIO_EXTENSIONS
+        is_video = file_extension in SUPPORTED_RAW_VIDEO_EXTENSIONS
         
         if file_type == "raw" and not (is_video or is_audio):
             return jsonify({"success": False, "error": "RAW files must be audio or video files"})
@@ -1513,12 +1514,15 @@ def complete_chunked_upload():
         # Create status file for tracking reassembly
         reassembly_status_file = os.path.join(chunk_dir, "reassembly.status")
         
+        # Capture the current app instance for background thread
+        flask_app = current_app._get_current_object()
+        
         # Reassemble file in background thread
         import threading
         
         def reassemble_file():
             # Create Flask application context for background thread
-            with app.app_context():
+            with flask_app.app_context():
                 try:
                     # Write status: starting
                     with open(reassembly_status_file, 'w') as f:
@@ -1535,7 +1539,7 @@ def complete_chunked_upload():
                         error_msg = f"Missing chunks: {missing_chunks}"
                         with open(reassembly_status_file, 'w') as f:
                             f.write(f"error:{error_msg}")
-                        app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                        flask_app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
                         return
                     
                     # Write status: reassembling
@@ -1543,7 +1547,7 @@ def complete_chunked_upload():
                         f.write("reassembling")
                     
                     # Reassemble chunks
-                    app.logger.info(f"Starting reassembly for talk {talk_id}: {final_path}")
+                    flask_app.logger.info(f"Starting reassembly for talk {talk_id}: {final_path}")
                     bytes_written = 0
                     
                     with open(final_path, 'wb') as output_file:
@@ -1558,7 +1562,7 @@ def complete_chunked_upload():
                                 error_msg = f"Error reading chunk {chunk_num}: {str(e)}"
                                 with open(reassembly_status_file, 'w') as f:
                                     f.write(f"error:{error_msg}")
-                                app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                                flask_app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
                                 # Clean up partial file
                                 if os.path.exists(final_path):
                                     os.remove(final_path)
@@ -1569,7 +1573,7 @@ def complete_chunked_upload():
                         error_msg = f"File size mismatch: expected {expected_file_size}, got {bytes_written}"
                         with open(reassembly_status_file, 'w') as f:
                             f.write(f"error:{error_msg}")
-                        app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                        flask_app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
                         # Clean up incorrect file
                         if os.path.exists(final_path):
                             os.remove(final_path)
@@ -1579,7 +1583,7 @@ def complete_chunked_upload():
                     with open(reassembly_status_file, 'w') as f:
                         f.write("success")
                     
-                    app.logger.info(f"Reassembly completed for talk {talk_id}: {final_path} ({bytes_written} bytes)")
+                    flask_app.logger.info(f"Reassembly completed for talk {talk_id}: {final_path} ({bytes_written} bytes)")
                     
                     # Start video processing if needed
                     if file_type == "raw" and is_video:
@@ -1597,7 +1601,7 @@ def complete_chunked_upload():
                             f.write(f"error:{error_msg}")
                     except:
                         pass
-                    app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
+                    flask_app.logger.error(f"Reassembly failed for talk {talk_id}: {error_msg}")
                     # Clean up partial file
                     if os.path.exists(final_path):
                         try:
@@ -1805,11 +1809,8 @@ def uploadtalk_ajax():
         file_extension = original_filename.split('.')[-1] if '.' in original_filename else ''
         
         # Determine file type based on extension
-        audio_extensions = ['mp3']
-        video_extensions = ['mp4']
-        
-        is_audio = file_extension in audio_extensions
-        is_video = file_extension in video_extensions
+        is_audio = file_extension in SUPPORTED_RAW_AUDIO_EXTENSIONS
+        is_video = file_extension in SUPPORTED_RAW_VIDEO_EXTENSIONS
         
         # Only allow video or audio files for raw uploads
         if file_type == "raw" and not (is_video or is_audio):

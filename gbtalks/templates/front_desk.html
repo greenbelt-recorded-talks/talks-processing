@@ -39,14 +39,14 @@ If you have a recorder notes photo, upload this first, as the talk will disappea
 			</div>
 		</div>
 		<form class="upload-form" data-talk-id="{{ talk.id }}" data-file-type="raw">
-                	<input name="file" type="file" accept=".mp3,.mp4,.mov,.avi,.mkv,.m4a,.wav" required>
+                	<input name="file" type="file" accept="{% for ext in supported_audio_extensions %}.{{ ext }}{% if not loop.last %},{% endif %}{% endfor %}{% for ext in supported_video_extensions %},.{{ ext }}{% endfor %}" required>
                         <button type="submit" class="uk-button uk-button-primary">
                             <span class="button-text">Upload</span>
                             <div uk-spinner="ratio: 0.5" class="upload-spinner" style="display: none;"></div>
                         </button>
                 </form>
                 <div class="upload-status" style="margin-top: 8px;"></div>
-                <small class="uk-text-muted">Supports audio (MP3, WAV, M4A) and video files (MP4, MOV, AVI, MKV)</small>
+                <small class="uk-text-muted">Supports audio ({% for ext in supported_audio_extensions %}{{ ext|upper }}{% if not loop.last %}, {% endif %}{% endfor %}) and video files ({% for ext in supported_video_extensions %}{{ ext|upper }}{% if not loop.last %}, {% endif %}{% endfor %})</small>
 	</td>
 	<td>
                 <form method=post enctype=multipart/form-data name=upload_photo action=uploadrecordernotes>
