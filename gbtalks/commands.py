@@ -22,23 +22,13 @@ import pprint
 
 from .libgbtalks import (
     get_path_for_file,
+    get_cd_dir_for_talk,
     gb_time_to_datetime
 )
 
 def run_command(cmd):
     with semaphore:
         os.system(cmd)
-
-
-def get_cd_dir_for_talk(talk):
-    return (
-        app.config["CD_DIR"]
-        + "/gb"
-        + app.config["GB_SHORT_YEAR"]
-        + "-"
-        + str(talk).zfill(3)
-        + "/"
-    )
 
 
 def process_talk(talk_id):

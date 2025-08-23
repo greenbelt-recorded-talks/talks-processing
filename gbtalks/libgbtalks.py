@@ -210,6 +210,18 @@ def get_video_processing_status(audio_output_path):
         return "error", f"Error reading status: {str(e)}"
 
 
+def get_cd_dir_for_talk(talk_id):
+    """Get the CD directory path for a talk"""
+    return (
+        app.config["CD_DIR"]
+        + "/gb"
+        + app.config["GB_SHORT_YEAR"]
+        + "-"
+        + str(talk_id).zfill(3)
+        + "/"
+    )
+
+
 def gb_time_to_datetime(day, time):
     """Convert "Greenbelt Days" to real days, and parse out the start times of talks"""
     fri_of_gb = datetime.strptime(app.config["GB_FRIDAY"], "%Y-%m-%d").date()
