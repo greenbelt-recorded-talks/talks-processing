@@ -120,6 +120,7 @@ def talks():
         x.name.split("_")[1] for x in os.scandir(app.config["PROCESSED_DIR"])
     ]
     notes_files = [x.name for x in os.scandir(app.config["IMG_DIR"])]
+    recorders = Recorder.query.order_by(Recorder.name).all()
 
     return render_template(
         "talks.html",
@@ -129,6 +130,7 @@ def talks():
         edited_files=edited_files,
         processed_files=processed_files,
         notes_files=notes_files,
+        recorders=recorders,
     )
 
 @app.route("/edit_talk", methods=["GET","POST"])
@@ -656,7 +658,8 @@ def add_talk():
             venue=venue,
             is_priority=bool(request.form.get('is_priority')),
             is_rotaed=bool(request.form.get('is_rotaed')),
-            is_cleared=bool(request.form.get('is_cleared'))
+            is_cleared=bool(request.form.get('is_cleared')),
+            is_cancelled=False  # New talks start as active
         )
         
         # Add to database
@@ -671,6 +674,110 @@ def add_talk():
         app.logger.error(f"Error adding talk: {e}")
     
     return redirect(url_for("setup"))
+
+
+@app.route("/toggle_talk_cancelled", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def toggle_talk_cancelled():
+    """Toggle the cancelled status of a talk"""
+    
+    try:
+        talk_id = request.form.get('talk_id')
+        action = request.form.get('action')
+        
+        if not talk_id or not action:
+            flash("Missing talk ID or action", "error")
+            return redirect(url_for("talks"))
+        
+        talk = Talk.query.get(int(talk_id))
+        if not talk:
+            flash(f"Talk {talk_id} not found", "error")
+            return redirect(url_for("talks"))
+        
+        if action == "cancel":
+            talk.is_cancelled = True
+            flash(f"Talk {talk_id} ({talk.title}) has been marked as cancelled", "success")
+        elif action == "uncancel":
+            talk.is_cancelled = False
+            flash(f"Talk {talk_id} ({talk.title}) has been restored to active status", "success")
+        else:
+            flash("Invalid action", "error")
+            return redirect(url_for("talks"))
+        
+        db.session.commit()
+        
+    except ValueError:
+        flash("Invalid talk ID", "error")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error updating talk status: {str(e)}", "error")
+        app.logger.error(f"Error toggling talk cancelled status: {e}")
+    
+    return redirect(url_for("talks"))
+
+
+@app.route("/assign_recorder", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def assign_recorder():
+    """Assign or unassign a recorder to a talk"""
+    
+    try:
+        talk_id = request.form.get('talk_id')
+        recorder_name = request.form.get('recorder_name')
+        
+        if not talk_id:
+            flash("Missing talk ID", "error")
+            return redirect(url_for("talks"))
+        
+        talk = Talk.query.get(int(talk_id))
+        if not talk:
+            flash(f"Talk {talk_id} not found", "error")
+            return redirect(url_for("talks"))
+        
+        # Handle unassignment (empty recorder_name)
+        if not recorder_name:
+            if talk.recorder_name:
+                old_recorder = talk.recorder_name
+                talk.recorder_name = None
+                db.session.commit()
+                flash(f"Removed {old_recorder} from talk {talk_id} ({talk.title})", "success")
+            else:
+                flash(f"Talk {talk_id} already has no assigned recorder", "info")
+            return redirect(url_for("talks"))
+        
+        # Validate recorder exists
+        recorder = Recorder.query.filter_by(name=recorder_name).first()
+        if not recorder:
+            flash(f"Recorder '{recorder_name}' not found", "error")
+            return redirect(url_for("talks"))
+        
+        # Check for time clashes with recorder's existing talks
+        for existing_talk in recorder.talks:
+            if existing_talk.id != talk.id:  # Don't check against the same talk
+                if talks_overlap(talk, existing_talk):
+                    flash(f"Cannot assign {recorder_name}: Talk {talk_id} ({talk.start_time.strftime('%H:%M')}-{talk.end_time.strftime('%H:%M')}) clashes with existing assignment to Talk {existing_talk.id} ({existing_talk.start_time.strftime('%H:%M')}-{existing_talk.end_time.strftime('%H:%M')})", "error")
+                    return redirect(url_for("talks"))
+        
+        # Assign recorder
+        old_recorder = talk.recorder_name
+        talk.recorder_name = recorder_name
+        db.session.commit()
+        
+        if old_recorder:
+            flash(f"Reassigned talk {talk_id} ({talk.title}) from {old_recorder} to {recorder_name}", "success")
+        else:
+            flash(f"Assigned {recorder_name} to talk {talk_id} ({talk.title})", "success")
+        
+    except ValueError:
+        flash("Invalid talk ID", "error")
+    except Exception as e:
+        db.session.rollback()
+        flash(f"Error assigning recorder: {str(e)}", "error")
+        app.logger.error(f"Error assigning recorder: {e}")
+    
+    return redirect(url_for("talks"))
 
 
 @app.route("/create_alltalks_gold", methods=["POST"])

@@ -297,6 +297,19 @@ def add_recorder_time_constraints():
         print(f"Note: latest_end_time column may already exist: {e}")
 
 
+def add_talk_cancelled_field():
+    """Migration: Add is_cancelled field to talks table"""
+    from sqlalchemy import text
+    
+    try:
+        # For SQLite, use ALTER TABLE to add column with default value
+        with db.engine.begin() as conn:
+            conn.execute(text('ALTER TABLE talks ADD COLUMN is_cancelled BOOLEAN DEFAULT 0'))
+        print("Added is_cancelled column to talks table")
+    except Exception as e:
+        print(f"Note: is_cancelled column may already exist: {e}")
+
+
 # Define all migrations here
 # 
 # Migration Naming Convention:
@@ -338,9 +351,22 @@ MIGRATIONS = [
         )
     ),
     
+    Migration(
+        version="003_add_talk_cancelled_field",
+        description="Add is_cancelled field to talks table for safe talk cancellation",
+        up_func=add_talk_cancelled_field,
+        notes=(
+            "Adds is_cancelled field to talks table to allow marking talks as cancelled "
+            "without deleting them or reusing talk IDs. This preserves data integrity "
+            "while providing a safe way to handle cancelled talks. "
+            "All existing talks will default to is_cancelled=False (active). "
+            "The talks page will show cancelled status with filtering options."
+        )
+    ),
+    
     # Template for future migrations:
     # Migration(
-    #     version="002_descriptive_name",
+    #     version="004_descriptive_name",
     #     description="Brief description of what this migration does",
     #     up_func=your_migration_function,
     #     down_func=your_rollback_function,  # Optional
