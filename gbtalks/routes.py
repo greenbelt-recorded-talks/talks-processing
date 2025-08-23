@@ -153,22 +153,46 @@ def edit_talk():
         talk_id = request.form.get("talk_id")
         talk = Talk.query.get(talk_id)
 
-        talk.title = request.form.get("title")
-        talk.description = request.form.get("description")
-        talk.speaker = request.form.get("speaker")
-        talk.day = request.form.get("day")
-        talk.start_time = gb_time_to_datetime(request.form.get("day"), request.form.get("start_time"))
-        talk.end_time = gb_time_to_datetime(request.form.get("day"), request.form.get("end_time"))
+        if not talk:
+            flash(f"Talk {talk_id} not found", "error")
+            return redirect(url_for("talks"))
 
-        talk.has_explicit_warning_sticker = True if request.form.get("has_explicit_warning_sticker") else False
-        talk.has_distressing_content_warning_sticker = True if request.form.get("has_distressing_content_warning_sticker") else False
-        talk.has_technical_issues_sticker = True if request.form.get("has_technical_issues_sticker") else False
-        talk.has_copyright_removal_sticker = True if request.form.get("has_copyright_removal_sticker") else False
+        try:
+            # Parse datetime fields with error handling
+            start_datetime = gb_time_to_datetime(request.form.get("day"), request.form.get("start_time"))
+            end_datetime = gb_time_to_datetime(request.form.get("day"), request.form.get("end_time"))
+            
+            # Ensure end time is after start time
+            if end_datetime <= start_datetime:
+                flash("End time must be after start time", "error")
+                return redirect(url_for("edit_talk", talk_id=talk_id))
 
-        talk.is_cleared = True if request.form.get("is_cleared") else False
+            # Update talk fields
+            talk.title = request.form.get("title")
+            talk.description = request.form.get("description")
+            talk.speaker = request.form.get("speaker")
+            talk.day = request.form.get("day")
+            talk.start_time = start_datetime
+            talk.end_time = end_datetime
 
-        db.session.commit()
-        return redirect(url_for("talks") + "#talk_" +  talk_id)
+            talk.has_explicit_warning_sticker = True if request.form.get("has_explicit_warning_sticker") else False
+            talk.has_distressing_content_warning_sticker = True if request.form.get("has_distressing_content_warning_sticker") else False
+            talk.has_technical_issues_sticker = True if request.form.get("has_technical_issues_sticker") else False
+            talk.has_copyright_removal_sticker = True if request.form.get("has_copyright_removal_sticker") else False
+
+            talk.is_cleared = True if request.form.get("is_cleared") else False
+
+            db.session.commit()
+            flash(f"Successfully updated talk: '{talk.title}'", "success")
+            return redirect(url_for("talks") + "#talk_" +  talk_id)
+            
+        except ValueError:
+            flash("Invalid day or time format", "error")
+            return redirect(url_for("edit_talk", talk_id=talk_id))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"Error updating talk: {str(e)}", "error")
+            return redirect(url_for("edit_talk", talk_id=talk_id))
 
 
 def perform_health_check():
@@ -632,10 +656,10 @@ def add_talk():
             flash(f"Talk ID {talk_id} already exists", "error")
             return redirect(url_for("setup"))
         
-        # Parse time fields
+        # Parse time fields using gb_time_to_datetime
         try:
-            start_datetime = datetime.strptime(f"{day} {start_time}", "%A %H:%M")
-            end_datetime = datetime.strptime(f"{day} {end_time}", "%A %H:%M")
+            start_datetime = gb_time_to_datetime(day, start_time)
+            end_datetime = gb_time_to_datetime(day, end_time)
             
             # Ensure end time is after start time
             if end_datetime <= start_datetime:
@@ -643,7 +667,7 @@ def add_talk():
                 return redirect(url_for("setup"))
                 
         except ValueError:
-            flash("Invalid time format", "error")
+            flash("Invalid day or time format", "error")
             return redirect(url_for("setup"))
         
         # Create new talk
