@@ -352,6 +352,14 @@ def perform_health_check():
             "critical": True,
             "used_by": ["Audio processing pipeline", "MP3 metadata"],
             "expected_type": "PNG image file (recommended 300x300px)"
+        },
+        {
+            "name": f"GB{app.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf",
+            "path": os.path.join(app.config["USB_GOLD_DIR"], f"GB{app.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf"),
+            "purpose": "Complete index of all talks for USB distribution",
+            "critical": True,
+            "used_by": ["USB duplication process", "All talks distribution"],
+            "expected_type": "PDF document"
         }
     ]
     
