@@ -9,12 +9,12 @@ fi
 
 # Then, check that the USB gold dir is there and has at least 50 files in it
 
-if ! ls /usb_gold > /dev/null; then 
+if ! ls /storage/usb_gold > /dev/null; then 
     echo "USB gold dir missing"
     exit
 fi
 
-if (( $(ls /usb_gold | wc -l ) < 50)); then
+if (( $(ls /storage/usb_gold | wc -l ) < 50)); then
     echo "USB gold dir has less than 50 files - are you sure it's ready?"
     exit
 fi

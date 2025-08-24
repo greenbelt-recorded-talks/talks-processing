@@ -7,7 +7,7 @@ if (( $EUID != 0 )); then
     exit
 fi
 
-if ! ls /usb_gold > /dev/null; then 
+if ! ls /storage/usb_gold > /dev/null; then 
     echo "USB gold dir missing"
     exit
 fi
