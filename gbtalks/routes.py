@@ -1073,7 +1073,7 @@ def front_desk():
 
     past_horizon = datetime.now() + timedelta(minutes=30)
 
-    talks_to_upload = Talk.query.filter(Talk.start_time < past_horizon).order_by(
+    talks_to_upload = Talk.query.filter(Talk.start_time < past_horizon, Talk.is_cancelled == False).order_by(
         asc(Talk.start_time)
     )
 

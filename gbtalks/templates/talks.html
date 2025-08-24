@@ -47,6 +47,13 @@
                 <li uk-filter-control="filter: [data-cancelled='true']; group: cancelled"><a href="#">Cancelled</a></li>
             </ul>
         </div>
+	<div>
+            <ul class="uk-subnav uk-subnav-pill" uk-margin>
+                <li>Cleared</li>
+                <li uk-filter-control="filter: [data-cleared='false']; group: cleared"><a href="#">No</a></li>
+                <li uk-filter-control="filter: [data-cleared='true']; group: cleared"><a href="#">Yes</a></li>
+            </ul>
+        </div>
     </div>
 
 <ul class="js-filter" uk-grid>
@@ -59,8 +66,9 @@
 {% set has_notes = "true" if 'gb' + gb_year + '-' + ('%03d' % talk.id)|string + "recorder_notes.jpg" in notes_files else "false" %}
 {% set is_priority = "true" if talk["is_priority"] else "false" %} 
 {% set is_cancelled = "true" if talk.is_cancelled else "false" %}
+{% set is_cleared = "true" if talk.is_cleared else "false" %}
 
-<li class="uk-card uk-card-body uk-card-default{% if talk.is_cancelled %} uk-card-muted{% endif %}" data-has-raw="{{ has_raw }}" data-has-edited="{{ has_edited }}" data-has-processed="{{ has_processed }}" data-priority="{{ is_priority }}" data-cancelled="{{ is_cancelled }}" >
+<li class="uk-card uk-card-body uk-card-default{% if talk.is_cancelled %} uk-card-muted{% endif %}" data-has-raw="{{ has_raw }}" data-has-edited="{{ has_edited }}" data-has-processed="{{ has_processed }}" data-priority="{{ is_priority }}" data-cancelled="{{ is_cancelled }}" data-cleared="{{ is_cleared }}" >
 	<div class="uk-width-1-1">
 		<h3 class="uk-card-title" id="talk_{{ talk.id }}">{{ 'gb' + gb_year + '-' + ('%03d' % talk.id) }}: {{ talk.title }}</h3>
 		<div class="uk-container uk-text-default uk-text-bold">{{ talk.day }} {{ talk.start_time.strftime("%H:%M") }} - {{ talk.end_time.strftime("%H:%M") }} | {% if talk.is_cancelled %}<span style="color: red;">CANCELLED</span> {% endif %}{% if not talk.is_cleared %}NOT CLEARED FOR RELEASE {% endif %}{% if talk.has_explicit_warning_sticker %}Explicit {% endif %}{% if talk.has_distressing_content_warning_sticker %}Advisory {% endif %}{% if talk.has_technical_issues_sticker %}Technical {% endif %}{% if talk.has_copyright_removal_sticker %}Copyright {% endif %} </div>
