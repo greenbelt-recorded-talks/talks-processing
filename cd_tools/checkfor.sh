@@ -1,1 +1,1 @@
-cd /storage/cds/gb24-$1 && ls
+cd /storage/cds/gb25-$1 && ls
