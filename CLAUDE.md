@@ -104,17 +104,16 @@ programme export rather than being written by hand:
 | `start_time`/`end_time` | a time of day (`7:00 PM`, `19:00`, `19:00:00`), or an absolute `YYYY-MM-DD HH:MM[:SS]` |
 
 **Prefer a time of day.** The date is then derived from the `day` column and the
-configured `GB_FRIDAY`, so the same file still works next year. An end time
-earlier than its start is read as running past midnight, provided the result is
-under six hours; beyond that it is reported as an error rather than silently
-turned into a 23-hour talk.
+configured `GB_FRIDAY`, so the same file still works next year. Talks run within
+a single day - festival programming is roughly 08:00 to 22:00 - so an end time
+that is not after its start is an error, not a talk running past midnight.
 
 A malformed file is rejected in full, naming the offending row and column, and
 the existing talks are left untouched - parsing happens before anything is
 deleted.
 
-`is_rotaed` is what the rota generator looks for. Talks without it are skipped,
-so a file with that column unset produces an empty rota.
+`is_rotaed` is what the rota generator builds around. A file with that column
+unset produces an empty rota.
 
 ### File Structure
 - Raw recordings stored in `UPLOAD_DIR` with `_RAW` suffix
@@ -142,6 +141,18 @@ Environment-based configuration in `config.py`:
 - Storage paths: All file directories configurable via environment variables
 - Greenbelt-specific: Automatic calculation of festival dates based on August bank holiday
 - Authentication: Google OAuth client credentials from environment
+
+### Rota Generation
+`is_rotaed` decides which talks the rota is *built around*, not which talks may
+be recorded. The two main loops in `gbtalks/rota/routes.py` only seek out a
+recorder for flagged talks.
+
+The follow-on passes deliberately do not filter on `is_rotaed`: once a recorder
+is on shift anyway, staying on for the next talk is effectively free, so an
+unflagged talk nearby is worth picking up. Do not "fix" this by adding an
+`is_rotaed` filter to those queries. Note the two passes differ - the priority
+follow-on is restricted to the same venue, while the additional-talk follow-on
+is not.
 
 ### Permission System
 Team leader permissions controlled via `TEAM_LEADERS_EMAILS` in config.py. These users can access editing and administration features.

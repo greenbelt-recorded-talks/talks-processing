@@ -58,15 +58,17 @@ class TestRotaFromSampleData:
         assigned = Talk.query.filter(Talk.recorder_name.isnot(None)).count()
         assert assigned > 0, "the sample data produced an empty rota"
 
-    def test_mostly_assigns_only_talks_flagged_for_the_rota(self, app, auth_client, db):
-        """KNOWN BUG: the follow-on assignment paths ignore is_rotaed.
+    def test_picks_up_unflagged_talks_a_recorder_is_already_there_for(
+        self, app, auth_client, db
+    ):
+        """is_rotaed decides what the rota is *built around*, not what may be
+        recorded.
 
-        The two main loops skip talks that are not flagged (rota/routes.py:266
-        and :302), but the queries that assign same-venue and nearby talks to a
-        recorder already on shift (:275 and :313) do not filter on it. So a
-        handful of talks marked "not in rota" still get a recorder.
-
-        This pins the current behaviour; it is not an endorsement of it.
+        The two main loops only seek out recorders for flagged talks
+        (rota/routes.py:266 and :302). The follow-on queries (:275 and :313)
+        deliberately do not filter on is_rotaed: once a recorder is in a venue
+        anyway, staying on for the next talk costs nothing, so an unflagged
+        talk is worth picking up.
         """
         runner = app.test_cli_runner()
         runner.invoke(args=["load-sample-data", "recorders"])
@@ -76,8 +78,21 @@ class TestRotaFromSampleData:
 
         unflagged_but_assigned = Talk.query.filter(
             Talk.is_rotaed.is_(False), Talk.recorder_name.isnot(None)
-        ).count()
-        assigned = Talk.query.filter(Talk.recorder_name.isnot(None)).count()
+        ).all()
 
-        assert unflagged_but_assigned > 0, "the follow-on paths now respect is_rotaed"
-        assert unflagged_but_assigned < assigned, "the main loops still gate on it"
+        assert unflagged_but_assigned, "no free extra talks were picked up"
+
+        # Each one must have gone to a recorder who was already working that
+        # day, rather than having been sought out on its own account.
+        for talk in unflagged_but_assigned:
+            same_day_talks = [
+                other
+                for other in Talk.query.filter(
+                    Talk.recorder_name == talk.recorder_name, Talk.id != talk.id
+                )
+                if other.start_time.date() == talk.start_time.date()
+            ]
+            assert same_day_talks, (
+                f"talk {talk.id} was assigned to {talk.recorder_name}, who has no "
+                f"other talk that day - it was not a free pick-up"
+            )

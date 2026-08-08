@@ -20,16 +20,16 @@ rather than being written by hand:
 Preferring a time of day is what keeps a file usable across festivals: the date
 comes from the day column and the configured GB_FRIDAY, so the same file still
 works next year.
+
+Talks run within a single day - festival programming is roughly 08:00 to 22:00 -
+so an end time that is not after its start is an error rather than a talk
+running past midnight.
 """
 
 import csv
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from .libgbtalks import gb_time_to_datetime
-
-# An end time before its start is read as running past midnight, but only if the
-# result is a plausible length. Beyond this it is treated as a transposed typo.
-MAX_TALK_DURATION = timedelta(hours=6)
 
 REQUIRED_COLUMNS = (
     "id",
@@ -101,12 +101,7 @@ def parse_talk_id(value, row_number):
 
 
 def parse_timestamp(day, value, column, row_number):
-    """Read a start/end value.
-
-    Returns (datetime, is_time_of_day). The flag matters because a time of day
-    carries no date, so an end time earlier than its start means the talk runs
-    past midnight - whereas an absolute timestamp saying that is just wrong.
-    """
+    """Read an absolute timestamp, or a time of day resolved against `day`."""
     timestamp = (value or "").strip()
 
     if not timestamp:
@@ -114,12 +109,12 @@ def parse_timestamp(day, value, column, row_number):
 
     for time_format in _ABSOLUTE_TIME_FORMATS:
         try:
-            return datetime.strptime(timestamp, time_format), False
+            return datetime.strptime(timestamp, time_format)
         except ValueError:
             continue
 
     try:
-        return gb_time_to_datetime(day, timestamp), True
+        return gb_time_to_datetime(day, timestamp)
     except (ValueError, TypeError):
         raise TalksCsvError(
             f"Row {row_number}: could not read {column!r} value {value!r} "
@@ -158,28 +153,11 @@ def parse_talks_csv(fileobj):
 
         day = (row.get("day") or "").strip()
 
-        start_time, start_is_time_of_day = parse_timestamp(
-            day, row.get("start_time"), "start_time", row_number
-        )
-        end_time, end_is_time_of_day = parse_timestamp(
-            day, row.get("end_time"), "end_time", row_number
-        )
-
-        # A late-night talk written as 23:30 -> 00:30 ends on the following day.
-        # Only times of day can mean this; an absolute timestamp says its date.
-        if (
-            start_is_time_of_day
-            and end_is_time_of_day
-            and end_time <= start_time
-            and (end_time + timedelta(days=1)) - start_time <= MAX_TALK_DURATION
-        ):
-            end_time += timedelta(days=1)
-
         talk = {
             "id": parse_talk_id(row.get("id"), row_number),
             "day": day,
-            "start_time": start_time,
-            "end_time": end_time,
+            "start_time": parse_timestamp(day, row.get("start_time"), "start_time", row_number),
+            "end_time": parse_timestamp(day, row.get("end_time"), "end_time", row_number),
         }
 
         for column in TEXT_COLUMNS:

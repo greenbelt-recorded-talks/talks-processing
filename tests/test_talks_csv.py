@@ -102,18 +102,20 @@ class TestTimes:
         )[0]
         assert talk["start_time"] == datetime(2024, 8, 23, 9, 0)
 
-    def test_a_late_talk_rolls_over_midnight(self, app_ctx):
-        talk = parse(ROW.replace(",10:00,11:00,", ",23:30,00:30,"))[0]
-
-        assert talk["start_time"] == datetime(2026, 8, 29, 23, 30)
-        assert talk["end_time"] == datetime(2026, 8, 30, 0, 30)
-
-    def test_a_transposed_time_is_rejected_rather_than_rolled_over(self, app_ctx):
-        """15:00 -> 14:00 would become a 23 hour talk, so it is an error."""
+    @pytest.mark.parametrize(
+        ("start", "end"),
+        [
+            ("15:00", "14:00"),  # transposed
+            ("11:00", "11:00"),  # zero length
+            ("23:30", "00:30"),  # would be a talk running past midnight
+        ],
+    )
+    def test_end_must_be_after_start(self, app_ctx, start, end):
+        """Talks run inside one day, so these are all errors."""
         with pytest.raises(TalksCsvError, match="not after"):
-            parse(ROW.replace(",10:00,11:00,", ",15:00,14:00,"))
+            parse(ROW.replace(",10:00,11:00,", f",{start},{end},"))
 
-    def test_absolute_timestamps_never_roll_over(self, app_ctx):
+    def test_absolute_timestamps_must_also_be_ordered(self, app_ctx):
         with pytest.raises(TalksCsvError, match="not after"):
             parse(
                 ROW.replace(",10:00,11:00,", ",2024-08-23 23:30:00,2024-08-23 00:30:00,")
@@ -152,6 +154,16 @@ class TestSampleData:
         rotaed = [t for t in talks if t["is_rotaed"]]
         assert len(rotaed) > 0
         assert len(rotaed) < len(talks), "some talks should exercise the skip path"
+
+    def test_every_talk_runs_within_the_festival_day(self, app_ctx):
+        """Programming runs roughly 08:00-22:00, and never past midnight."""
+        with open("sample_data/talks.csv", newline="", encoding="utf-8") as f:
+            talks = parse_talks_csv(f)
+
+        for talk in talks:
+            assert talk["start_time"].hour >= 8, talk["id"]
+            assert talk["end_time"] <= talk["end_time"].replace(hour=22, minute=0), talk["id"]
+            assert talk["start_time"].date() == talk["end_time"].date(), talk["id"]
 
     def test_dates_track_the_configured_festival_year(self, app_ctx):
         """Times of day, not hard-coded dates, so the file does not go stale."""
