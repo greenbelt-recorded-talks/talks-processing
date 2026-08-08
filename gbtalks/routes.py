@@ -33,6 +33,7 @@ from .libgbtalks import (
     get_video_processing_status,
 )
 from .models import Editor, Recorder, Talk, db
+from .talks_csv import TalksCsvError, parse_talks_csv
 
 # Supported file formats for RAW uploads
 SUPPORTED_RAW_AUDIO_EXTENSIONS = ['mp3']
@@ -81,35 +82,25 @@ def talks():
                 filename = secure_filename(file.filename)
                 file.save(os.path.join(app.config["UPLOAD_DIR"], filename))
 
-                Talk.query.delete()
-
+                # Parse the whole file before touching the database, so a
+                # malformed upload leaves the existing talks alone.
                 with open(
-                    os.path.join(app.config["UPLOAD_DIR"], filename), newline=""
+                    os.path.join(app.config["UPLOAD_DIR"], filename),
+                    newline="",
+                    encoding="utf-8",
                 ) as csvfile:
-                    talksreader = csv.reader(csvfile)
-                    next(talksreader, None)  # skip the headers
-                    for talk_line in talksreader:
-                        start_time = gb_time_to_datetime(talk_line[3], talk_line[4])
-                        end_time = gb_time_to_datetime(talk_line[3], talk_line[5])
-                        is_priority = True if talk_line[8] == "Yes" else False
-                        is_rotaed = True if talk_line[9] == "Yes" else False
-                        is_cleared = True if talk_line[10] == "Yes" else False
-                        talk = Talk(
-                            id=talk_line[0].split("-")[1],
-                            title=talk_line[2],
-                            description=talk_line[7],
-                            speaker=talk_line[1],
-                            venue=talk_line[6],
-                            day=talk_line[3],
-                            start_time=start_time,
-                            end_time=end_time,
-                            is_priority=is_priority,
-                            is_rotaed=is_rotaed,
-                            is_cleared=is_cleared
-                        )
-                        db.session.add(talk)
+                    try:
+                        parsed_talks = parse_talks_csv(csvfile)
+                    except TalksCsvError as error:
+                        flash(f"Could not read {filename}: {error}", "error")
+                        return redirect(request.url)
+
+                Talk.query.delete()
+                for talk_data in parsed_talks:
+                    db.session.add(Talk(**talk_data))
 
                 db.session.commit()
+                flash(f"Loaded {len(parsed_talks)} talks from {filename}", "success")
                 return redirect(url_for("talks", filename=filename))
 
     talks = Talk.query.order_by(asc(Talk.start_time)).all()

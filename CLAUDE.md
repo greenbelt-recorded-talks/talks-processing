@@ -82,6 +82,40 @@ This is a Flask web application for managing talk recordings at Greenbelt Festiv
 - **Content Management**: Track talk status, warnings, and metadata
 - **Authentication**: Google OAuth for team leader permissions
 
+### Talks CSV Format
+Talks enter the database two ways - the `/talks` upload and
+`flask load-sample-data talks` - and both go through the single parser in
+`gbtalks/talks_csv.py`. There is one format; `sample_data/talks.csv` is a
+working example of it.
+
+Columns are matched by **header name**, not position, so order does not matter.
+Required: `id`, `title`, `speaker`, `day`, `start_time`, `end_time`, `venue`.
+Everything else is optional and defaults to empty or False:
+`description`, `is_priority`, `is_rotaed`, `is_cleared`, the four `has_*_sticker`
+columns, `recorder_name`, `editor_name`.
+
+Values are read leniently, because the file normally comes from the festival
+programme export rather than being written by hand:
+
+| Field | Accepted |
+|---|---|
+| booleans | `Yes`/`No`, `Y`/`N`, `true`/`false`, `1`/`0`, or blank for False |
+| `id` | `17`, or a prefixed reference like `GB26-001` |
+| `start_time`/`end_time` | a time of day (`7:00 PM`, `19:00`, `19:00:00`), or an absolute `YYYY-MM-DD HH:MM[:SS]` |
+
+**Prefer a time of day.** The date is then derived from the `day` column and the
+configured `GB_FRIDAY`, so the same file still works next year. An end time
+earlier than its start is read as running past midnight, provided the result is
+under six hours; beyond that it is reported as an error rather than silently
+turned into a 23-hour talk.
+
+A malformed file is rejected in full, naming the offending row and column, and
+the existing talks are left untouched - parsing happens before anything is
+deleted.
+
+`is_rotaed` is what the rota generator looks for. Talks without it are skipped,
+so a file with that column unset produces an empty rota.
+
 ### File Structure
 - Raw recordings stored in `UPLOAD_DIR` with `_RAW` suffix
 - Edited files stored in `UPLOAD_DIR` with `_EDITED` suffix  

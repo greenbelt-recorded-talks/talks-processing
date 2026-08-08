@@ -15,6 +15,7 @@ from tendo import singleton
 
 from .libgbtalks import get_cd_dir_for_talk, get_path_for_file
 from .models import Editor, Recorder, Talk, db
+from .talks_csv import parse_talks_csv
 
 
 def process_talk(talk_id):
@@ -462,43 +463,29 @@ def load_sample_data(table, clear):
 
         print(f"Loading sample {table} data from {csv_file}...")
 
-        with open(csv_file, newline='', encoding='utf-8') as file:
-            reader = csv.DictReader(file)
-            count = 0
+        count = 0
 
-            for row in reader:
-                if table.lower() == "talks":
-                    # Convert string values to appropriate types
-                    talk_data = {
-                        'id': int(row['id']),
-                        'title': row['title'],
-                        'description': row['description'],
-                        'speaker': row['speaker'],
-                        'day': row['day'],
-                        'start_time': datetime.strptime(row['start_time'], '%Y-%m-%d %H:%M:%S'),
-                        'end_time': datetime.strptime(row['end_time'], '%Y-%m-%d %H:%M:%S'),
-                        'venue': row['venue'],
-                        'is_priority': bool(int(row['is_priority'])),
-                        'is_rotaed': bool(int(row['is_rotaed'])),
-                        'is_cleared': bool(int(row['is_cleared'])),
-                        'has_explicit_warning_sticker': bool(int(row['has_explicit_warning_sticker'])),
-                        'has_distressing_content_warning_sticker': bool(int(row['has_distressing_content_warning_sticker'])),
-                        'has_technical_issues_sticker': bool(int(row['has_technical_issues_sticker'])),
-                        'has_copyright_removal_sticker': bool(int(row['has_copyright_removal_sticker'])),
-                        'recorder_name': row['recorder_name'] if row['recorder_name'] else None,
-                        'editor_name': row['editor_name'] if row['editor_name'] else None
-                    }
-
-                    # Check if talk already exists
-                    existing_talk = Talk.query.filter_by(id=talk_data['id']).first()
-                    if existing_talk:
+        if table.lower() == "talks":
+            # Talks go through the same parser as the /talks upload, so the
+            # sample data is always a valid example of the real format.
+            with open(csv_file, newline='', encoding='utf-8') as file:
+                for talk_data in parse_talks_csv(file):
+                    if db.session.get(Talk, talk_data['id']):
                         print(f"Talk ID {talk_data['id']} already exists, skipping...")
                         continue
 
-                    talk = Talk(**talk_data)
-                    db.session.add(talk)
+                    db.session.add(Talk(**talk_data))
+                    count += 1
 
-                elif table.lower() == "recorders":
+            db.session.commit()
+            print(f"Successfully loaded {count} {table} records!")
+            return
+
+        with open(csv_file, newline='', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+
+            for row in reader:
+                if table.lower() == "recorders":
                     # Convert time strings to time objects
                     earliest_start = None
                     latest_end = None
