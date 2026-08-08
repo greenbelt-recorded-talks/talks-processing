@@ -281,7 +281,7 @@ The Talks File is the list of talks. It must be a CSV file (with utf-8 encoding,
 
 You'll probably get a list of talks in some sort of spreadsheet format from GBHQ. You'll normally need to do some prep work to get it ready to import: remove any talks that we don't want to record, rename the column headings to match the list below, and make sure that there is only one header line.
 
-**Columns are matched by their heading, not by their position**, so the order doesn't matter and extra columns you don't need are ignored. The first line of the file must be the headings.
+Columns are matched by their heading; order doesn't matter. Extra columns and columns with typos in the heading are ignored. 
 
 These seven columns are required:
 
@@ -295,7 +295,7 @@ These seven columns are required:
 
 These are optional, and default to empty or No if you leave them out:
 
-	description                              e.g. "Blah Blah Blah"
+	description                              e.g. "A wonderful not-to-be-missed talk about owls"
 	is_priority                              is this a "must-record" talk?
 	is_rotaed                                should the rota be built around this talk?
 	is_cleared                               is it cleared for release?
@@ -306,11 +306,11 @@ These are optional, and default to empty or No if you leave them out:
 	recorder_name
 	editor_name
 
-For the Yes/No columns you can use "Yes" or "No", "Y" or "N", "true" or "false", "1" or "0", or leave the cell blank for No. Case doesn't matter and spaces around the value are ignored.
+For the Yes/No columns you can use "Yes" or "No", "Y" or "N", "true" or "false", "1" or "0", or leave the cell blank for No.
 
-Times are read as a time of day and combined with the Day column, so the file still works next year. You can give a full "2026-08-29 20:15:00" timestamp instead if you need to. Talks must start and end on the same day.
+Times are read as a time of day and combined with the Day column, so the file still works next year. You can give a full "2026-08-29 20:15:00" timestamp if needed.
 
-**Day names are still case-sensitive** and must be one of Friday, Saturday, Sunday or Monday. "friday" won't match.
+Day names  must be one of Friday, Saturday, Sunday or Monday (case-sensitive)
 
 If anything in the file can't be read, nothing is imported at all: you'll get a message telling you which row and column is wrong, and the existing talks are left exactly as they were. So a failed import is safe.
 
