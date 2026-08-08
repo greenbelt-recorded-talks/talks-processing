@@ -137,6 +137,56 @@ class TestRowHandling:
             parse(ROW, ROW.replace(",Yes,Yes,Yes,", ",maybe,Yes,Yes,"))
 
 
+class TestSetupPageDocumentation:
+    """The worked example on the setup page must actually import.
+
+    The page previously documented a positional format that the parser had
+    stopped accepting, so a file built from those instructions was rejected.
+    """
+
+    DOCUMENTED_REQUIRED = "id,title,speaker,day,start_time,end_time,venue"
+    DOCUMENTED_EXAMPLE = "gb99-001,My Great Talk,Dr Awesome,Friday,20:15,21:15,A Field"
+
+    def test_the_required_columns_example_imports(self, app_ctx):
+        talk = parse(self.DOCUMENTED_EXAMPLE, header=self.DOCUMENTED_REQUIRED)[0]
+
+        assert talk["id"] == 1
+        assert talk["title"] == "My Great Talk"
+        assert talk["speaker"] == "Dr Awesome"
+        assert talk["venue"] == "A Field"
+        assert talk["start_time"] == datetime(2026, 8, 28, 20, 15)
+        assert talk["end_time"] == datetime(2026, 8, 28, 21, 15)
+
+    def test_every_column_named_on_the_page_is_understood(self, app_ctx):
+        """Guards against the page listing a column the parser ignores."""
+        from gbtalks.talks_csv import ALL_COLUMNS
+
+        documented = self.DOCUMENTED_REQUIRED.split(",") + [
+            "description",
+            "is_priority",
+            "is_rotaed",
+            "is_cleared",
+            "has_explicit_warning_sticker",
+            "has_distressing_content_warning_sticker",
+            "has_technical_issues_sticker",
+            "has_copyright_removal_sticker",
+            "recorder_name",
+            "editor_name",
+        ]
+
+        assert sorted(documented) == sorted(ALL_COLUMNS)
+
+    def test_the_day_names_the_page_lists_all_work(self, app_ctx):
+        for day in ("Friday", "Saturday", "Sunday", "Monday"):
+            row = self.DOCUMENTED_EXAMPLE.replace(",Friday,", f",{day},")
+            assert parse(row, header=self.DOCUMENTED_REQUIRED)[0]["day"] == day
+
+    def test_lowercase_day_names_are_rejected_as_the_page_warns(self, app_ctx):
+        row = self.DOCUMENTED_EXAMPLE.replace(",Friday,", ",friday,")
+        with pytest.raises(TalksCsvError):
+            parse(row, header=self.DOCUMENTED_REQUIRED)
+
+
 class TestSampleData:
     """The shipped sample data must be a valid example of the real format."""
 
