@@ -1,16 +1,28 @@
-blkinfo
-ffmpeg-normalize
-filetype
+# Web application
 Flask
 Flask-Dance[sqla]
 Flask-SQLAlchemy
 Flask-Login
-Flask-Markdown
-flake8
+python-dotenv
+markdown          # used by the vendored gbtalks/markdown wrapper
+
+# Audio / media processing
+ffmpeg-normalize
 mutagen
 pydub
-python-dotenv
-setuptools
+audioop-lts; python_version >= "3.13"   # pydub needs audioop, dropped from stdlib in 3.13
+
+# CD / USB tooling
+blkinfo
+filetype
 shortuuid
 tendo
-uwsgi
+
+# Development
+flake8
+
+# Deployment servers - install only the one your target needs.
+# PythonAnywhere provides its own uWSGI, and installing it here compiles from
+# source for no benefit. The Dockerfile's CMD uses gunicorn.
+# uwsgi
+# gunicorn
