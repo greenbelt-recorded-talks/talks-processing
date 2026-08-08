@@ -32,6 +32,7 @@ def register_commands(app):
 
 def setup_login(app):
     from flask_login import login_required, logout_user
+
     from .models import login_manager
 
     login_manager.init_app(app)
@@ -68,7 +69,7 @@ def create_app():
 
         # Create tables for our models
         db.create_all()
-        
+
         # Initialize default rota settings
         from .models import RotaSettings
         RotaSettings.initialize_defaults()

@@ -1,34 +1,20 @@
-import threading
-import os
-import json
-import subprocess
 import csv
+import os
+import pprint
+import shutil
+import subprocess
 from datetime import datetime
+from multiprocessing import Pool
+
 import click
 from flask import current_app as app
 from flask.cli import with_appcontext
-from werkzeug.exceptions import MethodNotAllowed, NotFound
-
-import shutil
-
-from .models import db, Talk, Recorder, Editor
-import sys
-from tendo import singleton
+from mutagen.id3 import APIC, COMM, ID3, TALB, TCMP, TCOP, TDRC, TIT2, TPE1, TPE2, TRCK
 from pydub import AudioSegment
+from tendo import singleton
 
-from multiprocessing import Pool
-from mutagen.id3 import ID3, TALB, TCOP, TIT2, TPE1, TPE2, TRCK, TDRC, COMM, TCMP, APIC
-import pprint
-
-from .libgbtalks import (
-    get_path_for_file,
-    get_cd_dir_for_talk,
-    gb_time_to_datetime
-)
-
-def run_command(cmd):
-    with semaphore:
-        os.system(cmd)
+from .libgbtalks import get_cd_dir_for_talk, get_path_for_file
+from .models import Editor, Recorder, Talk, db
 
 
 def process_talk(talk_id):
@@ -123,8 +109,10 @@ def process_talk(talk_id):
 def convert_talks():
     """Create production files (MP3 and CD) from edited files"""
 
-    # Make sure we only run one of these at a time
-    only_once_preventer = singleton.SingleInstance(flavor_id="convert_talks")
+    # Make sure we only run one of these at a time. The instance must stay
+    # referenced for the lifetime of the command - it releases the lock when it
+    # is garbage collected, so this binding is deliberate and load-bearing.
+    only_once_preventer = singleton.SingleInstance(flavor_id="convert_talks")  # noqa: F841
 
     gb_year = str(app.config["GB_FRIDAY"][2:4])
     gb_prefix = "gb" + gb_year + "-"
@@ -133,23 +121,23 @@ def convert_talks():
     # If a talk has an edited file but no converted file, convert it!
 
     edited_files = (
-        set(
-            [
+        {
+
                 x.name.replace("_EDITED.mp3", "").replace(gb_prefix, "")
                 for x in os.scandir(app.config["UPLOAD_DIR"])
                 if x.name.endswith("EDITED.mp3")
-            ]
-        )
+
+        }
         or set()
     )
     processed_files = (
-        set(
-            [
+        {
+
                 x.name.split("_")[1]
                 for x in os.scandir(app.config["PROCESSED_DIR"])
                 if x.name.endswith(".mp3")
-            ]
-        )
+
+        }
         or set()
     )
 
@@ -194,27 +182,27 @@ def create_db():
 class Migration:
     """
     Simple migration system for incremental database updates
-    
+
     Each migration should:
     - Have a unique version (format: NNN_descriptive_name)
     - Include a clear description of what it does
     - Provide an up_func that applies the changes
     - Optionally provide a down_func for rollbacks
     """
-    
+
     def __init__(self, version, description, up_func, down_func=None, notes=None):
         self.version = version
         self.description = description
         self.up_func = up_func
         self.down_func = down_func
         self.notes = notes  # Additional documentation for complex migrations
-    
+
     def apply(self):
         """Apply this migration"""
         print(f"Applying migration {self.version}: {self.description}")
         self.up_func()
         self._record_migration()
-    
+
     def rollback(self):
         """Rollback this migration"""
         if self.down_func:
@@ -223,7 +211,7 @@ class Migration:
             self._remove_migration_record()
         else:
             raise Exception(f"Migration {self.version} has no rollback function")
-    
+
     def _record_migration(self):
         """Record that this migration has been applied"""
         from sqlalchemy import text
@@ -231,7 +219,7 @@ class Migration:
             conn.execute(text(
                 "INSERT OR REPLACE INTO schema_migrations (version, applied_at) VALUES (:version, datetime('now'))"
             ), {"version": self.version})
-    
+
     def _remove_migration_record(self):
         """Remove migration record"""
         from sqlalchemy import text
@@ -258,7 +246,7 @@ def get_applied_migrations():
         with db.engine.connect() as conn:
             result = conn.execute(text("SELECT version FROM schema_migrations ORDER BY version"))
             return {row[0] for row in result}
-    except:
+    except Exception:
         return set()
 
 
@@ -272,14 +260,14 @@ def create_rota_settings_table():
 def add_recorder_time_constraints():
     """Migration: Add earliest_start_time and latest_end_time columns to recorders table"""
     from sqlalchemy import text
-    
+
     try:
         # For SQLite, use ALTER TABLE to add columns
         with db.engine.begin() as conn:
             conn.execute(text('ALTER TABLE recorders ADD COLUMN earliest_start_time TIME'))
     except Exception as e:
         print(f"Note: earliest_start_time column may already exist: {e}")
-    
+
     try:
         with db.engine.begin() as conn:
             conn.execute(text('ALTER TABLE recorders ADD COLUMN latest_end_time TIME'))
@@ -290,7 +278,7 @@ def add_recorder_time_constraints():
 def add_talk_cancelled_field():
     """Migration: Add is_cancelled field to talks table"""
     from sqlalchemy import text
-    
+
     try:
         # For SQLite, use ALTER TABLE to add column with default value
         with db.engine.begin() as conn:
@@ -301,7 +289,7 @@ def add_talk_cancelled_field():
 
 
 # Define all migrations here
-# 
+#
 # Migration Naming Convention:
 # - Use format: NNN_descriptive_name (e.g., 001_create_rota_settings)
 # - Always increment version numbers sequentially
@@ -326,7 +314,7 @@ MIGRATIONS = [
             "No existing data is affected."
         )
     ),
-    
+
     Migration(
         version="002_add_recorder_time_constraints",
         description="Add earliest_start_time and latest_end_time fields to recorders",
@@ -340,7 +328,7 @@ MIGRATIONS = [
             "Rota generation will respect these constraints when assigning talks."
         )
     ),
-    
+
     Migration(
         version="003_add_talk_cancelled_field",
         description="Add is_cancelled field to talks table for safe talk cancellation",
@@ -353,7 +341,7 @@ MIGRATIONS = [
             "The talks page will show cancelled status with filtering options."
         )
     ),
-    
+
     # Template for future migrations:
     # Migration(
     #     version="004_descriptive_name",
@@ -375,25 +363,25 @@ MIGRATIONS = [
 @with_appcontext
 def migrate_db():
     """Apply pending database migrations"""
-    
+
     print("Checking for pending migrations...")
-    
+
     try:
         # Ensure migrations table exists
         ensure_migrations_table()
-        
+
         # Get applied migrations
         applied = get_applied_migrations()
-        
+
         # Find pending migrations
         pending = [m for m in MIGRATIONS if m.version not in applied]
-        
+
         if not pending:
             print("✓ No pending migrations")
             return
-        
+
         print(f"Found {len(pending)} pending migration(s)")
-        
+
         # Apply each pending migration
         for migration in pending:
             try:
@@ -403,10 +391,10 @@ def migrate_db():
                 print(f"✗ Failed to apply {migration.version}: {e}")
                 db.session.rollback()
                 raise
-        
+
         db.session.commit()
         print(f"Successfully applied {len(pending)} migration(s)!")
-        
+
     except Exception as e:
         db.session.rollback()
         print(f"Migration failed: {e}")
@@ -418,31 +406,31 @@ def migrate_db():
 @with_appcontext
 def migration_status(verbose):
     """Show migration status and documentation"""
-    
+
     try:
         ensure_migrations_table()
         applied = get_applied_migrations()
-        
+
         print("Migration Status:")
         print("=" * 70)
-        
+
         for migration in MIGRATIONS:
             status = "✓ Applied" if migration.version in applied else "○ Pending"
             print(f"\n{status} {migration.version}")
             print(f"    Description: {migration.description}")
-            
+
             if verbose and migration.notes:
                 print(f"    Notes: {migration.notes}")
-            
+
             if verbose:
                 has_rollback = "Yes" if migration.down_func else "No"
                 print(f"    Rollback available: {has_rollback}")
-        
+
         print(f"\nSummary: {len(applied)}/{len(MIGRATIONS)} migrations applied")
-        
+
         if not verbose:
             print("\nUse --verbose for detailed information about each migration")
-        
+
     except Exception as e:
         print(f"Error checking migration status: {e}")
 
@@ -453,14 +441,14 @@ def migration_status(verbose):
 @with_appcontext
 def load_sample_data(table, clear):
     """Load sample data from CSV files into specified table"""
-    
+
     sample_data_dir = os.path.join(os.path.dirname(app.root_path), "sample_data")
     csv_file = os.path.join(sample_data_dir, f"{table.lower()}.csv")
-    
+
     if not os.path.exists(csv_file):
         print(f"Error: Sample data file not found: {csv_file}")
         return
-    
+
     try:
         if clear:
             print(f"Clearing existing {table} data...")
@@ -471,13 +459,13 @@ def load_sample_data(table, clear):
             elif table.lower() == "editors":
                 Editor.query.delete()
             db.session.commit()
-        
+
         print(f"Loading sample {table} data from {csv_file}...")
-        
-        with open(csv_file, 'r', newline='', encoding='utf-8') as file:
+
+        with open(csv_file, newline='', encoding='utf-8') as file:
             reader = csv.DictReader(file)
             count = 0
-            
+
             for row in reader:
                 if table.lower() == "talks":
                     # Convert string values to appropriate types
@@ -500,60 +488,59 @@ def load_sample_data(table, clear):
                         'recorder_name': row['recorder_name'] if row['recorder_name'] else None,
                         'editor_name': row['editor_name'] if row['editor_name'] else None
                     }
-                    
+
                     # Check if talk already exists
                     existing_talk = Talk.query.filter_by(id=talk_data['id']).first()
                     if existing_talk:
                         print(f"Talk ID {talk_data['id']} already exists, skipping...")
                         continue
-                        
+
                     talk = Talk(**talk_data)
                     db.session.add(talk)
-                    
+
                 elif table.lower() == "recorders":
                     # Convert time strings to time objects
-                    from datetime import time
                     earliest_start = None
                     latest_end = None
-                    
+
                     if row['earliest_start_time']:
                         earliest_start = datetime.strptime(row['earliest_start_time'], '%H:%M:%S').time()
                     if row['latest_end_time']:
                         latest_end = datetime.strptime(row['latest_end_time'], '%H:%M:%S').time()
-                    
+
                     recorder_data = {
                         'name': row['name'],
                         'max_shifts_per_day': int(row['max_shifts_per_day']),
                         'earliest_start_time': earliest_start,
                         'latest_end_time': latest_end
                     }
-                    
+
                     # Check if recorder already exists
                     existing_recorder = Recorder.query.filter_by(name=recorder_data['name']).first()
                     if existing_recorder:
                         print(f"Recorder {recorder_data['name']} already exists, skipping...")
                         continue
-                        
+
                     recorder = Recorder(**recorder_data)
                     db.session.add(recorder)
-                    
+
                 elif table.lower() == "editors":
                     editor_data = {'name': row['name']}
-                    
+
                     # Check if editor already exists
                     existing_editor = Editor.query.filter_by(name=editor_data['name']).first()
                     if existing_editor:
                         print(f"Editor {editor_data['name']} already exists, skipping...")
                         continue
-                        
+
                     editor = Editor(**editor_data)
                     db.session.add(editor)
-                
+
                 count += 1
-        
+
         db.session.commit()
         print(f"Successfully loaded {count} {table} records!")
-        
+
     except Exception as e:
         db.session.rollback()
         print(f"Error loading sample data: {e}")

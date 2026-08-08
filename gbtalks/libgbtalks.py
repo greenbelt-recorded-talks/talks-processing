@@ -1,6 +1,7 @@
-from flask import current_app as app
-from datetime import datetime, timedelta
 import subprocess
+from datetime import datetime, timedelta
+
+from flask import current_app as app
 
 
 def calculate_greenbelt_friday(year):
@@ -12,10 +13,10 @@ def calculate_greenbelt_friday(year):
     last_day_of_august = datetime(year, 8, 31)
     weekday = last_day_of_august.weekday()  # 0=Monday, 1=Tuesday, etc.
     last_monday = last_day_of_august - timedelta(days=weekday)
-    
+
     # Go back 3 days from that Monday to get the Friday before
     greenbelt_friday = last_monday - timedelta(days=3)
-    
+
     return greenbelt_friday
 
 
@@ -114,14 +115,14 @@ def extract_audio_from_video(video_path, audio_output_path):
             '-y',  # Overwrite output file
             audio_output_path
         ]
-        
+
         result = subprocess.run(cmd, capture_output=True, text=True)
-        
+
         if result.returncode == 0:
             return True, "Audio extracted successfully"
         else:
             return False, f"FFmpeg error: {result.stderr}"
-            
+
     except FileNotFoundError:
         return False, "FFmpeg not found. Please install ffmpeg."
     except Exception as e:
@@ -131,17 +132,16 @@ def extract_audio_from_video(video_path, audio_output_path):
 def extract_audio_from_video_async(video_path, audio_output_path):
     """Start background audio extraction from video file using ffmpeg"""
     import threading
-    import os
-    
+
     # Create a status file to track progress
     status_file = audio_output_path + ".status"
-    
+
     def background_extraction():
         try:
             # Write status: processing
             with open(status_file, 'w') as f:
                 f.write("processing")
-            
+
             # Use ffmpeg to extract audio at high quality
             cmd = [
                 '/usr/bin/ffmpeg',
@@ -153,9 +153,9 @@ def extract_audio_from_video_async(video_path, audio_output_path):
                 '-y',  # Overwrite output file
                 audio_output_path
             ]
-            
+
             result = subprocess.run(cmd, capture_output=True, text=True)
-            
+
             if result.returncode == 0:
                 # Write status: success
                 with open(status_file, 'w') as f:
@@ -164,35 +164,35 @@ def extract_audio_from_video_async(video_path, audio_output_path):
                 # Write status: error with message
                 with open(status_file, 'w') as f:
                     f.write(f"error: FFmpeg error: {result.stderr}")
-                    
+
         except FileNotFoundError:
             with open(status_file, 'w') as f:
                 f.write("error: FFmpeg not found. Please install ffmpeg.")
         except Exception as e:
             with open(status_file, 'w') as f:
                 f.write(f"error: Error extracting audio: {str(e)}")
-    
+
     # Start background thread
     thread = threading.Thread(target=background_extraction)
     thread.daemon = True
     thread.start()
-    
+
     return True, "Audio extraction started in background"
 
 
 def get_video_processing_status(audio_output_path):
     """Check the status of video processing"""
     import os
-    
+
     status_file = audio_output_path + ".status"
-    
+
     if not os.path.exists(status_file):
         return "not_started", "Processing not started"
-    
+
     try:
-        with open(status_file, 'r') as f:
+        with open(status_file) as f:
             status_content = f.read().strip()
-        
+
         if status_content == "processing":
             return "processing", "Audio extraction in progress"
         elif status_content == "success":

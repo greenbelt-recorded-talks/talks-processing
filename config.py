@@ -1,6 +1,7 @@
 import os
 from datetime import datetime
 
+
 class Config:
     """Set Flask configuration vars from .env file."""
 

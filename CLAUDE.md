@@ -34,8 +34,30 @@ uwsgi gbtalks.ini
 
 ### Code Quality
 ```bash
-python3 -m flake8 .          # Lint Python code
+ruff check .                 # Lint Python code
+ruff check --fix .           # Lint and apply safe autofixes
+pytest                       # Run the test suite
+pytest tests/test_rota.py    # Run one module
 ```
+
+Lint and test configuration both live in `pyproject.toml`. Ruff targets Python
+3.13 and excludes `gbtalks/markdown/`, which is vendored third-party code.
+
+Two lint conventions worth knowing before "fixing" what look like violations:
+
+- SQLAlchemy filters need `Column.is_(True)` / `is_(False)`, not a bare truth
+  test. Ruff's E712 suggestion would silently change the query.
+- `Talk.recorded_by` is a *relationship*, so `== None` / `!= None` is the
+  supported comparison there and is marked `# noqa: E711`.
+
+### Testing
+The suite uses an isolated temporary SQLite database and temp storage
+directories, both set up in `tests/conftest.py`. That has to happen at module
+scope, before `gbtalks` is imported, because `config.Config` reads `os.environ`
+when its class body executes.
+
+Useful fixtures: `client` (anonymous), `auth_client` (logged in as a team
+leader), `db`, and the `make_talk` / `make_recorder` / `make_editor` factories.
 
 ## Architecture
 
@@ -89,6 +111,13 @@ Environment-based configuration in `config.py`:
 
 ### Permission System
 Team leader permissions controlled via `TEAM_LEADERS_EMAILS` in config.py. These users can access editing and administration features.
+
+Most routes carry both `@login_required` and `@current_user_is_team_leader`.
+The exceptions are deliberate: the read-only rota views (`/rota_by_recorder`,
+`/rota_by_time`, `/rota_by_venue`) and the CSV exports are readable without
+signing in, so recorders can check their shifts on site. `POST /rota`
+regenerates the rota and clears every existing assignment, so it checks team
+leader permissions inline even though `GET /rota` is open.
 
 ### Dependencies
 - Flask ecosystem (Flask, Flask-SQLAlchemy, Flask-Login, Flask-Dance)

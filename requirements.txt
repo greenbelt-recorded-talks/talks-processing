@@ -5,6 +5,7 @@ Flask-SQLAlchemy
 Flask-Login
 python-dotenv
 markdown          # used by the vendored gbtalks/markdown wrapper
+pyexcel           # CSV export routes in gbtalks/routes.py
 
 # Audio / media processing
 ffmpeg-normalize
@@ -13,13 +14,13 @@ pydub
 audioop-lts; python_version >= "3.13"   # pydub needs audioop, dropped from stdlib in 3.13
 
 # CD / USB tooling
-blkinfo
 filetype
 shortuuid
 tendo
 
 # Development
-flake8
+ruff
+pytest
 
 # Deployment servers - install only the one your target needs.
 # PythonAnywhere provides its own uWSGI, and installing it here compiles from

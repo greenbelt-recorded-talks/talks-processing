@@ -1,16 +1,18 @@
+from datetime import datetime, timedelta
+
+from flask import current_app as app
+from flask import (
+    flash,
+    render_template,
+    request,
+)
+from flask_login import current_user
+from sqlalchemy.orm import joinedload
+
+from gbtalks.models import Recorder, RotaSettings, Talk, db
+
 from . import rota_blueprint
 
-from flask import (
-    request,
-    redirect,
-    url_for,
-    render_template,
-    flash,
-)
-from datetime import datetime, timedelta
-from flask import current_app as app
-from gbtalks.models import db, Talk, Recorder, RotaSettings
-from sqlalchemy.orm import joinedload
 
 def talk_would_clash(recorder, talk, settings_cache=None):
     # A talk clashes if it starts while the recorder is currently recording, or within the configured gap
@@ -30,7 +32,7 @@ def talk_would_clash(recorder, talk, settings_cache=None):
 # AND
 # * It ends before 17:20 (assuming a 1h talk)
 #
-# A talk at 17:30 would not clash. 
+# A talk at 17:30 would not clash.
 #
 
     for existing_talk in recorder.talks:
@@ -59,24 +61,12 @@ def recorder_is_maxed_out_for_day(recorder, talk, settings_cache=None):
         return False
 
 
-def recorder_shifts_exceeded(recorder, candidate_talk):
-    # The shift pattern is up to three hours per shift, with three hours off between, up to the maximum number of shifts the recorder can do per day
-
-    day = candidate_talk.start_time.day()
-
-    shifts = []
-
-    for talk in recorder.talks:
-        if talk.start_time.day() != day:
-            continue
-
-
 def talk_would_break_shift_pattern(recorder, candidate_talk, settings_cache=None):
     # make sure that if this talk is assigned, we don't violate any of the shift rules
     # - prepare the list of talks that would result if this talk were allocated
     # - check that there are no more shift_length groups containing talks than the candidate is allowed shifts
     # - check that the shift groups are more than break_between_shifts apart
-    
+
     shift_length = settings_cache['shift_length'] if settings_cache else RotaSettings.get_value('shift_length', 3)
     break_between_shifts = settings_cache['break_between_shifts'] if settings_cache else RotaSettings.get_value('break_between_shifts', 2)
 
@@ -119,30 +109,30 @@ def talk_would_break_shift_pattern(recorder, candidate_talk, settings_cache=None
     # Build shifts dynamically based on max_shifts_per_day_limit
     max_shifts_per_day_limit = settings_cache['max_shifts_per_day_limit'] if settings_cache else RotaSettings.get_value('max_shifts_per_day_limit', 2)
     max_allowed_shifts = min(recorder.max_shifts_per_day, max_shifts_per_day_limit)
-    
+
     all_shifts = [talks_in_first_shift]
     remaining_talks = talks_on_this_day_if_talk_assigned[len(talks_in_first_shift):]
-    
+
     # Build additional shifts up to the maximum allowed
-    for shift_num in range(2, max_allowed_shifts + 1):
+    for _shift_num in range(2, max_allowed_shifts + 1):
         if not remaining_talks:
             break
-            
+
         # Find the start time for this shift (first remaining talk)
         shift_start_time = remaining_talks[0].start_time
-        
+
         # Check if this shift starts with adequate break after previous shift
         previous_shift = all_shifts[-1]
         if previous_shift and shift_start_time < previous_shift[-1].end_time + timedelta(hours=break_between_shifts):
             return True  # Violates break rules
-        
+
         # Collect talks for this shift
         current_shift = []
         for talk in remaining_talks[:]:  # Copy list to avoid modification during iteration
             if shift_start_time <= talk.start_time <= shift_start_time + timedelta(hours=shift_length - 1):
                 current_shift.append(talk)
                 remaining_talks.remove(talk)
-        
+
         if current_shift:
             all_shifts.append(current_shift)
         else:
@@ -178,7 +168,7 @@ def clear_rota():
 def find_recorder_for_talk(talk, settings_cache=None):
     # Eager load recorder talks to avoid N+1 queries
     recorders = Recorder.query.options(joinedload(Recorder.talks)).all()
-    
+
     # Sort recorders once by current talk count, then maintain order by removing candidates
     recorders.sort(key=lambda x: len(x.talks))
 
@@ -191,7 +181,7 @@ def find_recorder_for_talk(talk, settings_cache=None):
         # Move on if talk starts before recorder's earliest start time
         if candidate_recorder.earliest_start_time and talk.start_time.time() < candidate_recorder.earliest_start_time:
             continue
-            
+
         # Move on if talk ends after recorder's latest end time
         if candidate_recorder.latest_end_time and talk.end_time.time() > candidate_recorder.latest_end_time:
             continue
@@ -222,7 +212,13 @@ def find_recorder_for_talk(talk, settings_cache=None):
         # If we've got this far, we're ok to assign the talk to the candidate recorder
         assign_talk_to_recorder(candidate_recorder, talk)
 
-    return candidate_recorder or None
+    # Only report a recorder if the talk was actually assigned to one. Returning
+    # the last candidate considered would report success after every candidate
+    # had been rejected, and callers use this result to assign follow-on talks.
+    if talk.recorded_by is None:
+        return None
+
+    return candidate_recorder
 
 
 @rota_blueprint.route("/rota", methods=["GET", "POST"])
@@ -231,11 +227,20 @@ def rota():
 
     # Initialize cache as None for GET requests
     rota_settings_cache = None
-    
+
     if request.method == "POST":
+        # Regenerating the rota clears every existing recorder assignment, so it
+        # is restricted to team leaders. The read-only rota views below stay open
+        # so recorders can check their own shifts without signing in.
+        if (
+            not current_user.is_authenticated
+            or current_user.email not in app.config["TEAM_LEADERS_EMAILS"]
+        ):
+            return app.login_manager.unauthorized()
+
         # If we've been asked to make a new rota, clear out the old one
         clear_rota()
-        
+
         # Cache all RotaSettings at the start to avoid repeated database lookups
         rota_settings_cache = {
             'minimum_time_between_talks': RotaSettings.get_value('minimum_time_between_talks', 20),
@@ -248,11 +253,11 @@ def rota():
             'additional_talk_minimum_gap': RotaSettings.get_value('additional_talk_minimum_gap', 20),
         }
 
-    talks = Talk.query.filter(Talk.is_priority == True).order_by(Talk.start_time)
+    talks = Talk.query.filter(Talk.is_priority.is_(True)).order_by(Talk.start_time)
 
     for talk in talks:
         app.logger.error("Finding a recorder for priority talk " + str(talk.id))
-        
+
         # Move on if this talk is already being recorded
         if talk.recorder_name is not None:
             continue
@@ -271,7 +276,7 @@ def rota():
                 Talk.start_time > talk.end_time,
                 Talk.start_time <= talk.start_time + timedelta(hours=same_venue_assignment_window - 1),
                 Talk.venue == talk.venue,
-                Talk.is_priority == True,
+                Talk.is_priority.is_(True),
             ).order_by(Talk.start_time):
                 if (
                     future_talk.start_time
@@ -282,7 +287,7 @@ def rota():
                 ):
                     assign_talk_to_recorder(assigned_recorder, future_talk)
 
-    additional_talks = Talk.query.filter(Talk.is_priority == False).order_by(
+    additional_talks = Talk.query.filter(Talk.is_priority.is_(False)).order_by(
         Talk.start_time
     )
 
@@ -308,7 +313,9 @@ def rota():
                 Talk.query.filter(
                     Talk.start_time > talk.end_time,
                     Talk.start_time <= talk.end_time + timedelta(hours=additional_talk_search_window),
-                    Talk.recorded_by == None,
+                    # recorded_by is a relationship, not a column: comparing it
+                    # to None is the supported way to test for "unassigned".
+                    Talk.recorded_by == None,  # noqa: E711
                 )
                 .order_by(Talk.start_time)
                 .all()
@@ -324,25 +331,30 @@ def rota():
 
     # Add completion message if this was a POST request (rota generation)
     if request.method == "POST":
-        priority_talks_count = Talk.query.filter(Talk.is_priority == True).count()
-        assigned_priority_talks = Talk.query.filter(Talk.is_priority == True, Talk.recorded_by != None).count()
-        
-        additional_talks_count = Talk.query.filter(Talk.is_priority == False).count()
-        assigned_additional_talks = Talk.query.filter(Talk.is_priority == False, Talk.recorded_by != None).count()
-        
+        # Talk.recorded_by is a relationship, so != None is the supported test.
+        priority_talks_count = Talk.query.filter(Talk.is_priority.is_(True)).count()
+        assigned_priority_talks = Talk.query.filter(
+            Talk.is_priority.is_(True), Talk.recorded_by != None  # noqa: E711
+        ).count()
+
+        additional_talks_count = Talk.query.filter(Talk.is_priority.is_(False)).count()
+        assigned_additional_talks = Talk.query.filter(
+            Talk.is_priority.is_(False), Talk.recorded_by != None  # noqa: E711
+        ).count()
+
         # Check if all talks were allocated
         unallocated_priority = priority_talks_count - assigned_priority_talks
         unallocated_additional = additional_talks_count - assigned_additional_talks
-        
+
         base_message = f"Rota generation completed! Assigned {assigned_priority_talks}/{priority_talks_count} priority talks and {assigned_additional_talks}/{additional_talks_count} additional talks."
-        
+
         if unallocated_priority > 0 or unallocated_additional > 0:
             warning_parts = []
             if unallocated_priority > 0:
                 warning_parts.append(f"{unallocated_priority} priority talk{'s' if unallocated_priority != 1 else ''}")
             if unallocated_additional > 0:
                 warning_parts.append(f"{unallocated_additional} additional talk{'s' if unallocated_additional != 1 else ''}")
-            
+
             warning_message = f" WARNING: {' and '.join(warning_parts)} could not be allocated - check recorder availability and rota settings."
             flash(base_message + warning_message, "warning")
         else:
@@ -356,12 +368,12 @@ def rota_by_venue():
     """Print the rota by venue"""
 
     days = [t.day for t in Talk.query.order_by(Talk.start_time).group_by(Talk.day).distinct()]
-    talks = {}        
+    talks = {}
     times = {}
     venues = {}
-    
+
     for day in days:
-        talks[day] = Talk.query.where(Talk.day == day).order_by(Talk.start_time) 
+        talks[day] = Talk.query.where(Talk.day == day).order_by(Talk.start_time)
         venues[day] = [t.venue for t in Talk.query.where(Talk.day==day).order_by(Talk.venue).group_by(Talk.venue).distinct()]
         times[day] = [t.start_time for t in Talk.query.where(Talk.day==day).order_by(Talk.start_time).group_by(Talk.start_time).distinct()]
 
@@ -389,44 +401,44 @@ def rota_by_recorder():
 
     # Get all talks ordered by time
     talks = Talk.query.order_by(Talk.start_time).all()
-    
+
     # Get all recorders who have talks assigned
     recorders = Recorder.query.filter(Recorder.talks.any()).order_by(Recorder.name).all()
-    
+
     # Get unique days
     days = []
     for talk in talks:
         if talk.day not in days:
             days.append(talk.day)
-    
+
     # Create data structure organized by day
     rota_data = {}
-    
+
     for day in days:
         # Get talks for this day
         day_talks = [t for t in talks if t.day == day]
-        
+
         if not day_talks:
             continue
-        
+
         # Get all unique start and end times for this day
         all_times = set()
         for talk in day_talks:
             all_times.add(talk.start_time)
             all_times.add(talk.end_time)
-        
+
         # Sort all times to create our time slots
         sorted_times = sorted(all_times)
-        
+
         rota_data[day] = {
             'times': sorted_times,
             'grid': {}
         }
-        
+
         # Initialize grid for each time slot
         for time_slot in sorted_times:
             rota_data[day]['grid'][time_slot] = {recorder.name: None for recorder in recorders}
-        
+
         # For each time slot, check which talks are active (started but not yet ended)
         for time_slot in sorted_times:
             for talk in day_talks:

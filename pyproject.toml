@@ -1,0 +1,39 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+filterwarnings = [
+    # The legacy Query.get() API has been migrated to Session.get(). Fail the
+    # suite rather than warn if it creeps back in.
+    "error::sqlalchemy.exc.LegacyAPIWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+exclude = ["gbtalks/markdown"]  # vendored third-party code
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "UP",   # pyupgrade
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+]
+ignore = [
+    "E501",  # line length is handled by the formatter
+    "B008",  # function call in default arg - common and deliberate in Flask
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Route modules are imported for their side effects (registering the routes),
+# and must be imported after the app/blueprint they attach to exists.
+"gbtalks/__init__.py" = ["F401", "E402"]
+"gbtalks/rota/__init__.py" = ["F401", "E402"]
+# conftest sets the environment variables config.Config reads at import time,
+# so gbtalks cannot be imported until after that has run.
+"tests/conftest.py" = ["E402"]
+"tests/*" = ["B011"]

@@ -1,11 +1,11 @@
 from flask import flash
-from flask_login import current_user, login_user
-from flask_dance.contrib.google import make_google_blueprint
 from flask_dance.consumer import oauth_authorized, oauth_error
 from flask_dance.consumer.storage.sqla import SQLAlchemyStorage
+from flask_dance.contrib.google import make_google_blueprint
+from flask_login import current_user, login_user
 from sqlalchemy.orm.exc import NoResultFound
-from .models import db, User, OAuth
 
+from .models import OAuth, User, db
 
 blueprint = make_google_blueprint(
     scope=["profile", "email"],
@@ -59,7 +59,5 @@ def google_logged_in(blueprint, token):
 # notify on OAuth provider error
 @oauth_error.connect_via(blueprint)
 def google_error(blueprint, message, response):
-    msg = ("OAuth error from {name}! " "message={message} response={response}").format(
-        name=blueprint.name, message=message, response=response
-    )
+    msg = (f"OAuth error from {blueprint.name}! " f"message={message} response={response}")
     flash(msg, category="error")
