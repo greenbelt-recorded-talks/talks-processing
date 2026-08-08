@@ -140,7 +140,14 @@ def edit_talk():
 
     if request.method == "GET":
         talk_id = request.args.get("talk_id")
-        talk = db.session.get(Talk, talk_id)
+        # Skip the lookup entirely without an id: SQLAlchemy warns that loading
+        # a NULL primary key may become an error in a future release.
+        talk = db.session.get(Talk, talk_id) if talk_id else None
+
+        if not talk:
+            flash(f"Talk {talk_id} not found", "error")
+            return redirect(url_for("talks"))
+
         return render_template("edit_talk.html",
                                 start_time=talk.start_time.strftime("%H:%M:%S"),
                                 end_time=talk.end_time.strftime("%H:%M:%S"),

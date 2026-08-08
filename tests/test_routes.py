@@ -128,14 +128,33 @@ class TestEditTalkPage:
         assert response.status_code == 200
         assert "Editable Talk" in response.get_data(as_text=True)
 
-    def test_crashes_when_no_talk_id_is_given(self, auth_client):
-        """Currently a 500 - Talk.query.get(None) returns None and is then used."""
-        with pytest.raises(AttributeError):
-            auth_client.get("/edit_talk")
+    @pytest.mark.parametrize(
+        ("query", "description"),
+        [
+            ("", "no talk_id at all"),
+            ("?talk_id=", "an empty talk_id"),
+            ("?talk_id=99999", "an unknown talk_id"),
+            ("?talk_id=abc", "a non-numeric talk_id"),
+        ],
+    )
+    def test_redirects_instead_of_crashing_for_a_bad_talk_id(
+        self, auth_client, query, description
+    ):
+        """Every one of these used to raise AttributeError and return a 500.
 
-    def test_crashes_for_an_unknown_talk_id(self, auth_client):
-        with pytest.raises(AttributeError):
-            auth_client.get("/edit_talk?talk_id=99999")
+        db.session.get returns None for all of them, and the template then
+        read .start_time off it.
+        """
+        response = auth_client.get(f"/edit_talk{query}")
+
+        assert response.status_code == 302, f"expected a redirect for {description}"
+        assert "/talks" in response.headers["Location"]
+
+    def test_bad_talk_id_flashes_an_explanation(self, auth_client):
+        response = auth_client.get("/edit_talk?talk_id=99999", follow_redirects=True)
+
+        assert response.status_code == 200
+        assert "Talk 99999 not found" in response.get_data(as_text=True)
 
 
 class TestTalksPage:
