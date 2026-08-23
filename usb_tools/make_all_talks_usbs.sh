@@ -21,12 +21,16 @@ fi
 
 # If any USBs are mounted, error out - that's not right
 
-
 echo -n "There are "
 /home/gbtalks/talks-processing/usb_tools/count_connected_usbs.sh
 echo " USB drives connected. Press any key to continue, or Ctrl+C to quit"
 
 read
+
+# Copy usb_gold to RAM
+
+mkdir /dev/shm/usb_gold
+rsync /storage/usb_gold/* /dev/shm/usb_gold
 
 echo "Starting work"
 

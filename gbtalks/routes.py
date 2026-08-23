@@ -2196,7 +2196,7 @@ def talks_products():
 
     talks = [["Title", "Description", "Talk ID", "Talk Variation ID", "Media", "Price", "Virtual", "Downloadable", "Shipping Class", "MP3 Filename", "MP3 URL", "Speakers", "Festival", "Date and Time", "Panel", "Venue", "Categories", "Talks Category", "Talks Category2", "Talks Category3", "Parental Advisory", "Explicit Content", "Copyright", "Technical"]]
 
-    for t in Talk.query.all():
+    for t in Talk.query.filter(Talk.is_cleared.is_(True), Talk.is_cancelled.is_(False)).all():
         talks.append([
             t.title,
             t.description,
