@@ -106,7 +106,7 @@ def extract_audio_from_video(video_path, audio_output_path):
     try:
         # Use ffmpeg to extract audio at high quality
         cmd = [
-            '/usr/bin/ffmpeg',
+            'ffmpeg',
             '-i', video_path,
             '-vn',  # No video
             '-acodec', 'libmp3lame',  # MP3 codec
@@ -144,7 +144,7 @@ def extract_audio_from_video_async(video_path, audio_output_path):
 
             # Use ffmpeg to extract audio at high quality
             cmd = [
-                '/usr/bin/ffmpeg',
+                'ffmpeg',
                 '-i', video_path,
                 '-vn',  # No video
                 '-acodec', 'libmp3lame',  # MP3 codec
