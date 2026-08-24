@@ -67,6 +67,10 @@
       p10k_users: 
         - gbtalks
       zsh_plugin: ohmyzsh
+      # lean draws no segment backgrounds, so the prompt takes the colour
+      # of whatever terminal you're sshing in from. classic hardcodes a
+      # dark bar, which fights a light terminal.
+      p10k_prompt_style: lean
 
 
 - name: Install the talks-processing application
