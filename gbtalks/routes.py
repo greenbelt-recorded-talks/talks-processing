@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 
 from .libgbtalks import (
     calculate_greenbelt_friday,
+    describe_file,
     extract_audio_from_video_async,
     festival_cycle_start,
     gb_time_to_datetime,
@@ -208,7 +209,9 @@ def critical_files():
             "purpose": "Audio segment played at the start of each processed talk",
             "critical": True,
             "used_by": ["Audio processing pipeline"],
-            "expected_type": "MP3 audio file"
+            "expected_type": "MP3 audio file",
+            "preview": "audio",
+            "mimetype": "audio/mpeg"
         },
         {
             "name": "tail.mp3",
@@ -216,7 +219,9 @@ def critical_files():
             "purpose": "Audio segment played at the end of each processed talk",
             "critical": True,
             "used_by": ["Audio processing pipeline"],
-            "expected_type": "MP3 audio file"
+            "expected_type": "MP3 audio file",
+            "preview": "audio",
+            "mimetype": "audio/mpeg"
         },
         {
             "name": "alltalksicon.png",
@@ -224,7 +229,9 @@ def critical_files():
             "purpose": "Cover art embedded in all processed MP3 files",
             "critical": True,
             "used_by": ["Audio processing pipeline", "MP3 metadata"],
-            "expected_type": "Square PNG image file, written by the cover art upload"
+            "expected_type": "Square PNG image file, written by the cover art upload",
+            "preview": "image",
+            "mimetype": "image/png"
         },
         {
             "name": f"GB{app.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf",
@@ -232,7 +239,9 @@ def critical_files():
             "purpose": "Complete index of all talks for USB distribution",
             "critical": True,
             "used_by": ["USB duplication process", "All talks distribution"],
-            "expected_type": "PDF document"
+            "expected_type": "PDF document",
+            "preview": "pdf",
+            "mimetype": "application/pdf"
         }
     ]
 
@@ -393,6 +402,7 @@ def perform_health_check():
             "critical": file_info["critical"],
             "used_by": file_info["used_by"],
             "expected_type": file_info["expected_type"],
+            "preview": file_info.get("preview"),
             "exists": False,
             "readable": False,
             "file_size": "Unknown",
@@ -401,7 +411,15 @@ def perform_health_check():
             "status": "error",
             "stale": False,
             "found_at": None,
-            "issues": []
+            "issues": [],
+            # Media details for the preview, and the reason there are none.
+            # Display only: a file the check has found and read is fine by the
+            # check's own lights whatever the describer makes of it.
+            "details": [],
+            "detail_error": None,
+            # Bumped when the file changes, so a replaced cover image is not
+            # served from the browser cache.
+            "cache_key": None
         }
 
         check_path = file_info["path"]
@@ -425,8 +443,14 @@ def perform_health_check():
                 mtime = stat_info.st_mtime
                 file_status["last_modified"] = datetime.fromtimestamp(stat_info.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
                 file_status["permissions"] = oct(stat_info.st_mode)[-3:]
+                file_status["cache_key"] = int(mtime)
             except Exception as e:
                 file_status["issues"].append(f"Could not read file details: {e}")
+
+            if file_status["readable"]:
+                file_status["details"], file_status["detail_error"] = describe_file(
+                    check_path, file_info.get("preview")
+                )
 
             if not file_status["readable"]:
                 file_status["status"] = "warning"
@@ -545,6 +569,42 @@ def confirm_file_current():
         flash(f"Confirmed as current for this year: {', '.join(confirmed)}", "success")
 
     return redirect(url_for("health_check_page"))
+
+
+@app.route("/critical_file", methods=["GET"])
+@login_required
+@current_user_is_team_leader
+def critical_file():
+    """Serve one of the critical files, for the health check page's previews.
+
+    Inline by default, so the page can put top.mp3 in an audio element and the
+    cover art in an img; ?download=1 for the save-it-to-your-machine button,
+    which is the only thing on offer for the PDF.
+
+    Like the confirm route, the name is resolved against critical_files()
+    rather than a path being taken from the query string: this serves those
+    four files and nothing else.
+    """
+
+    requested = request.args.get("name", "")
+    wanted = next((f for f in critical_files() if f["name"] == requested), None)
+
+    if wanted is None:
+        flash("Unknown file", "error")
+        return redirect(url_for("health_check_page"))
+
+    if not os.path.isfile(wanted["path"]):
+        flash(f"{wanted['name']} is not there", "error")
+        return redirect(url_for("health_check_page"))
+
+    download = bool(request.args.get("download"))
+
+    return send_file(
+        wanted["path"],
+        mimetype=wanted.get("mimetype"),
+        as_attachment=download,
+        download_name=wanted["name"],
+    )
 
 
 @app.route("/put_alltalks_pdf", methods=["POST"])

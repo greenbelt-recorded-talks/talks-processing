@@ -275,6 +275,26 @@ the submitted name against `critical_files()` instead of trusting a path from
 the form, and will not create a file that is missing - an empty `top.mp3` would
 satisfy the exists check and then break conversion quietly.
 
+Confirming a file only means anything if you can check it first, so each card
+carries a preview: an inline player for the two MP3s, a thumbnail for the cover
+art, a download button for all four. `GET /critical_file?name=` serves the
+bytes - inline by default, `&download=1` as an attachment - and resolves the
+name against `critical_files()` for the same reason the confirm route does.
+The URL carries the file's mtime as a cache buster, so a replaced cover image
+does not come back from the browser cache.
+
+The `describe_*_file` helpers in `libgbtalks.py` supply the stats beside each
+one (duration and bitrate, dimensions and colour mode, PDF version). They are
+**display only**: `describe_file` catches their failures into a message rather
+than adding an issue, because whether a present, readable file is the right one
+is exactly the question a human is being asked. A `top.mp3` mutagen cannot
+parse still gets a green card and a note. The PDF describer reads the 8-byte
+header and nothing else - page counts would mean a PDF library the app has no
+other use for, and the download button is right there.
+
+The thumbnail sits on a CSS checkerboard because `normalise_cover_image` pads a
+non-square source with transparency, which is invisible against a white card.
+
 ### Deployment Badge
 The navbar carries a badge saying which deployment you are looking at - `Cloud`
 on PythonAnywhere, `On-site` on the festival server. Detection is a sniff for

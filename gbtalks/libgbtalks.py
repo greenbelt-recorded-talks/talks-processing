@@ -3,6 +3,8 @@ import subprocess
 from datetime import datetime, timedelta
 
 from flask import current_app as app
+from mutagen import MutagenError
+from mutagen.mp3 import MP3
 from PIL import Image, UnidentifiedImageError
 
 
@@ -307,3 +309,110 @@ def normalise_cover_image(source, size):
             return buffer.getvalue()
     except UnidentifiedImageError as exc:
         raise ValueError("Not an image file we can read") from exc
+
+
+def _format_duration(seconds):
+    """Seconds as m:ss, or h:mm:ss once it runs past the hour."""
+    total = int(round(seconds))
+    hours, remainder = divmod(total, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
+
+
+def describe_audio_file(path):
+    """What an MP3 will sound like, as (label, value) pairs.
+
+    Duration is the useful one: top.mp3 and tail.mp3 are a few seconds long,
+    so anything reported in minutes is a talk somebody has copied into the
+    wrong place.
+
+    Raises ValueError if mutagen cannot read it as an MP3.
+    """
+    try:
+        audio = MP3(path)
+    except MutagenError as exc:
+        raise ValueError("Not an MP3 file we can read") from exc
+
+    info = audio.info
+    channels = {1: "Mono", 2: "Stereo"}.get(info.channels, f"{info.channels} channels")
+
+    return [
+        ("Duration", _format_duration(info.length)),
+        ("Bitrate", f"{round(info.bitrate / 1000)} kbps"),
+        ("Sample rate", f"{info.sample_rate / 1000:g} kHz"),
+        ("Channels", channels),
+    ]
+
+
+def describe_image_file(path):
+    """An image's dimensions and format, as (label, value) pairs.
+
+    The tagger wants a square cover, and the upload route produces one, so a
+    file that is not square got here some other way and is worth seeing.
+
+    Raises ValueError if Pillow cannot open it.
+    """
+    try:
+        with Image.open(path) as img:
+            width, height = img.size
+            details = [
+                ("Dimensions", f"{width} × {height} px"),
+                ("Format", img.format or "Unknown"),
+                ("Colour mode", img.mode),
+            ]
+    except UnidentifiedImageError as exc:
+        raise ValueError("Not an image file we can read") from exc
+
+    if width != height:
+        details.append(("Shape", "Not square - the cover art upload squares this up"))
+
+    return details
+
+
+def describe_pdf_file(path):
+    """A PDF's version, from its header, as (label, value) pairs.
+
+    Only the header is read. Counting pages properly means a PDF library the
+    app has no other use for, and the question this answers on the health
+    check page is "is this actually a PDF" - for anything past that, the
+    download button is right there.
+
+    Raises ValueError if the file does not begin with a PDF header.
+    """
+    with open(path, "rb") as pdf:
+        header = pdf.read(8)
+
+    if not header.startswith(b"%PDF-"):
+        raise ValueError("Does not start with a PDF header")
+
+    return [("Format", f"PDF {header[5:8].decode('ascii', 'replace').strip()}")]
+
+
+DESCRIBERS = {
+    "audio": describe_audio_file,
+    "image": describe_image_file,
+    "pdf": describe_pdf_file,
+}
+
+
+def describe_file(path, kind):
+    """Media details for a file, and whatever went wrong reading them.
+
+    Returns (details, error): a list of (label, value) pairs, and a message
+    when the file could not be read as the kind it is meant to be. Both are
+    for display only - a file the health check has already found and read is
+    present and correct as far as the check is concerned, and a describer
+    that chokes on it is a hint to a human, not a verdict.
+    """
+    describer = DESCRIBERS.get(kind)
+    if describer is None:
+        return [], None
+
+    try:
+        return describer(path), None
+    except ValueError as exc:
+        return [], str(exc)
+    except Exception as exc:  # a truncated or half-written file, most likely
+        return [], f"Could not read the file's details: {exc}"

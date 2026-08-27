@@ -181,3 +181,171 @@ class TestConfirmFileCurrent:
 
         assert b"not there to confirm" in response.data
         assert not top.exists()
+
+
+class TestFileDescriptions:
+    """The media details shown beside each critical file."""
+
+    def test_an_image_reports_its_size_and_format(self, tmp_path):
+        from PIL import Image
+
+        from gbtalks.libgbtalks import describe_image_file
+
+        path = tmp_path / "icon.png"
+        Image.new("RGBA", (300, 300)).save(path)
+
+        details = dict(describe_image_file(path))
+
+        assert details["Dimensions"] == "300 × 300 px"
+        assert details["Format"] == "PNG"
+        assert "Shape" not in details
+
+    def test_a_non_square_image_says_so(self, tmp_path):
+        """The cover art upload squares its output, so this one came from elsewhere."""
+        from PIL import Image
+
+        from gbtalks.libgbtalks import describe_image_file
+
+        path = tmp_path / "icon.png"
+        Image.new("RGBA", (400, 300)).save(path)
+
+        assert "Not square" in dict(describe_image_file(path))["Shape"]
+
+    def test_a_pdf_reports_its_version(self, tmp_path):
+        from gbtalks.libgbtalks import describe_pdf_file
+
+        path = tmp_path / "index.pdf"
+        path.write_bytes(b"%PDF-1.7\nrest of it")
+
+        assert dict(describe_pdf_file(path))["Format"] == "PDF 1.7"
+
+    def test_something_that_is_not_a_pdf_is_rejected(self, tmp_path):
+        from gbtalks.libgbtalks import describe_pdf_file
+
+        path = tmp_path / "index.pdf"
+        path.write_bytes(b"placeholder")
+
+        with pytest.raises(ValueError):
+            describe_pdf_file(path)
+
+    def test_an_unreadable_file_is_reported_not_raised(self, tmp_path):
+        """describe_file is for display; the health check's verdict is its own."""
+        from gbtalks.libgbtalks import describe_file
+
+        path = tmp_path / "top.mp3"
+        path.write_bytes(b"placeholder")
+
+        details, error = describe_file(path, "audio")
+
+        assert details == []
+        assert "MP3" in error
+
+    def test_a_bad_file_does_not_make_the_check_unhealthy(self, app_ctx, carried_over_files):
+        """A present, readable file is fine by the check whatever it contains."""
+        for path in carried_over_files:
+            os.utime(path, None)
+
+        health = perform_health_check()
+
+        assert all(f["status"] == "healthy" for f in health["files"])
+        assert all(f["detail_error"] for f in health["files"])
+        assert all(f["issues"] == [] for f in health["files"])
+
+
+class TestCriticalFileServing:
+    """/critical_file, which the previews and download buttons point at."""
+
+    def test_it_requires_a_team_leader(self, client, carried_over_files):
+        response = client.get("/critical_file?name=top.mp3")
+
+        assert response.status_code in (302, 401)
+        assert b"placeholder" not in response.data
+
+    def test_it_serves_audio_inline_for_the_player(self, auth_client, carried_over_files):
+        response = auth_client.get("/critical_file?name=top.mp3")
+
+        assert response.status_code == 200
+        assert response.mimetype == "audio/mpeg"
+        assert "attachment" not in response.headers.get("Content-Disposition", "")
+        assert response.data == b"placeholder"
+
+    def test_download_sends_it_as_an_attachment(self, auth_client, carried_over_files):
+        response = auth_client.get("/critical_file?name=top.mp3&download=1")
+
+        disposition = response.headers["Content-Disposition"]
+        assert disposition.startswith("attachment")
+        assert "top.mp3" in disposition
+
+    def test_the_pdf_is_downloadable(self, auth_client, app_ctx, carried_over_files):
+        name = f"GB{app_ctx.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf"
+
+        response = auth_client.get(f"/critical_file?name={name}&download=1")
+
+        assert response.status_code == 200
+        assert response.mimetype == "application/pdf"
+
+    def test_an_unknown_name_serves_nothing(self, auth_client, carried_over_files):
+        response = auth_client.get(
+            "/critical_file?name=nonesuch.mp3", follow_redirects=True
+        )
+
+        assert b"Unknown file" in response.data
+        assert b"placeholder" not in response.data
+
+    def test_a_path_is_not_a_name(self, auth_client, carried_over_files):
+        """Names are resolved against the list, so a path fetches nothing."""
+        top = next(p for p in carried_over_files if p.name == "top.mp3")
+
+        response = auth_client.get(
+            f"/critical_file?name={top}", follow_redirects=True
+        )
+
+        assert b"Unknown file" in response.data
+
+    def test_a_missing_file_is_not_served(self, auth_client, carried_over_files):
+        carried_over_files[0].unlink()
+
+        response = auth_client.get(
+            "/critical_file?name=top.mp3", follow_redirects=True
+        )
+
+        assert b"is not there" in response.data
+
+
+class TestPreviewsOnThePage:
+
+    def test_audio_files_get_a_player(self, auth_client, carried_over_files):
+        response = auth_client.get("/health")
+
+        assert b"<audio" in response.data
+        assert b"/critical_file?name=top.mp3" in response.data
+
+    def test_the_cover_art_gets_an_image(self, auth_client, carried_over_files):
+        response = auth_client.get("/health")
+
+        assert b"file-preview-image" in response.data
+        assert b"name=alltalksicon.png" in response.data
+
+    def test_every_file_gets_a_download_button(self, auth_client, app_ctx, carried_over_files):
+        response = auth_client.get("/health")
+
+        assert response.data.count(b"download=1") == len(carried_over_files)
+
+    def test_a_missing_file_gets_no_preview(self, auth_client, carried_over_files):
+        for path in carried_over_files:
+            path.unlink()
+
+        response = auth_client.get("/health")
+
+        assert b"<audio" not in response.data
+        assert b"download=1" not in response.data
+
+    def test_the_image_details_are_shown(self, auth_client, carried_over_files):
+        from PIL import Image
+
+        icon = next(p for p in carried_over_files if p.name == "alltalksicon.png")
+        Image.new("RGBA", (300, 300)).save(icon)
+
+        response = auth_client.get("/health")
+
+        assert "300 × 300 px".encode() in response.data

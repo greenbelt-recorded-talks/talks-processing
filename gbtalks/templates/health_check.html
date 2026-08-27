@@ -156,6 +156,10 @@
                         <dd><code>{{ file.found_at }}</code></dd>
                         <dt>File Size</dt>
                         <dd>{{ file.file_size }}</dd>
+                        {% for label, value in file.details %}
+                        <dt>{{ label }}</dt>
+                        <dd>{{ value }}</dd>
+                        {% endfor %}
                         <dt>Last Modified or Confirmed</dt>
                         <dd>
                             {{ file.last_modified }}
@@ -179,6 +183,35 @@
                         </dd>
                         {% endif %}
                     </dl>
+                    {% if file.exists and file.readable %}
+                    <div class="uk-margin-small-top file-preview">
+                        {% if file.detail_error %}
+                        <p class="uk-text-small uk-text-warning">⚠ {{ file.detail_error }}</p>
+                        {% endif %}
+                        {% if file.preview == 'audio' %}
+                        <audio class="file-preview-audio" controls preload="metadata"
+                               src="{{ url_for('critical_file', name=file.name, v=file.cache_key) }}">
+                            Your browser will not play this here - use the download button.
+                        </audio>
+                        {% elif file.preview == 'image' %}
+                        <img class="file-preview-image" alt="Current {{ file.name }}"
+                             src="{{ url_for('critical_file', name=file.name, v=file.cache_key) }}">
+                        {% endif %}
+                        <div class="uk-margin-small-top">
+                            <a class="uk-button uk-button-default uk-button-small"
+                               href="{{ url_for('critical_file', name=file.name, download=1) }}">
+                                ↓ Download
+                            </a>
+                            {% if file.preview in ['image', 'pdf'] %}
+                            <a class="uk-button uk-button-default uk-button-small"
+                               href="{{ url_for('critical_file', name=file.name, v=file.cache_key) }}"
+                               target="_blank" rel="noopener">
+                                Open in a new tab
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endif %}
                     {% if file.stale %}
                     <form action="{{ url_for('confirm_file_current') }}" method="post">
                         <input type="hidden" name="name" value="{{ file.name }}">

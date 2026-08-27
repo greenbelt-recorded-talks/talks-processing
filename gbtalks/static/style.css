@@ -75,3 +75,25 @@
 .health-card-error {
 	border-left-color: #f0506e;
 }
+
+/* Critical file previews on the health check page.
+   The cover art sits on a checkerboard because normalise_cover_image pads a
+   non-square source with transparency - on a white card that padding is
+   invisible, which is exactly the thing worth seeing before the MP3s are
+   tagged with it. */
+.file-preview-audio {
+	width: 100%;
+	max-width: 420px;
+}
+
+.file-preview-image {
+	max-width: 150px;
+	max-height: 150px;
+	border: 1px solid #e5e5e5;
+	background-color: #fff;
+	background-image:
+		linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%),
+		linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%);
+	background-size: 16px 16px;
+	background-position: 0 0, 8px 8px;
+}
