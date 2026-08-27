@@ -22,15 +22,70 @@ python3 -m flask load-sample-data editors          # Load sample editor data
 python3 -m flask convert-talks          # Process edited audio files to production MP3s
 ```
 
-### Production Deployment
-```bash
-# Docker deployment
-docker build -t gbtalks .
-docker run -p 5002:5002 gbtalks
+### Deployment
 
-# uWSGI deployment (production)
-uwsgi gbtalks.ini
+The server hosts **two checkouts of this repo**, with different jobs. Editing
+the wrong one loses work.
+
+| Path | Remote | Role |
+|---|---|---|
+| `~/build/talks-processing` | SSH — **has push access** | Where you edit, commit and push. No venv, no runtime state. |
+| `~/talks-processing` | HTTPS — read-only | The *deployed* copy. Ansible owns it. Never edit it by hand. |
+
+The deployed checkout is also the one holding the state that is not in git:
+`.env`, `instance/`, and the `.ve/` virtualenv the systemd unit runs from.
+
+The deploy target is this machine itself — the playbook is `hosts: localhost`.
+There is no remote to ship to, which is why "deploying" is just a matter of
+getting the pushed commit into `~/talks-processing` and restarting things.
+
+#### edit → push → pull
+
+```bash
+# 1. Edit and push, in the build checkout (Claude does this part)
+cd ~/build/talks-processing
+git commit -am "..."
+git push
+
+# 2. Pull and apply, in the deployed checkout (a human does this part)
+cd ~/talks-processing
+git pull
+cd ansible
+ansible-playbook --become --ask-become-pass gbtalks-playbook.yaml
 ```
+
+**A push alone changes nothing.** The commit is not live until step 2 has run.
+
+Step 2's `git pull` looks redundant — the playbook checks the repo out itself —
+but it is not. Ansible resolves a task's `src:` from the playbook's own
+directory, and the first play that copies a file (`gbtalks-zshenv`) runs
+*before* the play that does the git checkout. Without the manual pull, that
+early play would copy the previous run's version of the file.
+
+Ansible's `git` module refuses to overwrite local modifications, so
+`~/talks-processing` has to stay clean or the deploy dies partway through,
+after some services have been reconfigured and others have not.
+
+The playbook is itself in this repo (`ansible/`), so a change to the deployment
+goes through exactly the same cycle as a change to the app.
+
+#### What the playbook does
+
+Beyond the checkout: installs apt packages and the `gbtalks` user, installs
+`requirements.txt` into `.ve/`, writes `gbtalks-uwsgi.conf` to
+`/etc/systemd/system/gbtalks.service` and `gbtalks-nginx` to the nginx sites
+dir, restarts both services, installs the 5-minute `conversion_cron.sh` cron
+job, configures dnsmasq for the on-site network, and creates the `/storage/*`
+working directories.
+
+It depends on two Galaxy roles listed in `ansible/gbtalks-requirements.yaml`
+(`gantsign.oh-my-zsh`, `diodonfrost.p10k`); both are already installed under
+`~/.ansible/roles`, so `ansible-galaxy install -r` is only needed on a fresh
+machine.
+
+`.github/workflows/ci.yml` runs ruff and pytest on push and PR. It does **not**
+deploy. The `Dockerfile` is leftover VS Code scaffolding and is not part of the
+deployment path.
 
 ### Code Quality
 ```bash
