@@ -51,3 +51,27 @@
 .upload-spinner {
     margin-left: 4px;
 }
+
+/* Health check status cards.
+   These used uk-card-primary/-secondary, which are solid blue and black fills.
+   UIkit's inverse styles skip uk-description-list, so every <dt> stayed #333
+   and the labels vanished into the dark card - worst on the stale-file cards,
+   which were the black one. (uk-card-danger was never a UIkit class, so the
+   error cards had no fill at all.) Status rides on a left border instead, over
+   the normal light card, and the uk-label in the header still names it. */
+.health-card {
+	border-left: 4px solid #999;
+}
+
+.health-card-healthy {
+	border-left-color: #32d296;
+}
+
+.health-card-stale,
+.health-card-warning {
+	border-left-color: #faa05a;
+}
+
+.health-card-error {
+	border-left-color: #f0506e;
+}

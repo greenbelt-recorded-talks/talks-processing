@@ -6,17 +6,17 @@
 
 <div class="uk-card uk-card-default uk-card-body">
     {% if health_check.overall_status == 'healthy' %}
-        <div class="uk-alert-success" uk-alert>
+        <div class="uk-alert uk-alert-success" uk-alert>
             <p><strong>✓ System Status: HEALTHY</strong></p>
             <p>All critical components are functioning properly.</p>
         </div>
     {% elif health_check.overall_status == 'warning' %}
-        <div class="uk-alert-warning" uk-alert>
+        <div class="uk-alert uk-alert-warning" uk-alert>
             <p><strong>⚠ System Status: WARNING</strong></p>
             <p>Some non-critical issues detected. Review details below.</p>
         </div>
     {% else %}
-        <div class="uk-alert-danger" uk-alert>
+        <div class="uk-alert uk-alert-danger" uk-alert>
             <p><strong>✗ System Status: ERROR</strong></p>
             <p>Critical issues detected that may prevent normal operation.</p>
         </div>
@@ -42,8 +42,8 @@
         <summary class="uk-text-bold">Directory Status</summary>
         <div class="uk-margin-small-top">
             {% for dir in health_check.directories %}
-            <div class="uk-card uk-card-small uk-margin-small
-                {% if dir.status == 'healthy' %}uk-card-primary{% elif dir.status == 'warning' %}uk-card-secondary{% else %}uk-card-danger{% endif %}">
+            <div class="uk-card uk-card-default uk-card-small uk-margin-small health-card
+                {% if dir.status == 'healthy' %}health-card-healthy{% elif dir.status == 'warning' %}health-card-warning{% else %}health-card-error{% endif %}">
                 <div class="uk-card-header uk-padding-small">
                     <div class="uk-grid-small uk-flex-middle" uk-grid>
                         <div class="uk-width-expand">
@@ -103,7 +103,7 @@
         <summary class="uk-text-bold">Critical Files Status</summary>
         <div class="uk-margin-small-top">
             {% if health_check.stale_count %}
-            <div class="uk-alert-warning" uk-alert>
+            <div class="uk-alert uk-alert-warning" uk-alert>
                 <p>
                     <strong>⟳ {{ health_check.stale_count }} file{{ 's' if health_check.stale_count != 1 }}
                     unchanged since the {{ health_check.previous_festival_year }} festival.</strong>
@@ -119,8 +119,8 @@
             </div>
             {% endif %}
             {% for file in health_check.files %}
-            <div class="uk-card uk-card-small uk-margin-small
-                {% if file.status == 'healthy' %}uk-card-primary{% elif file.status in ['warning', 'stale'] %}uk-card-secondary{% else %}uk-card-danger{% endif %}">
+            <div class="uk-card uk-card-default uk-card-small uk-margin-small health-card
+                {% if file.status == 'healthy' %}health-card-healthy{% elif file.status == 'stale' %}health-card-stale{% elif file.status == 'warning' %}health-card-warning{% else %}health-card-error{% endif %}">
                 <div class="uk-card-header uk-padding-small">
                     <div class="uk-grid-small uk-flex-middle" uk-grid>
                         <div class="uk-width-expand">
