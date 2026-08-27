@@ -1,6 +1,8 @@
 server {
     listen 80;
-    server_name gbtalks.local talks-processing.greenbelt.org.uk;
+    server_name gbtalks.local
+                talks-processing.greenbelt.org.uk
+                on-site.talks-processing.greenbelt.org.uk;
 
     client_max_body_size 1G;
 

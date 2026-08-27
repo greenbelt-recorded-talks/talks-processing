@@ -164,6 +164,41 @@
         - /storage/cds
         - /usb_gold
 
+- name: Serve DNS for the on-site network
+  hosts: localhost
+  become_user: root
+  become: true
+
+  tasks:
+    # The config has to land before the package does. dnsmasq starts on
+    # install, and the default config it ships binds port 53 on every
+    # interface - that collides with systemd-resolved's stub on 127.0.0.53 and
+    # fails the dpkg configure step, taking the playbook with it. Ours binds
+    # eno1 only, so the first start is already the right one.
+    - name: Create the dnsmasq config directory
+      ansible.builtin.file:
+        path: /etc/dnsmasq.d
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Copy the dnsmasq configuration
+      ansible.builtin.copy:
+        src: gbtalks-dnsmasq.conf
+        dest: /etc/dnsmasq.d/gbtalks.conf
+        owner: root
+        group: root
+        mode: '0644'
+    - name: Ensure dnsmasq is installed
+      ansible.builtin.apt:
+        name: dnsmasq
+        state: latest
+    - name: Start dnsmasq
+      ansible.builtin.service:
+        name: dnsmasq
+        state: restarted
+        enabled: true
+
 - name: Set up backups
   hosts: localhost
   become_user: root
