@@ -78,6 +78,31 @@ dir, restarts both services, installs the 5-minute `conversion_cron.sh` cron
 job, configures dnsmasq for the on-site network, and creates the `/storage/*`
 working directories.
 
+#### Python version
+
+The app runs on **3.13**, matching CI and PythonAnywhere. Ubuntu 24.04 only
+ships 3.12, so the playbook adds the deadsnakes PPA and builds `.ve/` with
+`python3.13 -m venv`.
+
+`/usr/bin/python3` stays on 3.12 and must not be repointed — Ubuntu's own
+tooling is built against it. Only the venv moves, so `python3` at a shell
+prompt is still 3.12 and is not what the app uses; `.ve/bin/python` is.
+
+Ansible's `pip` module creates a venv only when one is absent, so an existing
+venv would otherwise stay on whatever Python built it. The play checks
+`.ve/bin/python`'s version and deletes the venv when it does not match, forcing
+a rebuild. That makes the first run after this change slow — every dependency
+reinstalls, and uWSGI compiles from source.
+
+uWSGI is deliberately **not** in `requirements.txt` (PythonAnywhere provides its
+own, and the Dockerfile uses gunicorn), so the playbook pip-installs it into the
+venv as a separate step. Before that step existed it was only ever installed by
+hand, and a venv rebuild would have left the systemd unit with no `uwsgi` to
+exec.
+
+`pydub` needs `audioop`, which left the stdlib in 3.13; `requirements.txt`
+already covers that with `audioop-lts; python_version >= "3.13"`.
+
 It depends on two Galaxy roles listed in `ansible/gbtalks-requirements.yaml`
 (`gantsign.oh-my-zsh`, `diodonfrost.p10k`); both are already installed under
 `~/.ansible/roles`, so `ansible-galaxy install -r` is only needed on a fresh

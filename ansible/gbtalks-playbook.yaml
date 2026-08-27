@@ -5,6 +5,14 @@
   become: true
 
   tasks:
+    # Noble ships 3.12 and nothing newer, but CI and PythonAnywhere are both on
+    # 3.13, so the app venv is built from deadsnakes. This deliberately does not
+    # touch /usr/bin/python3 - Ubuntu's own tooling is built against 3.12 and
+    # repointing it breaks apt. Only .ve/ moves.
+    - name: Add the deadsnakes PPA
+      ansible.builtin.apt_repository:
+        repo: ppa:deadsnakes/ppa
+        state: present
     - name: Ensure all system packages are installed
       ansible.builtin.apt:
         name: 
@@ -17,7 +25,9 @@
           - curl
           - nmap
           - npm
-          - python3.12-venv
+          - python3.13
+          - python3.13-venv
+          - python3.13-dev
           - gcc
           - python3-dev
           - libpcre3
@@ -95,11 +105,35 @@
       ansible.builtin.git:
         repo: 'https://github.com/greenbelt-recorded-talks/talks-processing.git'
         dest: /home/gbtalks/talks-processing
+    # The pip module creates a venv only when one is missing, so an existing
+    # venv would silently stay on whatever Python built it. Check and discard.
+    - name: Find the Python the venv was built with
+      ansible.builtin.command:
+        cmd: .ve/bin/python -c "import sys; print('%d.%d' % sys.version_info[:2])"
+        chdir: /home/gbtalks/talks-processing
+      register: venv_python
+      failed_when: false
+      changed_when: false
+    # Deleting the venv out from under the running uwsgi is safe - it holds its
+    # files open by inode - and the service is restarted later in this play.
+    - name: Discard the venv if it is not on the target Python
+      ansible.builtin.file:
+        path: /home/gbtalks/talks-processing/.ve
+        state: absent
+      when: venv_python.rc | default(1) == 0 and venv_python.stdout | default('') | trim != '3.13'
     - name: Install Python requirements in venv
       ansible.builtin.pip:
         requirements: /home/gbtalks/talks-processing/requirements.txt
         virtualenv: /home/gbtalks/talks-processing/.ve
-        virtualenv_command: python3 -m venv
+        virtualenv_command: python3.13 -m venv
+    # Not in requirements.txt on purpose: PythonAnywhere supplies its own uWSGI
+    # and the Dockerfile uses gunicorn, so only this deployment wants it. It
+    # compiles from source, which is why the play installs gcc, python3.13-dev
+    # and libpcre3-dev.
+    - name: Install uWSGI in the venv
+      ansible.builtin.pip:
+        name: uwsgi
+        virtualenv: /home/gbtalks/talks-processing/.ve
     - name: Configure the uwsgi service
       ansible.builtin.copy:
         src: gbtalks-uwsgi.conf
