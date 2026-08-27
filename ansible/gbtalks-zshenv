@@ -1,0 +1,9 @@
+# Claude Code installs itself to ~/.local/bin, and nothing puts that on PATH
+# for zsh. ~/.profile does it, but zsh never reads that file, and the
+# gantsign.oh-my-zsh role rewrites ~/.zshrc on every run, so it cannot live
+# there either - the same trap as ~/.p10k.zsh.
+#
+# .zshenv rather than .zprofile so every zsh gets it, not just login shells.
+# typeset -U keeps the entry unique when shells nest.
+typeset -U path
+path=("$HOME/.local/bin" $path)

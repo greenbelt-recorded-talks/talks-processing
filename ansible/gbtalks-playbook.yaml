@@ -72,6 +72,18 @@
       # dark bar, which fights a light terminal.
       p10k_prompt_style: lean
 
+  tasks:
+    # Runs after the roles above, which is the point: the oh-my-zsh role
+    # rewrites ~/.zshrc every run, so PATH cannot live there. ~/.zshenv is
+    # untouched by it.
+    - name: Put ~/.local/bin on PATH for zsh
+      ansible.builtin.copy:
+        src: gbtalks-zshenv
+        dest: /home/gbtalks/.zshenv
+        owner: gbtalks
+        group: gbtalks
+        mode: '0644'
+
 
 - name: Install the talks-processing application
   hosts: localhost
