@@ -48,6 +48,18 @@ class Config:
     GB_FRIDAY = os.getenv("GB_FRIDAY", default_gb_friday.strftime("%Y-%m-%d"))
     GB_SHORT_YEAR = GB_FRIDAY[2:4]
 
+    # Deployment environment
+    # PythonAnywhere sets these in web workers and consoles alike; nothing on
+    # the on-site box does, so their absence is what "bare metal" looks like.
+    # DEPLOYMENT_ENV overrides the guess for the awkward cases - a laptop
+    # standing in for the festival server, or a staging site on PythonAnywhere.
+    _ON_PYTHONANYWHERE = bool(
+        os.getenv("PYTHONANYWHERE_DOMAIN") or os.getenv("PYTHONANYWHERE_SITE")
+    )
+    DEPLOYMENT_ENV = os.getenv(
+        "DEPLOYMENT_ENV", "cloud" if _ON_PYTHONANYWHERE else "onsite"
+    )
+
     # Login
 
     GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID")

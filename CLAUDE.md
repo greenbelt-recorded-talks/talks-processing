@@ -234,6 +234,22 @@ unflagged talk nearby is worth picking up. Do not "fix" this by adding an
 follow-on is restricted to the same venue, while the additional-talk follow-on
 is not.
 
+### Deployment Badge
+The navbar carries a badge saying which deployment you are looking at - `Cloud`
+on PythonAnywhere, `On-site` on the festival server. Detection is a sniff for
+`PYTHONANYWHERE_DOMAIN` / `PYTHONANYWHERE_SITE`, which PythonAnywhere sets in
+web workers and consoles alike and nothing else does; `DEPLOYMENT_ENV`
+overrides it. An unrecognised value renders in red rather than being hidden.
+
+`DEPLOYMENT_LABELS` in `gbtalks/__init__.py` maps the value to its label,
+colour and tooltip, and a context processor injects it, so the badge needs no
+per-route wiring.
+
+It only appears on templates that extend `base.html`, all of which are behind a
+login. The three anonymous rota views (`/rota_by_recorder`, `/rota_by_time`,
+`/rota_by_venue`) are standalone print-oriented templates with no navbar at
+all, so they carry no badge.
+
 ### Permission System
 Team leader permissions controlled via `TEAM_LEADERS_EMAILS` in config.py. These users can access editing and administration features.
 

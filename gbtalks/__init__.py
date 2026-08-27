@@ -30,6 +30,33 @@ def register_commands(app):
     app.cli.add_command(commands.load_sample_data)
 
 
+# Both are shown in the navbar on every page. The colours only need to be
+# unmistakably different from each other - neither state is an error.
+DEPLOYMENT_LABELS = {
+    "cloud": ("Cloud", "uk-label-primary", "Running on PythonAnywhere"),
+    "onsite": ("On-site", "uk-label-warning", "Running on the festival server"),
+}
+
+
+def setup_deployment_banner(app):
+    """Expose the deployment environment to every template."""
+
+    @app.context_processor
+    def inject_deployment():
+        env = app.config["DEPLOYMENT_ENV"]
+        # An unrecognised value means DEPLOYMENT_ENV was set to something
+        # unexpected. Say so in the navbar rather than guessing or hiding it.
+        label, css, hint = DEPLOYMENT_LABELS.get(
+            env, (env, "uk-label-danger", "Unrecognised DEPLOYMENT_ENV")
+        )
+        return {
+            "deployment_env": env,
+            "deployment_label": label,
+            "deployment_css": css,
+            "deployment_hint": hint,
+        }
+
+
 def setup_login(app):
     from flask_login import login_required, logout_user
 
@@ -56,6 +83,9 @@ def create_app():
 
     # Setup login
     setup_login(app)
+
+    # Show which deployment this is
+    setup_deployment_banner(app)
 
     # Use Markdown
 
