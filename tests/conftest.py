@@ -10,7 +10,18 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-_TEST_ROOT = Path(tempfile.mkdtemp(prefix="gbtalks-tests-"))
+# The suite is dominated by SQLite commits - the db fixture drops and recreates
+# every table per test, and each commit costs an fsync. Landing those on a
+# spinning disk is what makes the suite take minutes on the festival server, so
+# put the database and the temp storage dirs on tmpfs where the machine has
+# one. Falls back to the normal temp dir anywhere that does not (macOS).
+_TMPFS = Path("/dev/shm")
+_TEST_ROOT = Path(
+    tempfile.mkdtemp(
+        prefix="gbtalks-tests-",
+        dir=_TMPFS if _TMPFS.is_dir() and os.access(_TMPFS, os.W_OK) else None,
+    )
+)
 
 # A year where the last Monday in August is the 31st, so the Friday before it
 # falls in the same month. Pinned so date-dependent assertions stay stable.
