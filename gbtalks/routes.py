@@ -211,7 +211,10 @@ def critical_files():
             "used_by": ["Audio processing pipeline"],
             "expected_type": "MP3 audio file",
             "preview": "audio",
-            "mimetype": "audio/mpeg"
+            "mimetype": "audio/mpeg",
+            "upload": "mp3",
+            "upload_label": "an MP3",
+            "accept": ".mp3,audio/mpeg"
         },
         {
             "name": "tail.mp3",
@@ -221,7 +224,10 @@ def critical_files():
             "used_by": ["Audio processing pipeline"],
             "expected_type": "MP3 audio file",
             "preview": "audio",
-            "mimetype": "audio/mpeg"
+            "mimetype": "audio/mpeg",
+            "upload": "mp3",
+            "upload_label": "an MP3",
+            "accept": ".mp3,audio/mpeg"
         },
         {
             "name": "alltalksicon.png",
@@ -231,7 +237,12 @@ def critical_files():
             "used_by": ["Audio processing pipeline", "MP3 metadata"],
             "expected_type": "Square PNG image file, written by the cover art upload",
             "preview": "image",
-            "mimetype": "image/png"
+            "mimetype": "image/png",
+            # Squared and converted on the way in, so a JPEG off the
+            # designer's desk is a perfectly good thing to hand it.
+            "upload": "cover",
+            "upload_label": "a PNG or a JPEG",
+            "accept": ".png,.jpg,.jpeg,image/png,image/jpeg"
         },
         {
             "name": f"GB{app.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf",
@@ -241,7 +252,10 @@ def critical_files():
             "used_by": ["USB duplication process", "All talks distribution"],
             "expected_type": "PDF document",
             "preview": "pdf",
-            "mimetype": "application/pdf"
+            "mimetype": "application/pdf",
+            "upload": "pdf",
+            "upload_label": "a PDF",
+            "accept": ".pdf,application/pdf"
         }
     ]
 
@@ -403,6 +417,8 @@ def perform_health_check():
             "used_by": file_info["used_by"],
             "expected_type": file_info["expected_type"],
             "preview": file_info.get("preview"),
+            "upload_label": file_info.get("upload_label"),
+            "accept": file_info.get("accept"),
             "exists": False,
             "readable": False,
             "file_size": "Unknown",
@@ -605,6 +621,67 @@ def critical_file():
         as_attachment=download,
         download_name=wanted["name"],
     )
+
+
+@app.route("/replace_critical_file", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def replace_critical_file():
+    """Put a new copy of one of the critical files in place.
+
+    The health check asks "is this one still right?"; confirming is one answer
+    and this is the other. Setup can already upload three of these four, but
+    it drops you back on the setup page with nothing to look at - here the
+    card you have just listened to is the thing you are replacing.
+
+    The name is resolved against critical_files() exactly as the confirm and
+    download routes do, so a form cannot nominate a destination of its own.
+    """
+
+    requested = request.form.get("name", "")
+    wanted = next((f for f in critical_files() if f["name"] == requested), None)
+
+    if wanted is None:
+        flash("Unknown file - nothing uploaded", "error")
+        return redirect(url_for("health_check_page"))
+
+    file = request.files.get("file")
+
+    if not file or not file.filename:
+        flash("No file selected", "error")
+        return redirect(url_for("health_check_page"))
+
+    # filetype.guess returns None for anything it cannot place, so the format
+    # check cannot go through kind.extension unguarded.
+    kind = filetype.guess(file.read(261))
+    file.seek(0)
+    extension = kind.extension if kind is not None else None
+
+    if wanted["upload"] == "cover":
+        if extension not in ("png", "jpg"):
+            flash(f"{wanted['name']} must be {wanted['upload_label']}", "error")
+            return redirect(url_for("health_check_page"))
+        try:
+            content = normalise_cover_image(file, app.config["COVER_ART_SIZE"])
+        except ValueError:
+            flash("That file is not an image we can read", "error")
+            return redirect(url_for("health_check_page"))
+    else:
+        if extension != wanted["upload"]:
+            flash(f"{wanted['name']} must be {wanted['upload_label']}", "error")
+            return redirect(url_for("health_check_page"))
+        content = file.read()
+
+    try:
+        with open(wanted["path"], "wb") as f:
+            f.write(content)
+    except OSError as e:
+        flash(f"Could not write {wanted['name']}: {e}", "error")
+        return redirect(url_for("health_check_page"))
+
+    flash(f"Replaced {wanted['name']}", "success")
+
+    return redirect(url_for("health_check_page"))
 
 
 @app.route("/put_alltalks_pdf", methods=["POST"])

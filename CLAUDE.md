@@ -277,7 +277,15 @@ satisfy the exists check and then break conversion quietly.
 
 Confirming a file only means anything if you can check it first, so each card
 carries a preview: an inline player for the two MP3s, a thumbnail for the cover
-art, a download button for all four. `GET /critical_file?name=` serves the
+art, a download button for all four. The cards are laid out two to a row and
+kept short: what stays on the face of one is the preview plus the glance-level
+facts (size, then the describers' values with their labels dropped - "0:07 ·
+128 kbps", "300 × 300 px · PNG"), and everything else is behind a **Details**
+disclosure. The stale warning is not repeated in the issues line, because the
+"Modified or confirmed" line already carries it. The directory cards above
+them follow the same shape - three to a row, contents and permissions on the
+face, path and used-by behind Details - so the whole page fits on a screen or
+two instead of a dozen. `GET /critical_file?name=` serves the
 bytes - inline by default, `&download=1` as an attachment - and resolves the
 name against `critical_files()` for the same reason the confirm route does.
 The URL carries the file's mtime as a cache buster, so a replaced cover image
@@ -294,6 +302,19 @@ other use for, and the download button is right there.
 
 The thumbnail sits on a CSS checkerboard because `normalise_cover_image` pads a
 non-square source with transparency, which is invisible against a white card.
+
+Confirming is only one of the two answers, so every card also carries a
+`POST /replace_critical_file` form, behind its own disclosure and open by
+default when the file is missing, that writes a new copy in place. It resolves
+the name against `critical_files()` like the other two routes, and each entry
+there says what it will accept (`upload`, `upload_label`, `accept`). The cover
+art goes through `normalise_cover_image`, so a JPEG at any size is fine; the
+other three are checked with the guarded `kind is not None` form of
+`filetype.guess`. A replacement is written now, so it clears the staleness
+check on its own without also being touched. Setup's own `upload_top_tail` and
+`put_alltalks_pdf` still exist and are unchanged - they land you back on the
+setup page, where there is nothing to look at, which is the whole reason for
+having the same thing on the card you have just previewed.
 
 ### Deployment Badge
 The navbar carries a badge saying which deployment you are looking at - `Cloud`
