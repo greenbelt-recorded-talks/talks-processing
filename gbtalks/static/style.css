@@ -87,8 +87,8 @@
 }
 
 .file-preview-image {
-	max-width: 150px;
-	max-height: 150px;
+	max-width: 120px;
+	max-height: 120px;
 	border: 1px solid #e5e5e5;
 	background-color: #fff;
 	background-image:
@@ -96,4 +96,35 @@
 		linear-gradient(45deg, #eee 25%, transparent 25%, transparent 75%, #eee 75%);
 	background-size: 16px 16px;
 	background-position: 0 0, 8px 8px;
+}
+
+/* Critical file cards are compact: four of them plus previews and forms made
+   a page nobody scrolled to the bottom of. What is left on the face of the
+   card is what you would check at a glance - size, duration or dimensions,
+   when it was last touched - and the labelled version of all of it moved into
+   the Details disclosure. The two disclosures read as links rather than as
+   another heading, so the card's own name stays the only bold thing on it. */
+.file-replace > summary,
+.file-details > summary {
+	cursor: pointer;
+	font-size: 0.875rem;
+	color: #1e87f0;
+}
+
+.file-replace > summary:hover,
+.file-details > summary:hover {
+	color: #0f6ecd;
+}
+
+.file-replace {
+	margin-top: 12px;
+}
+
+.file-details {
+	margin-top: 4px;
+}
+
+/* Buttons on one row, and still on one row when they wrap. */
+.file-actions > * {
+	margin-right: 5px;
 }
