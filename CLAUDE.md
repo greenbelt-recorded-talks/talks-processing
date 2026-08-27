@@ -222,6 +222,42 @@ Environment-based configuration in `config.py`:
 - Greenbelt-specific: Automatic calculation of festival dates based on August bank holiday
 - Authentication: Google OAuth client credentials from environment
 
+#### GB_FRIDAY
+
+`GB_FRIDAY` is the Friday the festival starts, and it feeds every filename
+(`gb26-001_RAW.mp3`), every MP3 year tag, and the date the `day` column in a
+talks CSV is resolved against.
+
+It is **dynamic by default**: `config.Config` calls `default_gb_friday()`, which
+gives this calendar year's festival. Setting `GB_FRIDAY` in `.env` overrides it;
+leaving it unset is the normal case, and an empty `GB_FRIDAY=` counts as unset.
+
+The arithmetic lives once, in top-level `festival_dates.py`. It is top-level
+rather than in the package because `config.py` needs it and must not import the
+application; `gbtalks/libgbtalks.py` re-exports `calculate_greenbelt_friday` so
+the rest of the app still imports it from where it always has.
+
+The default follows the **calendar year**, deliberately *not*
+`festival_cycle_start`'s notion of the cycle. The two disagree from the Tuesday
+after the festival until New Year, and the calendar year is right here:
+September is spent turning August's recordings into MP3s, and those filenames
+want the year of the festival they came from. New Year is therefore the one
+moment the default moves under you - which is when to pin `GB_FRIDAY` if a
+year's talks are somehow still unfinished.
+
+The value is read when the class body executes, so a restart is needed to pick
+up a change. That is not worth engineering around: the only time the default
+moves is 1 January, when nothing is running on site.
+
+`POST /update_festival_year` on the setup page writes `.env` (the path is
+`ENV_FILE`, defaulting to the deployed checkout and overridable so tests are not
+editing the real one). It pins `GB_FRIDAY` **only when the chosen year differs
+from `default_gb_friday()`**, and strips the line otherwise. Picking the current
+year is asking for the default, so freezing it as a literal is exactly wrong -
+that is how the on-site `.env` came to say `GB_FRIDAY=2025-08-22` with GB26 a
+day away. A pin for a genuine look-ahead to a future year removes itself the
+next time someone picks the current year.
+
 ### Rota Generation
 `is_rotaed` decides which talks the rota is *built around*, not which talks may
 be recorded. The two main loops in `gbtalks/rota/routes.py` only seek out a

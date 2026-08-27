@@ -8,6 +8,8 @@ import pytest
 from gbtalks.libgbtalks import (
     calculate_greenbelt_friday,
     character_mapping,
+    default_gb_friday,
+    festival_cycle_start,
     gb_time_to_datetime,
     get_cd_dir_for_talk,
     get_path_for_file,
@@ -37,11 +39,12 @@ class TestCalculateGreenbeltFriday:
             assert calculate_greenbelt_friday(year).weekday() == 4
 
     def test_config_default_matches_this_calculation(self):
-        """config.Config derives its GB_FRIDAY default the same way this does.
+        """config.Config's GB_FRIDAY default is this calculation.
 
-        The two implementations must agree. Reloading config with GB_FRIDAY
-        unset re-runs its class body so we see the computed default rather than
-        the value the test environment pins.
+        Both now call the one implementation in festival_dates, so this guards
+        the wiring rather than two copies of the arithmetic. Reloading config
+        with GB_FRIDAY unset re-runs its class body so we see the computed
+        default rather than the value the test environment pins.
         """
         import importlib
 
@@ -56,6 +59,43 @@ class TestCalculateGreenbeltFriday:
             if pinned is not None:
                 os.environ["GB_FRIDAY"] = pinned
             importlib.reload(config)
+
+    def test_config_treats_a_blank_pin_as_unset(self):
+        """GB_FRIDAY= with nothing after it means "follow the calendar"."""
+        import importlib
+
+        import config
+
+        pinned = os.environ.get("GB_FRIDAY")
+        os.environ["GB_FRIDAY"] = ""
+        try:
+            recomputed = importlib.reload(config)
+            expected = calculate_greenbelt_friday(datetime.now().year).strftime("%Y-%m-%d")
+            assert recomputed.Config.GB_FRIDAY == expected
+        finally:
+            if pinned is not None:
+                os.environ["GB_FRIDAY"] = pinned
+            else:
+                del os.environ["GB_FRIDAY"]
+            importlib.reload(config)
+
+
+class TestDefaultGbFriday:
+    """The default follows the calendar year, not the festival cycle."""
+
+    def test_is_this_calendar_years_festival(self):
+        for year in (2025, 2026, 2027):
+            now = datetime(year, 3, 1)
+            assert default_gb_friday(now) == calculate_greenbelt_friday(year).strftime(
+                "%Y-%m-%d"
+            )
+
+    def test_still_names_this_years_festival_after_it_has_finished(self):
+        """September is spent processing August's talks, and the filenames want
+        the year those talks came from - so this does not follow
+        festival_cycle_start over to the next year."""
+        assert default_gb_friday(datetime(2026, 9, 15)) == "2026-08-28"
+        assert festival_cycle_start(datetime(2026, 9, 15)) == datetime(2026, 9, 1)
 
 
 class TestGbTimeToDatetime:

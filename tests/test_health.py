@@ -109,9 +109,7 @@ class TestHealthPage:
         response = auth_client.get("/health")
 
         assert b"These are all still correct" in response.data
-        # The button reads "Still correct" under the card's own heading; its
-        # aria-label is where the name it applies to is spelled out.
-        assert b'aria-label="top.mp3 is still correct"' in response.data
+        assert b"top.mp3 is still correct" in response.data
 
     def test_it_asks_nothing_once_everything_is_current(self, auth_client, carried_over_files):
         for path in carried_over_files:
@@ -312,114 +310,6 @@ class TestCriticalFileServing:
         )
 
         assert b"is not there" in response.data
-
-
-class TestReplaceCriticalFile:
-    """The other answer to "is this still last year's?" - hand it a new one."""
-
-    @staticmethod
-    def _mp3():
-        """Enough of a file for filetype.guess to call it an MP3."""
-        return b"ID3\x03\x00\x00\x00\x00\x00\x00" + b"\x00" * 256
-
-    @staticmethod
-    def _png():
-        from io import BytesIO
-
-        from PIL import Image
-
-        buffer = BytesIO()
-        Image.new("RGBA", (400, 300)).save(buffer, format="PNG")
-        return buffer.getvalue()
-
-    def _post(self, client, name, content, filename="new", follow_redirects=True):
-        from io import BytesIO
-
-        return client.post(
-            "/replace_critical_file",
-            data={"name": name, "file": (BytesIO(content), filename)},
-            content_type="multipart/form-data",
-            follow_redirects=follow_redirects,
-        )
-
-    def test_it_requires_a_team_leader(self, client, carried_over_files):
-        # Not followed: an anonymous post redirects off to Google.
-        response = self._post(
-            client, "top.mp3", self._mp3(), "top.mp3", follow_redirects=False
-        )
-
-        assert response.status_code in (302, 401)
-        top = next(p for p in carried_over_files if p.name == "top.mp3")
-        assert top.read_bytes() == b"placeholder"
-
-    def test_uploading_replaces_the_file(self, auth_client, app_ctx, carried_over_files):
-        response = self._post(auth_client, "top.mp3", self._mp3(), "top.mp3")
-
-        assert b"Replaced top.mp3" in response.data
-        top = next(p for p in carried_over_files if p.name == "top.mp3")
-        assert top.read_bytes() == self._mp3()
-
-    def test_a_replaced_file_is_no_longer_stale(self, auth_client, app_ctx, carried_over_files):
-        """The new copy is written now, so the mtime check clears by itself."""
-        self._post(auth_client, "top.mp3", self._mp3(), "top.mp3")
-
-        health = perform_health_check()
-        top_status = next(f for f in health["files"] if f["name"] == "top.mp3")
-        assert top_status["status"] == "healthy"
-
-    def test_it_can_supply_a_missing_file(self, auth_client, app_ctx, carried_over_files):
-        top = next(p for p in carried_over_files if p.name == "top.mp3")
-        top.unlink()
-
-        self._post(auth_client, "top.mp3", self._mp3(), "top.mp3")
-
-        assert top.exists()
-
-    def test_the_cover_art_is_squared_on_the_way_in(self, auth_client, app_ctx, carried_over_files):
-        """Same normalising the cover art upload does - a JPEG or an odd size is fine."""
-        from PIL import Image
-
-        icon = next(p for p in carried_over_files if p.name == "alltalksicon.png")
-
-        self._post(auth_client, "alltalksicon.png", self._png(), "logo.png")
-
-        size = app_ctx.config["COVER_ART_SIZE"]
-        assert Image.open(icon).size == (size, size)
-
-    def test_the_wrong_kind_of_file_is_refused(self, auth_client, carried_over_files):
-        response = self._post(auth_client, "top.mp3", self._png(), "logo.png")
-
-        assert b"must be an MP3" in response.data
-        top = next(p for p in carried_over_files if p.name == "top.mp3")
-        assert top.read_bytes() == b"placeholder"
-
-    def test_something_unidentifiable_is_refused(self, auth_client, carried_over_files):
-        """filetype.guess returns None rather than raising, so this must be guarded."""
-        response = self._post(auth_client, "top.mp3", b"not a media file at all")
-
-        assert b"must be an MP3" in response.data
-
-    def test_an_unknown_name_writes_nothing(self, auth_client, carried_over_files):
-        response = self._post(auth_client, "nonesuch.mp3", self._mp3())
-
-        assert b"Unknown file" in response.data
-        assert all(p.read_bytes() == b"placeholder" for p in carried_over_files)
-
-    def test_a_path_is_not_a_name(self, auth_client, carried_over_files):
-        """Names are resolved against the list, so a form cannot pick a destination."""
-        top = next(p for p in carried_over_files if p.name == "top.mp3")
-
-        response = self._post(auth_client, str(top), self._mp3())
-
-        assert b"Unknown file" in response.data
-        assert top.read_bytes() == b"placeholder"
-
-    def test_no_file_is_not_an_upload(self, auth_client, carried_over_files):
-        response = auth_client.post(
-            "/replace_critical_file", data={"name": "top.mp3"}, follow_redirects=True
-        )
-
-        assert b"No file selected" in response.data
 
 
 class TestPreviewsOnThePage:

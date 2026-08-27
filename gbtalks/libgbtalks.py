@@ -7,21 +7,9 @@ from mutagen import MutagenError
 from mutagen.mp3 import MP3
 from PIL import Image, UnidentifiedImageError
 
-
-def calculate_greenbelt_friday(year):
-    """
-    Calculate the Friday before the UK Summer Bank Holiday (last Monday in August).
-    Greenbelt Festival traditionally starts on this Friday.
-    """
-    # Find last Monday in August (Aug 31 - weekday gives us the Monday)
-    last_day_of_august = datetime(year, 8, 31)
-    weekday = last_day_of_august.weekday()  # 0=Monday, 1=Tuesday, etc.
-    last_monday = last_day_of_august - timedelta(days=weekday)
-
-    # Go back 3 days from that Monday to get the Friday before
-    greenbelt_friday = last_monday - timedelta(days=3)
-
-    return greenbelt_friday
+# One implementation, shared with config.Config's GB_FRIDAY default. Re-exported
+# here because this is where the rest of the app has always imported it from.
+from festival_dates import calculate_greenbelt_friday, default_gb_friday  # noqa: F401
 
 
 def festival_cycle_start(now=None):

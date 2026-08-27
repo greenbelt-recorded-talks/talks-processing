@@ -1,5 +1,6 @@
 import os
-from datetime import datetime
+
+from festival_dates import default_gb_friday
 
 
 class Config:
@@ -38,15 +39,19 @@ class Config:
             }
     }
 
-    # Greenbelt - Default to Friday of August Bank Holiday weekend of current year
-    current_year = datetime.now().year
-    # August bank holiday is last Monday of August, so Friday is 3 days before
-    august_last_monday = datetime(current_year, 8, 31)
-    while august_last_monday.weekday() != 0:  # Find last Monday
-        august_last_monday = august_last_monday.replace(day=august_last_monday.day - 1)
-    default_gb_friday = august_last_monday.replace(day=august_last_monday.day - 3)
-    GB_FRIDAY = os.getenv("GB_FRIDAY", default_gb_friday.strftime("%Y-%m-%d"))
+    # Greenbelt - the Friday of the August Bank Holiday weekend, worked out
+    # from the calendar so a year nobody rolled over still lands on the right
+    # dates. Setting GB_FRIDAY in .env overrides it; leaving it unset is the
+    # normal case. Read once, when this class body executes, so a change to
+    # either the pin or the calendar needs a restart to be picked up - the
+    # default only moves at New Year, when nothing is running on site.
+    GB_FRIDAY = os.getenv("GB_FRIDAY") or default_gb_friday()
     GB_SHORT_YEAR = GB_FRIDAY[2:4]
+
+    # The .env the setup page's festival-year control writes to. Defaults to
+    # the deployed checkout, which is the only place it means anything on the
+    # festival server; overridable so the tests are not editing the real one.
+    ENV_FILE = os.getenv("ENV_FILE", os.path.expanduser("~/talks-processing/.env"))
 
     # Cover art
     # Embedded in every processed MP3, so it is worth keeping small. Uploads

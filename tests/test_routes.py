@@ -4,8 +4,12 @@ These are deliberately broad rather than deep: the point is a safety net that
 notices if a refactor breaks a page, not exhaustive behavioural coverage.
 """
 
+from datetime import datetime
+from pathlib import Path
+
 import pytest
 
+from gbtalks.libgbtalks import calculate_greenbelt_friday
 from gbtalks.models import Talk
 
 # Routes that render a page and need no query parameters.
@@ -248,3 +252,59 @@ class TestAssignRecorder:
         )
 
         assert db.session.get(Talk, 1).recorder_name == "Robin Recorder"
+
+
+class TestUpdateFestivalYear:
+    """The setup page's festival-year control writes GB_FRIDAY into .env.
+
+    It should only ever leave a pin behind for a year the calendar would not
+    have given on its own. A pin naming the current year is how the on-site
+    .env came to claim 2025 a year later.
+    """
+
+    @pytest.fixture
+    def env_file(self, app_ctx):
+        path = Path(app_ctx.config["ENV_FILE"])
+        path.write_text("SECRET_KEY=whatever\n")
+        yield path
+        path.unlink(missing_ok=True)
+
+    def _post(self, auth_client, year):
+        return auth_client.post("/update_festival_year", data={"festival_year": str(year)})
+
+    def test_current_year_leaves_no_pin(self, auth_client, env_file):
+        response = self._post(auth_client, datetime.now().year)
+
+        assert response.status_code == 302
+        assert "GB_FRIDAY" not in env_file.read_text()
+
+    def test_a_later_year_is_pinned(self, auth_client, env_file):
+        year = datetime.now().year + 1
+
+        self._post(auth_client, year)
+
+        expected = calculate_greenbelt_friday(year).strftime("%Y-%m-%d")
+        assert f"GB_FRIDAY={expected}\n" in env_file.read_text()
+
+    def test_choosing_the_current_year_again_removes_an_existing_pin(
+        self, auth_client, env_file
+    ):
+        self._post(auth_client, datetime.now().year + 1)
+        assert "GB_FRIDAY" in env_file.read_text()
+
+        self._post(auth_client, datetime.now().year)
+
+        assert "GB_FRIDAY" not in env_file.read_text()
+
+    def test_leaves_the_rest_of_the_file_alone(self, auth_client, env_file):
+        self._post(auth_client, datetime.now().year + 1)
+
+        assert "SECRET_KEY=whatever\n" in env_file.read_text()
+
+    def test_does_not_duplicate_the_pin(self, auth_client, env_file):
+        year = datetime.now().year + 1
+
+        self._post(auth_client, year)
+        self._post(auth_client, year)
+
+        assert env_file.read_text().count("GB_FRIDAY=") == 1

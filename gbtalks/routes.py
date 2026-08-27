@@ -26,6 +26,7 @@ from werkzeug.utils import secure_filename
 
 from .libgbtalks import (
     calculate_greenbelt_friday,
+    default_gb_friday,
     describe_file,
     extract_audio_from_video_async,
     festival_cycle_start,
@@ -771,8 +772,7 @@ def update_festival_year():
         festival_date = gb_friday.strftime("%Y-%m-%d")
 
         # Update the .env file
-        project_folder = os.path.expanduser('~/talks-processing')
-        env_path = os.path.join(project_folder, '.env')
+        env_path = app.config["ENV_FILE"]
 
         # Read existing .env file or create new content
         env_lines = []
@@ -780,22 +780,26 @@ def update_festival_year():
             with open(env_path) as f:
                 env_lines = f.readlines()
 
-        # Update or add GB_FRIDAY line
-        gb_friday_updated = False
-        for i, line in enumerate(env_lines):
-            if line.startswith('GB_FRIDAY='):
-                env_lines[i] = f'GB_FRIDAY={festival_date}\n'
-                gb_friday_updated = True
-                break
+        # Pin GB_FRIDAY only when the choice differs from what config.Config
+        # would work out on its own. Picking the current year is asking for the
+        # default, so the line comes out rather than freezing today's answer as
+        # a literal - which is how the on-site .env came to claim 2025 a year
+        # later. Only a deliberate look ahead to another year needs a pin, and
+        # that pin removes itself the next time someone picks the current year.
+        pinning = festival_date != default_gb_friday()
 
-        if not gb_friday_updated:
+        env_lines = [line for line in env_lines if not line.startswith('GB_FRIDAY=')]
+        if pinning:
             env_lines.append(f'GB_FRIDAY={festival_date}\n')
 
         # Write back to .env file
         with open(env_path, 'w') as f:
             f.writelines(env_lines)
 
-        flash(f"Festival year set to {year}. Calculated Friday date: {festival_date}. Restart the application for changes to take effect.", "success")
+        if pinning:
+            flash(f"Festival year pinned to {year}. Calculated Friday date: {festival_date}. Restart the application for changes to take effect.", "success")
+        else:
+            flash(f"Festival year set to {year}, which is what the calendar gives anyway - GB_FRIDAY is now unpinned and will follow the calendar. Calculated Friday date: {festival_date}. Restart the application for changes to take effect.", "success")
 
     except ValueError:
         flash("Invalid year format!", "error")

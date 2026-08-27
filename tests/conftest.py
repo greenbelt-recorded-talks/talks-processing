@@ -31,6 +31,8 @@ TEAM_LEADER_EMAIL = "team-leader@example.test"
 os.environ["SECRET_KEY"] = "test-secret-key"
 os.environ["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{_TEST_ROOT / 'test.sqlite'}"
 os.environ["GB_FRIDAY"] = TEST_GB_FRIDAY
+# The festival-year control rewrites this file, so it must not be the real one.
+os.environ["ENV_FILE"] = str(_TEST_ROOT / "dotenv")
 os.environ.setdefault("GOOGLE_OAUTH_CLIENT_ID", "test-client-id")
 os.environ.setdefault("GOOGLE_OAUTH_CLIENT_SECRET", "test-client-secret")
 
