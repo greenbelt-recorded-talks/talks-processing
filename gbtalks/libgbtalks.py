@@ -22,6 +22,31 @@ def calculate_greenbelt_friday(year):
     return greenbelt_friday
 
 
+def festival_cycle_start(now=None):
+    """
+    The moment preparation for the next festival began: the Tuesday after the
+    most recently finished festival.
+
+    This is the line between "put in place for this year" and "left over from
+    last year". A file not touched since before it is a carry-over, whatever
+    its name suggests.
+
+    Deliberately worked out from the clock rather than from GB_FRIDAY. A year
+    nobody remembered to roll over is exactly what this is meant to catch, and
+    GB_FRIDAY is one of the things that gets forgotten.
+    """
+    if now is None:
+        now = datetime.now()
+
+    # The festival runs Friday to the Bank Holiday Monday, so the Tuesday after
+    # is the first day belonging to the next year's cycle.
+    cycle_start = calculate_greenbelt_friday(now.year) + timedelta(days=4)
+    if now < cycle_start:
+        cycle_start = calculate_greenbelt_friday(now.year - 1) + timedelta(days=4)
+
+    return cycle_start
+
+
 # Character mapping table to avoid FAT filesystem character problems
 character_mapping = str.maketrans(
     {

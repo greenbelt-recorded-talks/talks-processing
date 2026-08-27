@@ -252,6 +252,29 @@ check has to be `kind is not None and kind.extension in (...)`. The same
 unguarded `kind.extension` pattern still exists in the recorder-notes upload in
 `routes.py` and will 500 on an unrecognised file.
 
+### Carried-over Files
+`top.mp3`, `tail.mp3`, `alltalksicon.png` and the all-talks index keep the same
+names from one year to the next, so last year's copy sits in `/storage` looking
+perfectly healthy. The health check flags any of them not modified since the
+last festival ended, and `POST /confirm_file_current` records "checked, still
+the right one" by **touching the file**. mtime is the only state, so there is
+no second record to drift out of step with the files themselves; the price is
+that "Last Modified" now means "modified or confirmed", which is what the page
+calls it.
+
+`festival_cycle_start` in `libgbtalks.py` draws the line: the Tuesday after the
+most recently *finished* festival. It works that out from the clock rather than
+from `GB_FRIDAY`, deliberately. A year nobody rolled over is exactly what this
+check exists to catch, and when it was written the on-site `.env` still said
+`GB_FRIDAY=2025-08-22` with GB26 a day away - a config-derived cutoff would
+have called all four files current.
+
+A stale file is a **warning**, never an error. It is present and readable, and
+only a human can say whether it is the right one. The confirm route resolves
+the submitted name against `critical_files()` instead of trusting a path from
+the form, and will not create a file that is missing - an empty `top.mp3` would
+satisfy the exists check and then break conversion quietly.
+
 ### Deployment Badge
 The navbar carries a badge saying which deployment you are looking at - `Cloud`
 on PythonAnywhere, `On-site` on the festival server. Detection is a sniff for

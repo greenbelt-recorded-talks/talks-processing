@@ -27,6 +27,7 @@ from werkzeug.utils import secure_filename
 from .libgbtalks import (
     calculate_greenbelt_friday,
     extract_audio_from_video_async,
+    festival_cycle_start,
     gb_time_to_datetime,
     get_path_for_file,
     get_path_for_video_file,
@@ -193,15 +194,73 @@ def edit_talk():
             return redirect(url_for("edit_talk", talk_id=talk_id))
 
 
+def critical_files():
+    """The files that have to be in place before the pipeline will run.
+
+    The health check and the confirm-still-correct route both work from
+    this one list, so the route resolves a name to a path itself and never
+    has to trust a path arriving from a form.
+    """
+    return [
+        {
+            "name": "top.mp3",
+            "path": os.path.join(app.config["UPLOAD_DIR"], "top.mp3"),
+            "purpose": "Audio segment played at the start of each processed talk",
+            "critical": True,
+            "used_by": ["Audio processing pipeline"],
+            "expected_type": "MP3 audio file"
+        },
+        {
+            "name": "tail.mp3",
+            "path": os.path.join(app.config["UPLOAD_DIR"], "tail.mp3"),
+            "purpose": "Audio segment played at the end of each processed talk",
+            "critical": True,
+            "used_by": ["Audio processing pipeline"],
+            "expected_type": "MP3 audio file"
+        },
+        {
+            "name": "alltalksicon.png",
+            "path": os.path.join(app.config["IMG_DIR"], "alltalksicon.png"),
+            "purpose": "Cover art embedded in all processed MP3 files",
+            "critical": True,
+            "used_by": ["Audio processing pipeline", "MP3 metadata"],
+            "expected_type": "Square PNG image file, written by the cover art upload"
+        },
+        {
+            "name": f"GB{app.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf",
+            "path": os.path.join(app.config["USB_GOLD_DIR"], f"GB{app.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf"),
+            "purpose": "Complete index of all talks for USB distribution",
+            "critical": True,
+            "used_by": ["USB duplication process", "All talks distribution"],
+            "expected_type": "PDF document"
+        }
+    ]
+
+
+def _is_older_than(path, cutoff):
+    """True when path is a file last touched before cutoff (a POSIX timestamp)."""
+    try:
+        return os.path.isfile(path) and os.stat(path).st_mtime < cutoff
+    except OSError:
+        return False
+
+
 def perform_health_check():
     """Perform a comprehensive health check of the system with detailed information"""
+
+    cycle_start = festival_cycle_start()
 
     health_status = {
         "directories": [],
         "files": [],
         "system_info": [],
         "overall_status": "healthy",
-        "checked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        "checked_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        # Anything older than this was in place before the last festival ended,
+        # so it belongs to a previous year until somebody says otherwise.
+        "cycle_start": cycle_start.strftime("%Y-%m-%d"),
+        "previous_festival_year": cycle_start.year,
+        "stale_count": 0
     }
 
     # Add system information
@@ -325,44 +384,8 @@ def perform_health_check():
 
         health_status["directories"].append(status)
 
-    # Define critical files with detailed information
-    critical_files = [
-        {
-            "name": "top.mp3",
-            "path": os.path.join(app.config["UPLOAD_DIR"], "top.mp3"),
-            "purpose": "Audio segment played at the start of each processed talk",
-            "critical": True,
-            "used_by": ["Audio processing pipeline"],
-            "expected_type": "MP3 audio file"
-        },
-        {
-            "name": "tail.mp3",
-            "path": os.path.join(app.config["UPLOAD_DIR"], "tail.mp3"),
-            "purpose": "Audio segment played at the end of each processed talk",
-            "critical": True,
-            "used_by": ["Audio processing pipeline"],
-            "expected_type": "MP3 audio file"
-        },
-        {
-            "name": "alltalksicon.png",
-            "path": os.path.join(app.config["IMG_DIR"], "alltalksicon.png"),
-            "purpose": "Cover art embedded in all processed MP3 files",
-            "critical": True,
-            "used_by": ["Audio processing pipeline", "MP3 metadata"],
-            "expected_type": "Square PNG image file, written by the cover art upload"
-        },
-        {
-            "name": f"GB{app.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf",
-            "path": os.path.join(app.config["USB_GOLD_DIR"], f"GB{app.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf"),
-            "purpose": "Complete index of all talks for USB distribution",
-            "critical": True,
-            "used_by": ["USB duplication process", "All talks distribution"],
-            "expected_type": "PDF document"
-        }
-    ]
-
     # Check critical files with detailed information
-    for file_info in critical_files:
+    for file_info in critical_files():
         file_status = {
             "name": file_info["name"],
             "path": file_info["path"],
@@ -376,6 +399,7 @@ def perform_health_check():
             "last_modified": "Unknown",
             "permissions": "Unknown",
             "status": "error",
+            "stale": False,
             "found_at": None,
             "issues": []
         }
@@ -387,6 +411,7 @@ def perform_health_check():
             file_status["found_at"] = check_path
 
             # Get file details
+            mtime = None
             try:
                 stat_info = os.stat(check_path)
                 file_size = stat_info.st_size
@@ -397,19 +422,36 @@ def perform_health_check():
                 else:
                     file_status["file_size"] = f"{file_size} bytes"
 
+                mtime = stat_info.st_mtime
                 file_status["last_modified"] = datetime.fromtimestamp(stat_info.st_mtime).strftime("%Y-%m-%d %H:%M:%S")
                 file_status["permissions"] = oct(stat_info.st_mode)[-3:]
             except Exception as e:
                 file_status["issues"].append(f"Could not read file details: {e}")
 
-            file_status["status"] = "healthy" if file_status["readable"] else "warning"
             if not file_status["readable"]:
+                file_status["status"] = "warning"
                 file_status["issues"].append("File is not readable")
+            elif mtime is not None and mtime < cycle_start.timestamp():
+                # These filenames stay the same from year to year, so an
+                # untouched one is indistinguishable from a current one until
+                # somebody plays it. Ask.
+                file_status["status"] = "stale"
+                file_status["stale"] = True
+                file_status["issues"].append(
+                    f"Not touched since before the {cycle_start.year} festival ended, "
+                    "so this may still be last year's file"
+                )
+            else:
+                file_status["status"] = "healthy"
         else:
             file_status["issues"].append("File not found")
 
         # Update overall status
-        if file_status["status"] == "error" and file_status["critical"]:
+        if file_status["status"] == "stale":
+            health_status["stale_count"] += 1
+            if health_status["overall_status"] == "healthy":
+                health_status["overall_status"] = "warning"
+        elif file_status["status"] == "error" and file_status["critical"]:
             health_status["overall_status"] = "error"
         elif file_status["status"] in ["error", "warning"] and health_status["overall_status"] == "healthy":
             health_status["overall_status"] = "warning" if not file_status["critical"] else "error"
@@ -453,6 +495,56 @@ def health_check_page():
     health_check = perform_health_check()
 
     return render_template("health_check.html", health_check=health_check)
+
+
+@app.route("/confirm_file_current", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def confirm_file_current():
+    """Record that a carried-over file has been checked and is right for this year.
+
+    The confirmation is the touch itself: the file's mtime moves into the
+    current festival cycle, which is exactly what the health check reads. No
+    second copy of the truth to drift out of step with the files.
+    """
+
+    requested = request.form.get("name", "")
+    files = critical_files()
+
+    if requested == "all":
+        cutoff = festival_cycle_start().timestamp()
+        wanted = [f for f in files if _is_older_than(f["path"], cutoff)]
+        if not wanted:
+            flash("Nothing left to confirm", "warning")
+            return redirect(url_for("health_check_page"))
+    else:
+        # Resolved by name against the list above, never by a path from the
+        # form - this route touches those four files and nothing else.
+        wanted = [f for f in files if f["name"] == requested]
+        if not wanted:
+            flash("Unknown file - nothing confirmed", "error")
+            return redirect(url_for("health_check_page"))
+
+    confirmed = []
+    for file_info in wanted:
+        path = file_info["path"]
+
+        # Never create the file. An empty top.mp3 would satisfy the exists
+        # check and break conversion quietly, which is worse than a red card.
+        if not os.path.isfile(path):
+            flash(f"{file_info['name']} is not there to confirm", "error")
+            continue
+
+        try:
+            os.utime(path, None)
+            confirmed.append(file_info["name"])
+        except OSError as e:
+            flash(f"Could not confirm {file_info['name']}: {e}", "error")
+
+    if confirmed:
+        flash(f"Confirmed as current for this year: {', '.join(confirmed)}", "success")
+
+    return redirect(url_for("health_check_page"))
 
 
 @app.route("/put_alltalks_pdf", methods=["POST"])

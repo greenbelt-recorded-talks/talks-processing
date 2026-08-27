@@ -102,9 +102,25 @@
     <details class="uk-margin" open>
         <summary class="uk-text-bold">Critical Files Status</summary>
         <div class="uk-margin-small-top">
+            {% if health_check.stale_count %}
+            <div class="uk-alert-warning" uk-alert>
+                <p>
+                    <strong>⟳ {{ health_check.stale_count }} file{{ 's' if health_check.stale_count != 1 }}
+                    unchanged since the {{ health_check.previous_festival_year }} festival.</strong>
+                    These names stay the same every year, so last year's file sits there looking
+                    perfectly healthy. Replace it below, or confirm it is still the one you want.
+                </p>
+                <form action="{{ url_for('confirm_file_current') }}" method="post" class="uk-margin-remove">
+                    <input type="hidden" name="name" value="all">
+                    <button class="uk-button uk-button-primary uk-button-small">
+                        These are all still correct
+                    </button>
+                </form>
+            </div>
+            {% endif %}
             {% for file in health_check.files %}
             <div class="uk-card uk-card-small uk-margin-small
-                {% if file.status == 'healthy' %}uk-card-primary{% elif file.status == 'warning' %}uk-card-secondary{% else %}uk-card-danger{% endif %}">
+                {% if file.status == 'healthy' %}uk-card-primary{% elif file.status in ['warning', 'stale'] %}uk-card-secondary{% else %}uk-card-danger{% endif %}">
                 <div class="uk-card-header uk-padding-small">
                     <div class="uk-grid-small uk-flex-middle" uk-grid>
                         <div class="uk-width-expand">
@@ -117,6 +133,8 @@
                         <div>
                             {% if file.status == 'healthy' %}
                                 <span class="uk-label uk-label-success">✓ OK</span>
+                            {% elif file.status == 'stale' %}
+                                <span class="uk-label uk-label-warning">⟳ CHECK</span>
                             {% elif file.status == 'warning' %}
                                 <span class="uk-label uk-label-warning">⚠ WARN</span>
                             {% else %}
@@ -138,8 +156,13 @@
                         <dd><code>{{ file.found_at }}</code></dd>
                         <dt>File Size</dt>
                         <dd>{{ file.file_size }}</dd>
-                        <dt>Last Modified</dt>
-                        <dd>{{ file.last_modified }}</dd>
+                        <dt>Last Modified or Confirmed</dt>
+                        <dd>
+                            {{ file.last_modified }}
+                            {% if file.stale %}
+                            <span class="uk-text-warning">— before the {{ health_check.previous_festival_year }} festival ended</span>
+                            {% endif %}
+                        </dd>
                         <dt>Permissions</dt>
                         <dd>{{ file.permissions }} {% if file.readable %}(Readable){% else %}(Not Readable){% endif %}</dd>
                         {% endif %}
@@ -156,6 +179,14 @@
                         </dd>
                         {% endif %}
                     </dl>
+                    {% if file.stale %}
+                    <form action="{{ url_for('confirm_file_current') }}" method="post">
+                        <input type="hidden" name="name" value="{{ file.name }}">
+                        <button class="uk-button uk-button-primary uk-button-small">
+                            Checked it — {{ file.name }} is still correct
+                        </button>
+                    </form>
+                    {% endif %}
                 </div>
             </div>
             {% endfor %}
