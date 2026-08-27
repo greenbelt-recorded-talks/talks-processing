@@ -48,6 +48,11 @@ class Config:
     GB_FRIDAY = os.getenv("GB_FRIDAY", default_gb_friday.strftime("%Y-%m-%d"))
     GB_SHORT_YEAR = GB_FRIDAY[2:4]
 
+    # Cover art
+    # Embedded in every processed MP3, so it is worth keeping small. Uploads
+    # are resized to this square regardless of what was handed in.
+    COVER_ART_SIZE = int(os.getenv("COVER_ART_SIZE", "300"))
+
     # Deployment environment
     # PythonAnywhere sets these in web workers and consoles alike; nothing on
     # the on-site box does, so their absence is what "bare metal" looks like.

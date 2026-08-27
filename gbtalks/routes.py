@@ -31,6 +31,7 @@ from .libgbtalks import (
     get_path_for_file,
     get_path_for_video_file,
     get_video_processing_status,
+    normalise_cover_image,
 )
 from .models import Editor, Recorder, Talk, db
 from .talks_csv import TalksCsvError, parse_talks_csv
@@ -348,7 +349,7 @@ def perform_health_check():
             "purpose": "Cover art embedded in all processed MP3 files",
             "critical": True,
             "used_by": ["Audio processing pipeline", "MP3 metadata"],
-            "expected_type": "PNG image file (recommended 300x300px)"
+            "expected_type": "Square PNG image file, written by the cover art upload"
         },
         {
             "name": f"GB{app.config['GB_SHORT_YEAR']}-AllTalksIndex.pdf",
@@ -1230,12 +1231,23 @@ def upload_cover_image():
     file = request.files["file"]
 
     if file:
+        # Whatever comes in - a 2000px JPEG off the designer's desk, a PNG
+        # someone already sized - is converted to the square PNG the tagger
+        # embeds. filetype.guess returns None for anything it cannot place,
+        # so the format check cannot go through kind.extension unguarded.
         kind = filetype.guess(file.read(261))
         file.seek(0)
-        if kind.extension == "png":
-            file.save(app.config["IMG_DIR"] + "/alltalksicon.png")
+        if kind is not None and kind.extension in ("png", "jpg"):
+            try:
+                icon = normalise_cover_image(file, app.config["COVER_ART_SIZE"])
+            except ValueError:
+                flash("That file is not an image we can read")
+            else:
+                with open(app.config["IMG_DIR"] + "/alltalksicon.png", "wb") as f:
+                    f.write(icon)
+                flash("Cover image updated", "success")
         else:
-            flash("Must be a PNG")
+            flash("Must be a PNG or a JPEG")
 
     return redirect(url_for(source_path))
 

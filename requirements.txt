@@ -8,6 +8,7 @@ markdown          # used by the vendored gbtalks/markdown wrapper
 pyexcel           # CSV export routes in gbtalks/routes.py
 
 # Audio / media processing
+Pillow            # resizes uploaded cover art to the square PNG the tagger wants
 ffmpeg-normalize
 mutagen
 pydub

@@ -132,7 +132,12 @@ Configure the variables that control how the automatic rota generation works. Ch
 {% filter markdown %}
 ### Upload Icon
 
-The icon is used as the cover image for MP3 files. It must be a square PNG, recommended 300x300 pixels. 
+The icon is used as the cover image for MP3 files.
+
+Upload a PNG or a JPEG at whatever size you have - it is resized to a square
+{{ config.COVER_ART_SIZE }}x{{ config.COVER_ART_SIZE }} PNG for you. A source that is not
+already square is padded out rather than cropped, so nothing is trimmed off
+the edges of the logo.
 
 Uploading a file here will replace the existing one.
 
@@ -140,7 +145,7 @@ Uploading a file here will replace the existing one.
 
         <form action="upload_cover_image" method=post enctype=multipart/form-data>
                 <label for=file>File</label>
-                <input name=file type=file id=file accept=".png">
+                <input name=file type=file id=file accept=".png,.jpg,.jpeg">
                 <button>Submit</button>
         </form>
 

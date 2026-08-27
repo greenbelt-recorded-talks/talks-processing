@@ -234,6 +234,24 @@ unflagged talk nearby is worth picking up. Do not "fix" this by adding an
 follow-on is restricted to the same venue, while the additional-talk follow-on
 is not.
 
+### Cover Art
+`alltalksicon.png` in `IMG_DIR` is embedded as the front cover of every
+processed MP3 (`APIC` in `gbtalks/commands.py`). It is not something to prepare
+by hand: `POST /upload_cover_image` accepts a PNG or JPEG at any size and
+`normalise_cover_image` in `libgbtalks.py` converts it to a square PNG of
+`COVER_ART_SIZE` (default 300, override with the env var).
+
+A source that is not square is **padded** with transparency, not centre-cropped.
+The icon is a logo, and cropping one silently eats its edges - padding is
+visibly wrong rather than subtly wrong, which is the better failure when nobody
+looks at the result until the MP3s are on the USB sticks. If you ever want
+cropping instead, that is the one decision to revisit in that function.
+
+`filetype.guess` returns `None` for anything it cannot identify, so the format
+check has to be `kind is not None and kind.extension in (...)`. The same
+unguarded `kind.extension` pattern still exists in the recorder-notes upload in
+`routes.py` and will 500 on an unrecognised file.
+
 ### Deployment Badge
 The navbar carries a badge saying which deployment you are looking at - `Cloud`
 on PythonAnywhere, `On-site` on the festival server. Detection is a sniff for

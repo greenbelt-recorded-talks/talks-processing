@@ -1,7 +1,9 @@
+import io
 import subprocess
 from datetime import datetime, timedelta
 
 from flask import current_app as app
+from PIL import Image, UnidentifiedImageError
 
 
 def calculate_greenbelt_friday(year):
@@ -240,3 +242,43 @@ def gb_time_to_datetime(day, time):
         except ValueError:
             time_of_talk = datetime.strptime(time, "%H:%M").time()
     return datetime.combine(day_of_talk, time_of_talk)
+
+
+def normalise_cover_image(source, size):
+    """Turn an uploaded image into the square PNG the MP3 tagger expects.
+
+    Takes anything Pillow can open - the point is that you can hand it the
+    2000px JPEG straight from the designer rather than preparing a PNG by
+    hand - and returns the PNG bytes.
+
+    A non-square source is padded out to a square with transparency rather
+    than centre-cropped. The icon is a logo, and cropping a logo silently
+    eats the edges of it; padding is visibly wrong instead of subtly wrong,
+    which is the better failure when nobody checks the result until the MP3s
+    are already on the USB sticks.
+
+    Raises ValueError if the file is not an image Pillow recognises.
+    """
+    try:
+        with Image.open(source) as img:
+            img = img.convert("RGBA")
+
+            # thumbnail() only ever shrinks, so scale explicitly - a source
+            # smaller than the target still wants to fill the square.
+            scale = size / max(img.width, img.height)
+            scaled = img.resize(
+                (max(1, round(img.width * scale)), max(1, round(img.height * scale))),
+                Image.LANCZOS,
+            )
+
+            square = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+            square.paste(
+                scaled,
+                ((size - scaled.width) // 2, (size - scaled.height) // 2),
+            )
+
+            buffer = io.BytesIO()
+            square.save(buffer, format="PNG")
+            return buffer.getvalue()
+    except UnidentifiedImageError as exc:
+        raise ValueError("Not an image file we can read") from exc
