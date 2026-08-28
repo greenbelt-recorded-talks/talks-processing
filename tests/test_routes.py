@@ -308,3 +308,45 @@ class TestUpdateFestivalYear:
         self._post(auth_client, year)
 
         assert env_file.read_text().count("GB_FRIDAY=") == 1
+
+
+class TestRawFileScan:
+    """Previous festivals' recordings share the upload directory with this
+    year's - nothing sweeps them out at rollover - so a scan for "which talks
+    have been recorded" has to ignore them rather than trying to read a talk
+    ID out of a filename that does not carry one.
+    """
+
+    @pytest.fixture
+    def uploads(self, app):
+        """The upload directory, emptied of anything a test left behind."""
+        directory = Path(app.config["UPLOAD_DIR"])
+        yield directory
+        for leftover in directory.iterdir():
+            leftover.unlink()
+
+    def test_finds_this_years_recordings(self, app_ctx, uploads):
+        from gbtalks.routes import talk_ids_with_file
+
+        (uploads / "gb26-001_RAW.mp3").touch()
+        (uploads / "gb26-042_RAW.mp3").touch()
+
+        assert talk_ids_with_file(uploads, "_RAW.mp3") == {1, 42}
+
+    def test_ignores_other_years_and_other_kinds(self, app_ctx, uploads):
+        from gbtalks.routes import talk_ids_with_file
+
+        (uploads / "gb26-001_RAW.mp3").touch()
+        (uploads / "gb25-001_RAW.mp3").touch()
+        (uploads / "gb26-001_EDITED.mp3").touch()
+        (uploads / "notes.txt").touch()
+
+        assert talk_ids_with_file(uploads, "_RAW.mp3") == {1}
+
+    def test_front_desk_survives_last_years_recordings(
+        self, auth_client, make_talk, uploads
+    ):
+        make_talk(talk_id=1)
+        (uploads / "gb25-001_RAW.mp3").touch()
+
+        assert auth_client.get("/front_desk").status_code == 200

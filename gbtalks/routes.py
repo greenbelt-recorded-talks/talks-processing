@@ -1542,25 +1542,36 @@ def talks_overlap(talk_a, talk_b):
     return (talk_a.start_time < talk_b.end_time and talk_b.start_time < talk_a.end_time)
 
 
+def talk_ids_with_file(directory, suffix):
+    """The IDs of talks that have a file of this kind in *directory*.
+
+    Previous festivals' recordings sit in the same directory as this year's -
+    nothing moves them out - so a name is only one of our talks if it carries
+    this year's prefix and a numeric ID. Anything else belongs to another year
+    and is skipped rather than being parsed and blowing up.
+    """
+
+    prefix = "gb" + str(app.config["GB_FRIDAY"][2:4]) + "-"
+
+    talk_ids = set()
+    for entry in os.scandir(directory):
+        name = entry.name
+        if not (name.startswith(prefix) and name.endswith(suffix)):
+            continue
+        talk_id = name[len(prefix) : -len(suffix)]
+        if talk_id.isdigit():
+            talk_ids.add(int(talk_id))
+
+    return talk_ids
+
+
 @app.route("/front_desk", methods=["GET", "POST"])
 @login_required
 @current_user_is_team_leader
 def front_desk():
     """Management functions for front desk"""
 
-    gb_year = str(app.config["GB_FRIDAY"][2:4])
-    gb_prefix = "gb" + gb_year + "-"
-
-    raw_files = (
-        {
-
-                int(x.name.replace("_RAW.mp3", "").replace(gb_prefix, ""))
-                for x in os.scandir(app.config["UPLOAD_DIR"])
-                if x.name.endswith("RAW.mp3")
-
-        }
-        or set()
-    )
+    raw_files = talk_ids_with_file(app.config["UPLOAD_DIR"], "_RAW.mp3")
 
     past_horizon = datetime.now() + timedelta(minutes=30)
 
