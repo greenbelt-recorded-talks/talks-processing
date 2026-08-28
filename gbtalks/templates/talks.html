@@ -4,7 +4,11 @@
 
 <h1 class="uk-heading-line uk-text-center"><span>Talks</span></h1>
 
-<div uk-filter="target: .js-filter">
+<div id="talks-filter" uk-filter="target: .js-filter">
+
+    <div class="uk-card uk-card-default uk-card-body uk-padding-small uk-margin-small-bottom uk-text-center">
+        <span class="uk-text-bold" id="talks-summary">{% if talks %}Showing all {{ talks|length }} talk{{ '' if talks|length == 1 else 's' }}{% else %}No talks loaded{% endif %}</span>
+    </div>
 
     <div class="uk-grid-small uk-grid-divider uk-child-width-auto" uk-grid>
         <div>
@@ -189,6 +193,42 @@
 </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filter = document.getElementById('talks-filter');
+    const list = filter.querySelector('.js-filter');
+    const summary = document.getElementById('talks-summary');
+    const total = list.children.length;
+    const noun = total === 1 ? 'talk' : 'talks';
+
+    // UIkit hides a filtered-out card with an inline display:none, so the
+    // count comes off the list itself - no need to work out what the pills
+    // add up to, which is the part that would go stale as filters are added.
+    function updateSummary() {
+        let shown = 0;
+        for (const card of list.children) {
+            if (card.style.display !== 'none') {
+                shown += 1;
+            }
+        }
+
+        if (total === 0) {
+            summary.textContent = 'No talks loaded';
+        } else if (shown === total) {
+            summary.textContent = `Showing all ${total} ${noun}`;
+        } else {
+            summary.textContent = `Showing ${shown} of ${total} ${noun}`;
+        }
+    }
+
+    // afterFilter fires once UIkit has finished applying a filter change.
+    filter.addEventListener('afterFilter', updateSummary);
+    updateSummary();
+});
+</script>
 {% endblock %}
 
 

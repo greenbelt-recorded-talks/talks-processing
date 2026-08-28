@@ -169,6 +169,25 @@ class TestTalksPage:
         body = auth_client.get("/talks").get_data(as_text=True)
         assert body.index("Earlier Talk") < body.index("Later Talk")
 
+    def test_summary_counts_the_talks(self, auth_client, make_talk):
+        # The filters are applied in the browser, so this is the unfiltered
+        # figure the script starts from and revises on the first click.
+        for talk_id in range(1, 4):
+            make_talk(talk_id=talk_id)
+
+        body = auth_client.get("/talks").get_data(as_text=True)
+        assert "Showing all 3 talks" in body
+
+    def test_summary_is_singular_for_one_talk(self, auth_client, make_talk):
+        make_talk(talk_id=1)
+
+        body = auth_client.get("/talks").get_data(as_text=True)
+        assert "Showing all 1 talk<" in body
+
+    def test_summary_with_no_talks_at_all(self, auth_client):
+        body = auth_client.get("/talks").get_data(as_text=True)
+        assert "No talks loaded" in body
+
 
 class TestAddTalk:
     def test_creates_a_talk(self, auth_client, db):
