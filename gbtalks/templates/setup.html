@@ -46,6 +46,11 @@ This page provides a range of tools that set up the application. Use with care: 
 {% endfilter %}
 </div>
 
+{# Only the festival server has a certificate to trust. Gated on "not cloud"
+   rather than "is onsite" on purpose: an unset or mistyped DEPLOYMENT_ENV
+   should leave the instructions visible on the machine that needs them,
+   and they are merely useless - not harmful - anywhere else. #}
+{% if deployment_env != 'cloud' %}
 <hr class="uk-divider-icon">
 
 <div class="uk-card uk-card-default uk-card-body">
@@ -135,6 +140,7 @@ Silence means it is not installed.
 {% endfilter %}
 
 </div>
+{% endif %}
 
 
 <hr class="uk-divider-icon">
