@@ -1,8 +1,10 @@
 import csv
 import os
 import pprint
+import re
 import shutil
 import subprocess
+import traceback
 from datetime import datetime
 from multiprocessing import Pool
 
@@ -17,8 +19,32 @@ from .libgbtalks import get_cd_dir_for_talk, get_path_for_file
 from .models import Editor, Recorder, Talk, db
 from .talks_csv import parse_talks_csv
 
+# The two generated filenames, as get_path_for_file writes them: an edited
+# upload is gb26-020_EDITED.mp3, a finished conversion GB26_020_Title_Name.mp3.
+# Both are matched whole. Picking them apart with replace() and split()
+# instead is what let last year's gb25-013_EDITED.mp3 through as a talk id of
+# "gb25-013" - the prefix being stripped is always the current year's, so a
+# foreign one survives intact - and what made any stray .mp3 without an
+# underscore in PROCESSED_DIR raise IndexError and stop the run outright.
+EDITED_FILE_RE = re.compile(r"^gb(?P<year>\d{2})-(?P<id>\d{3})_EDITED\.mp3$")
+PROCESSED_FILE_RE = re.compile(r"^GB(?P<year>\d{2})_(?P<id>\d{3})_.*\.mp3$")
+
 
 def process_talk(talk_id):
+    """Convert one edited talk, logging any failure rather than raising.
+
+    Pool.map runs these in chunks, and a chunk is a plain map - so an
+    exception does not only lose its own talk, it abandons every talk queued
+    behind it in the same chunk. One unreadable file should cost one talk.
+    """
+    try:
+        _process_talk(talk_id)
+    except Exception:
+        pprint.pprint("FAILED to process talk " + str(talk_id))
+        traceback.print_exc()
+
+
+def _process_talk(talk_id):
     top = AudioSegment.from_file(os.path.join(app.config["UPLOAD_DIR"], "top.mp3"))
     tail = AudioSegment.from_file(os.path.join(app.config["UPLOAD_DIR"], "tail.mp3"))
 
@@ -116,39 +142,65 @@ def convert_talks():
     only_once_preventer = singleton.SingleInstance(flavor_id="convert_talks")  # noqa: F841
 
     gb_year = str(app.config["GB_FRIDAY"][2:4])
-    gb_prefix = "gb" + gb_year + "-"
 
-    # Work out which files need to be converted by looking at the filesystem
+    # Work out which files need to be converted by looking at the filesystem.
     # If a talk has an edited file but no converted file, convert it!
+    #
+    # Anything in UPLOAD_DIR that looks like an edited file but is not one of
+    # this year's is set aside and named below, rather than guessed at. It is
+    # nearly always a leftover from last festival, but a typo in a hand-made
+    # filename looks the same and would otherwise be silently ignored - a talk
+    # that never converts and nobody notices until the USB build.
+    edited_files = set()
+    skipped_files = []
+    for entry in os.scandir(app.config["UPLOAD_DIR"]):
+        if not entry.name.endswith("_EDITED.mp3"):
+            continue
+        match = EDITED_FILE_RE.match(entry.name)
+        if match is None or match["year"] != gb_year:
+            skipped_files.append(entry.name)
+            continue
+        edited_files.add(match["id"])
 
-    edited_files = (
-        {
+    # A previous festival's conversions must not count as this one's, or a
+    # leftover GB25_020_*.mp3 would suppress GB26's talk 020 for good.
+    processed_files = {
+        match["id"]
+        for match in (
+            PROCESSED_FILE_RE.match(entry.name)
+            for entry in os.scandir(app.config["PROCESSED_DIR"])
+        )
+        if match is not None and match["year"] == gb_year
+    }
 
-                x.name.replace("_EDITED.mp3", "").replace(gb_prefix, "")
-                for x in os.scandir(app.config["UPLOAD_DIR"])
-                if x.name.endswith("EDITED.mp3")
+    talks = edited_files - processed_files
 
-        }
-        or set()
-    )
-    processed_files = (
-        {
+    # Only convert talks that are in the database and cleared. A Query is
+    # truthy whether or not it matches anything, so the obvious spelling of
+    # this test passes everything: an uncleared talk gets converted, and an
+    # id with no talk behind it reaches process_talk and fails there on
+    # `talk.id`. Ask the database once and intersect - the ids in `talks` came
+    # off zero-padded filenames, so the cleared ids are padded to match rather
+    # than relying on SQLite quietly reading "020" as an integer.
+    cleared_ids = {
+        str(row.id).zfill(3)
+        for row in Talk.query.where(Talk.is_cleared.is_(True)).all()
+    }
+    talks_to_process = sorted(talks & cleared_ids)
 
-                x.name.split("_")[1]
-                for x in os.scandir(app.config["PROCESSED_DIR"])
-                if x.name.endswith(".mp3")
-
-        }
-        or set()
-    )
-
-    talks = edited_files
-    talks.difference_update(processed_files)
-
-    talks_to_process = [x for x in list(talks) if Talk.query.where(Talk.id==x, Talk.is_cleared)] or []
+    # Edited, but not going anywhere: no talk of that id, or not cleared yet.
+    # Both are ordinary states rather than errors, and both are invisible
+    # unless said out loud.
+    held_back = sorted(talks - cleared_ids)
 
     pprint.pprint("Processing Talks:")
     pprint.pprint(talks_to_process)
+    if held_back:
+        pprint.pprint("Edited, but not a cleared talk - not converting:")
+        pprint.pprint(held_back)
+    if skipped_files:
+        pprint.pprint("Not an edited file for GB" + gb_year + " - ignoring:")
+        pprint.pprint(sorted(skipped_files))
 
     with Pool(5) as p:
         p.map(process_talk, talks_to_process)
