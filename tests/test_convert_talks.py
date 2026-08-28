@@ -14,6 +14,10 @@ from flask import current_app as app
 
 from gbtalks import commands
 
+# Whatever the configured levels happen to be, these are what the calls below
+# hand over - the point of the tests is the failure handling, not the figures.
+LEVELS = (-16.0, 11.0, -1.5)
+
 
 @pytest.fixture
 def selected(app, app_ctx, monkeypatch):
@@ -255,7 +259,7 @@ class TestNormaliseAudio:
         monkeypatch.setattr(commands.subprocess, "run", _fail)
 
         with pytest.raises(RuntimeError) as raised:
-            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"))
+            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"), *LEVELS)
 
         assert "exited 1" in str(raised.value)
         assert "Invalid loudness target" in str(raised.value)
@@ -267,7 +271,7 @@ class TestNormaliseAudio:
         monkeypatch.setattr(commands.subprocess, "run", _hang)
 
         with pytest.raises(RuntimeError, match="did not finish within"):
-            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"))
+            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"), *LEVELS)
 
     def test_a_missing_ffmpeg_normalize_says_which_tool_is_missing(
             self, monkeypatch, tmp_path):
@@ -277,7 +281,7 @@ class TestNormaliseAudio:
         monkeypatch.setattr(commands.subprocess, "run", _absent)
 
         with pytest.raises(RuntimeError, match="ffmpeg-normalize is not on PATH"):
-            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"))
+            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"), *LEVELS)
 
     def test_a_clean_exit_that_wrote_nothing_still_raises(self, monkeypatch, tmp_path):
         monkeypatch.setattr(
@@ -285,7 +289,7 @@ class TestNormaliseAudio:
         )
 
         with pytest.raises(RuntimeError, match="wrote no output"):
-            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"))
+            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"), *LEVELS)
 
     def test_a_written_output_is_accepted_quietly(self, monkeypatch, tmp_path):
         output = tmp_path / "out.wav"
@@ -295,7 +299,7 @@ class TestNormaliseAudio:
 
         monkeypatch.setattr(commands.subprocess, "run", _succeed)
 
-        commands.normalise_audio("in.wav", str(output))
+        commands.normalise_audio("in.wav", str(output), *LEVELS)
 
     def test_the_call_carries_a_timeout_and_checks_its_exit(self, monkeypatch, tmp_path):
         seen = {}
@@ -307,9 +311,27 @@ class TestNormaliseAudio:
 
         monkeypatch.setattr(commands.subprocess, "run", _record)
 
-        commands.normalise_audio("in.wav", str(output))
+        commands.normalise_audio("in.wav", str(output), *LEVELS)
 
         assert seen["check"] is True
         assert seen["timeout"] == commands.NORMALIZE_TIMEOUT_SECONDS
         assert seen["capture_output"] is True
         assert seen["command"][0] == "ffmpeg-normalize"
+
+    def test_the_configured_levels_reach_the_command_line(self, monkeypatch,
+                                                          tmp_path):
+        seen = {}
+        output = tmp_path / "out.wav"
+
+        def _record(command, **kwargs):
+            seen["command"] = command
+            output.write_bytes(b"RIFF")
+
+        monkeypatch.setattr(commands.subprocess, "run", _record)
+
+        commands.normalise_audio("in.wav", str(output), -16.0, 11.0, -1.5)
+
+        command = seen["command"]
+        assert command[command.index("-t") + 1] == "-16.0"
+        assert command[command.index("--loudness-range-target") + 1] == "11.0"
+        assert command[command.index("-tp") + 1] == "-1.5"

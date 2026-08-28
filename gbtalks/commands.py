@@ -40,8 +40,13 @@ PROCESSED_FILE_RE = re.compile(r"^GB(?P<year>\d{2})_(?P<id>\d{3})_.*\.mp3$")
 NORMALIZE_TIMEOUT_SECONDS = 3600
 
 
-def normalise_audio(input_path, output_path):
+def normalise_audio(input_path, output_path, target_lufs, loudness_range,
+                    true_peak):
     """Normalise input_path onto output_path, raising on anything but success.
+
+    The three figures are passed in rather than read from config here, so the
+    levels the pipeline uses are decided in one place and this stays testable
+    without an application context.
 
     The call used to be a bare subprocess.call, whose return code nothing
     looked at. Execution then carried on into AudioSegment.from_file() on an
@@ -60,10 +65,12 @@ def normalise_audio(input_path, output_path):
         input_path,
         "-o",
         output_path,
-        "--loudness-range-target",
-        "3",
         "-t",
-        "-13",
+        str(target_lufs),
+        "--loudness-range-target",
+        str(loudness_range),
+        "-tp",
+        str(true_peak),
         "-f",
         "-ar",
         "44100",
@@ -159,7 +166,13 @@ def _process_talk(talk_id):
 
         # Normalise to a fixed level
         normalized_path = os.path.join(work, "normalized.wav")
-        normalise_audio(toptail_path, normalized_path)
+        normalise_audio(
+            toptail_path,
+            normalized_path,
+            app.config["AUDIO_TARGET_LUFS"],
+            app.config["AUDIO_LOUDNESS_RANGE_LU"],
+            app.config["AUDIO_TRUE_PEAK_DBTP"],
+        )
 
         # Load the normalised file back in. Everything downstream works from
         # this, in memory, so the temp directory is done with here.

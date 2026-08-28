@@ -209,6 +209,47 @@ The `convert_talks` command processes edited audio files:
 4. Creates CD-ready WAV files (5-minute segments)
 5. Copies to web directory
 
+### Audio Levels
+
+Three values in `config.py`, and every part of the pipeline reads them rather
+than carrying its own copy:
+
+| | default | |
+|---|---|---|
+| `AUDIO_TARGET_LUFS` | -16 | the loudness every finished talk is cut to |
+| `AUDIO_LOUDNESS_RANGE_LU` | 11 | the loudness range target handed to loudnorm |
+| `AUDIO_TRUE_PEAK_DBTP` | -1.5 | the peak ceiling |
+
+They were three literals in the middle of `convert_talks`'s
+`ffmpeg-normalize` argument list. That is how the range target came to be
+asking for something no talk can give: real talks measure LRA 8 to 11, and a
+target of **3** can only be met by riding the gain 3-4 dB throughout, which is
+audible as pumping. Every run logged two warnings saying the filter had given
+up on linear normalisation and fallen back to dynamic; the settings had never
+once done what they said.
+
+`AUDIO_LOUDNESS_RANGE_LU` is deliberately set **above** the loudness range of
+any talk measured so far, so the filter is never asked to compress one to hit
+it. Lowering it is a request for compression - that is what it is for.
+
+Up to GB26 the target was **-13 LUFS**, chosen for playback in a car, and
+every talk in the archive before this change sits there. -16 is the usual
+spoken-word figure and is quieter, so this year's talks are quieter than
+previous years': a deliberate change, not a tidy-up. Measured on real talks,
+the gain movement across 45 seconds of ordinary speech drops from 3.5 dB at
+the old settings to 0.6 dB at these.
+
+Linear normalisation is not reachable for this material at any sane level, and
+that is fine. The talks measure -18 to -26 LUFS integrated with true peaks
+around -1 dBTP - a crest factor wide enough that lifting them to any modern
+target linearly would clip. Dynamic is the right mode here; the point of the
+range target is to make it gentle rather than to escape it.
+
+**Changing the target orphans the talks already converted.** Nothing
+re-converts a talk that already has a processed file, so a mid-festival change
+leaves a split archive until the processed MP3s are deleted and the cron job
+rebuilds them.
+
 ### Migration System
 Custom migration framework in `gbtalks/commands.py`:
 - Tracks applied migrations in `schema_migrations` table
@@ -355,10 +396,9 @@ having the same thing on the card you have just previewed.
 ### Jingle Levels
 
 `top.mp3` and `tail.mp3` are bolted onto every processed talk, so they want to
-sit at the loudness the talks themselves are cut to. `AUDIO_TARGET_LUFS`
-(default -13) and `AUDIO_TRUE_PEAK_DBTP` (default -2) are that pair, and the
-health check measures both jingles against them with `audio_level_check` in
-`libgbtalks.py`.
+sit at the loudness the talks themselves are cut to. The health check measures
+both against `AUDIO_TARGET_LUFS` and `AUDIO_TRUE_PEAK_DBTP` (see Audio Levels
+above) with `audio_level_check` in `libgbtalks.py`.
 
 Note this only bites once the jingles are levelled *separately* from the talk.
 While `convert_talks` normalises `top + body + tail` as one unit, loudnorm
@@ -372,10 +412,10 @@ different answers: a file that is quiet **with** peak headroom can simply be
 turned up (`quiet`), and one that is quiet **without** it (`squashed`) can only
 reach the target by having its peaks limited. Both current jingles are the
 second kind - they are mastered at -18.5 and -17.2 LUFS with true peaks at
--1.5 and -1.1 dBTP, which is essentially no headroom at all. Reaching -13
-costs the top about 5.9 dB of limiting and the tail about 5.1 dB, enough to
-flatten a four-second sting. The message says so, and past 2 dB it suggests a
-re-cut instead.
+-1.5 and -1.1 dBTP, which is essentially no headroom at all. At the -16 target
+the top needs about 2.4 dB of limiting and the tail about 1.6 dB. The message
+says so, and past 2 dB it suggests a re-cut instead, which is why the top asks
+for one and the tail does not.
 
 Being off target does **not** move the card's status or the page's. The
 pipeline has run for years on jingles that sit off target, so this is something

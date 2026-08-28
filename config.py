@@ -60,13 +60,26 @@ class Config:
     COVER_ART_SIZE = int(os.getenv("COVER_ART_SIZE", "300"))
 
     # Audio levels
-    # The loudness every finished talk is aimed at, and the peak ceiling it
-    # must not cross. These are the figures convert-talks normalises to, and
-    # the same pair the health check measures top.mp3 and tail.mp3 against -
-    # a jingle that sits well off this target is audibly wrong against the
-    # speech it is bolted to, and only shows up once the MP3s are cut.
-    AUDIO_TARGET_LUFS = float(os.getenv("AUDIO_TARGET_LUFS", "-13"))
-    AUDIO_TRUE_PEAK_DBTP = float(os.getenv("AUDIO_TRUE_PEAK_DBTP", "-2"))
+    # One place the whole pipeline agrees on: convert-talks normalises every
+    # talk to these, and the health check measures top.mp3 and tail.mp3
+    # against the same figures. They were three literals in the middle of an
+    # ffmpeg-normalize argument list, which is how the loudness range target
+    # came to be asking for something no talk has ever been able to give.
+    #
+    # -16 LUFS is the usual figure for spoken word. Up to GB26 this archive
+    # sat at -13, so this year's talks are quieter than every previous year's
+    # - a deliberate change, not a tidy-up. -13 was chosen for playback in a
+    # car, and the cost of it was a loudness range target of 3 against
+    # material measuring 8 to 11, which the loudnorm filter can only meet by
+    # riding the gain 3-4 dB throughout. At -16 with a reachable range target
+    # that movement drops to well under 1 dB on most talks.
+    AUDIO_TARGET_LUFS = float(os.getenv("AUDIO_TARGET_LUFS", "-16"))
+    AUDIO_TRUE_PEAK_DBTP = float(os.getenv("AUDIO_TRUE_PEAK_DBTP", "-1.5"))
+
+    # Deliberately above the loudness range of any talk we have measured, so
+    # the filter is never asked to compress the life out of one to hit it.
+    # Lower this and you are asking for compression; that is what it is for.
+    AUDIO_LOUDNESS_RANGE_LU = float(os.getenv("AUDIO_LOUDNESS_RANGE_LU", "11"))
 
     # How far off target a file may sit before the health check mentions it.
     # Loudness measurement of a clip only a few seconds long is not accurate
