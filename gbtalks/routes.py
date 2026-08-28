@@ -1645,42 +1645,11 @@ def editing():
                 as_attachment=True,
             )
 
-    gb_year = str(app.config["GB_FRIDAY"][2:4])
-    gb_prefix = "gb" + gb_year + "-"
-
-    raw_files = (
-        {
-
-                x.name.replace("_RAW.mp3", "").replace(gb_prefix, "")
-                for x in os.scandir(app.config["UPLOAD_DIR"])
-                if x.name.endswith("RAW.mp3")
-
-        }
-        or set()
-    )
-    edited_files = (
-        {
-
-                x.name.replace("_EDITED.mp3", "").replace(gb_prefix, "")
-                for x in os.scandir(app.config["UPLOAD_DIR"])
-                if x.name.endswith("EDITED.mp3")
-
-        }
-        or set()
-    )
-    processed_files = (
-        {
-
-                x.name.replace("mp3.mp3", "").replace(gb_prefix, "")
-                for x in os.scandir(app.config["PROCESSED_DIR"])
-                if x.name.endswith("mp3.mp3")
-
-        }
-        or set()
-    )
+    raw_files = talk_ids_with_file(app.config["UPLOAD_DIR"], "_RAW.mp3")
+    edited_files = talk_ids_with_file(app.config["UPLOAD_DIR"], "_EDITED.mp3")
 
     talks_to_edit = Talk.query.filter(
-        Talk.id.in_(set(raw_files.difference(edited_files)))
+        Talk.id.in_(raw_files.difference(edited_files))
     ).order_by(asc(Talk.start_time))
 
     # - A way for someone to download raw files, assign a talk to an editor, upload the edited files
@@ -1689,9 +1658,6 @@ def editing():
         "editing.html",
         editors=editors,
         talks_to_edit=talks_to_edit,
-        raw_talks_available=raw_files,
-        edited_talks_available=edited_files,
-        processed_talks_available=processed_files,
     )
 
 

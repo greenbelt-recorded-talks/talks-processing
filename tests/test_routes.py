@@ -350,3 +350,29 @@ class TestRawFileScan:
         (uploads / "gb25-001_RAW.mp3").touch()
 
         assert auth_client.get("/front_desk").status_code == 200
+
+    def test_editing_lists_talks_whose_raw_file_has_not_been_edited(
+        self, auth_client, make_talk, uploads
+    ):
+        make_talk(talk_id=1, title="Still To Edit")
+        make_talk(talk_id=2, title="Already Edited")
+        make_talk(talk_id=3, title="Never Recorded")
+        for name in ("gb26-001_RAW.mp3", "gb26-002_RAW.mp3", "gb26-002_EDITED.mp3"):
+            (uploads / name).touch()
+
+        page = auth_client.get("/editing").get_data(as_text=True)
+
+        assert "Still To Edit" in page
+        assert "Already Edited" not in page
+        assert "Never Recorded" not in page
+
+    def test_editing_ignores_last_years_recordings(
+        self, auth_client, make_talk, uploads
+    ):
+        """The IDs collide across years - gb25-001 must not stand in for talk 1."""
+        make_talk(talk_id=1, title="Not Recorded This Year")
+        (uploads / "gb25-001_RAW.mp3").touch()
+
+        page = auth_client.get("/editing").get_data(as_text=True)
+
+        assert "Not Recorded This Year" not in page
