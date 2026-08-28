@@ -21,6 +21,12 @@ def live_database(app_ctx, db, tmp_path):
     The upload route replaces this file, and the suite's engine is
     session-scoped, so without the restore every later test would be looking
     at whatever a test here happened to install.
+
+    It also clears out the "here is what you overwrote" snapshots the route
+    leaves beside it, so a test that counts them is counting its own. They are
+    named to the second, so two uploads land on one filename or on two
+    depending only on where the run falls in the clock - which made counting
+    them a coin toss rather than an assertion.
     """
     from gbtalks.routes import database_path
 
@@ -29,12 +35,22 @@ def live_database(app_ctx, db, tmp_path):
 
     keep = tmp_path / "original.sqlite"
     shutil.copy(path, keep)
+    remove_snapshots(path)
 
     yield path
 
     db.engine.dispose()
     shutil.copy(keep, path)
     db.engine.dispose()
+    remove_snapshots(path)
+
+
+def remove_snapshots(database_path):
+    """Delete the replaced-*.sqlite files an upload leaves beside the database."""
+    instance_dir = os.path.dirname(database_path)
+    for name in os.listdir(instance_dir):
+        if name.startswith("replaced-"):
+            os.remove(os.path.join(instance_dir, name))
 
 
 def make_database(path, talk_title="Imported Talk", talk_id=901):
@@ -125,7 +141,6 @@ class TestUploadDatabase:
             titles = [row[0] for row in connection.execute("SELECT title FROM talks")]
         finally:
             connection.close()
-            os.remove(os.path.join(instance_dir, saved[0]))
 
         assert titles == ["The Talk That Is Here Now"]
 
@@ -221,9 +236,6 @@ class TestUploadDatabase:
 
         instance_dir = os.path.dirname(live_database)
         leftovers = [n for n in os.listdir(instance_dir) if n.startswith("incoming-")]
-        for name in os.listdir(instance_dir):
-            if name.startswith("replaced-"):
-                os.remove(os.path.join(instance_dir, name))
 
         assert leftovers == []
 
