@@ -4,7 +4,12 @@
 
 <h1 class="uk-heading-line uk-text-center"><span>Setup</span></h1>
 
-<div class="uk-card uk-card-default uk-card-body">
+<p class="uk-text-lead">
+    Tools that set the application up. Use with care: this page lets you break
+    things in interesting ways. Each tool is folded away until you open it.
+</p>
+
+<div class="uk-card uk-card-default uk-card-body setup-section">
     <div class="uk-grid-small uk-flex-middle" uk-grid>
         <div class="uk-width-expand">
             <h3 class="uk-margin-remove">System Health Check</h3>
@@ -13,7 +18,7 @@
             <a href="{{ url_for('health_check_page') }}" class="uk-button uk-button-small uk-button-default">View Details</a>
         </div>
     </div>
-    
+
     {% if health_check.overall_status == 'healthy' %}
         <div class="uk-alert-success uk-margin-small-top" uk-alert>
             <p class="uk-margin-remove"><strong>✓ System Status: HEALTHY</strong></p>
@@ -27,23 +32,369 @@
             <p class="uk-margin-remove"><strong>✗ System Status: ERROR</strong> - Critical issues detected</p>
         </div>
     {% endif %}
-    
+
     <p class="uk-text-small uk-text-muted uk-margin-small-top">
-        Last checked: {{ health_check.checked_at }} | 
+        Last checked: {{ health_check.checked_at }} |
         <a href="{{ url_for('health_check_page') }}" class="uk-link-muted">View detailed report</a>
     </p>
 </div>
 
-<hr class="uk-divider-icon">
+<div class="uk-card uk-card-default uk-card-body setup-section">
+    <h3 class="uk-margin-remove-bottom">Upload All Talks Index File</h3>
+    <p class="uk-text-meta">The PDF on the All Talks USB stick that lists every talk.</p>
 
-<div class="uk-card uk-card-default uk-card-body">
+    <form action="put_alltalks_pdf" method=post enctype=multipart/form-data class="setup-inline-form">
+        <label for=alltalks_file>File</label>
+        <input name=file type=file id=alltalks_file accept=".pdf">
+        <button class="uk-button uk-button-primary uk-button-small">Upload</button>
+    </form>
+
+    <details class="setup-help">
+        <summary>About this file</summary>
 {% filter markdown %}
 
-### Setup
+We create it during the festival, usually from the order form, and update it as
+talks are added to or dropped from the list.
 
-This page provides a range of tools that set up the application. Use with care: this allows you to break things in interesting ways. 
+Uploading a file here replaces the existing one.
 
 {% endfilter %}
+    </details>
+</div>
+
+<div class="uk-card uk-card-default uk-card-body setup-section">
+    <h3 class="uk-margin-remove-bottom">Festival Year</h3>
+    <p class="uk-text-meta">
+        Currently <strong>{{ config.GB_FRIDAY }}</strong> (short year {{ config.GB_SHORT_YEAR }}).
+    </p>
+
+    <form action="update_festival_year" method=post class="setup-inline-form">
+        <label for=festival_year>Festival year</label>
+        <input class="uk-input uk-form-width-xsmall" name=festival_year type=number id=festival_year
+               value="{{ config.GB_FRIDAY[:4] }}" min="{{ current_year }}" max="{{ current_year + 10 }}" required>
+        <button class="uk-button uk-button-primary uk-button-small">Update</button>
+    </form>
+
+    <details class="setup-help">
+        <summary>How the date is worked out</summary>
+{% filter markdown %}
+
+You choose the year; the Friday is calculated for you as the Friday before the
+UK Summer Bank Holiday (the last Monday in August).
+
+That date feeds every filename, every MP3 year tag, and the date the Day column
+of a talks file is resolved against.
+
+{% endfilter %}
+    </details>
+</div>
+
+<div class="uk-card uk-card-default uk-card-body setup-section">
+    <h3 class="uk-margin-remove-bottom">Upload Icon</h3>
+    <p class="uk-text-meta">The cover image embedded in every processed MP3.</p>
+
+    <form action="upload_cover_image" method=post enctype=multipart/form-data class="setup-inline-form">
+        <label for=cover_file>File</label>
+        <input name=file type=file id=cover_file accept=".png,.jpg,.jpeg">
+        <button class="uk-button uk-button-primary uk-button-small">Upload</button>
+    </form>
+
+    <details class="setup-help">
+        <summary>What it accepts</summary>
+{% filter markdown %}
+
+A PNG or a JPEG at whatever size you have - it is resized to a square
+{{ config.COVER_ART_SIZE }}x{{ config.COVER_ART_SIZE }} PNG for you. A source
+that is not already square is padded out rather than cropped, so nothing is
+trimmed off the edges of the logo.
+
+Uploading a file here replaces the existing one.
+
+{% endfilter %}
+    </details>
+</div>
+
+<div class="uk-card uk-card-default uk-card-body setup-section">
+    <h3 class="uk-margin-remove-bottom">Upload Top and Tail Audio</h3>
+    <p class="uk-text-meta">The short MP3s stuck on the start and end of every processed talk.</p>
+
+    <details class="setup-form">
+        <summary>Replace the top or tail audio</summary>
+        <div class="uk-grid-small uk-child-width-1-2@s uk-margin-small-top" uk-grid>
+            <div>
+                <h4 class="uk-margin-remove-bottom">Top Audio (Intro)</h4>
+                <form action="upload_top_tail" method=post enctype=multipart/form-data class="setup-inline-form">
+                    <label for=top_file>Top MP3</label>
+                    <input name=file type=file id=top_file accept=".mp3" required>
+                    <input name=file_type type=hidden value="top">
+                    <button class="uk-button uk-button-primary uk-button-small">Upload Top</button>
+                </form>
+            </div>
+            <div>
+                <h4 class="uk-margin-remove-bottom">Tail Audio (Outro)</h4>
+                <form action="upload_top_tail" method=post enctype=multipart/form-data class="setup-inline-form">
+                    <label for=tail_file>Tail MP3</label>
+                    <input name=file type=file id=tail_file accept=".mp3" required>
+                    <input name=file_type type=hidden value="tail">
+                    <button class="uk-button uk-button-primary uk-button-small">Upload Tail</button>
+                </form>
+            </div>
+        </div>
+    </details>
+
+    <details class="setup-help">
+        <summary>About these files</summary>
+{% filter markdown %}
+
+The top file plays at the start of each talk and the tail file at the end. Both
+should be short - typically 5 to 10 seconds. Uploading replaces the existing
+one.
+
+{% endfilter %}
+    </details>
+</div>
+
+<div class="uk-card uk-card-default uk-card-body setup-section">
+    <h3 class="uk-margin-remove-bottom">Rota Settings</h3>
+    <p class="uk-text-meta">The variables the automatic rota generation is built on.</p>
+
+    {% if rota_settings %}
+    <details class="setup-form">
+        <summary>Change the rota settings ({{ rota_settings|length }})</summary>
+        <form action="update_rota_settings" method=post class="uk-margin-small-top">
+            {% for key, setting in rota_settings.items() %}
+            <div class="uk-margin-small">
+                <label class="uk-form-label" for="{{ key }}">{{ setting.description }}</label>
+                <div class="uk-form-controls">
+                    <input class="uk-input uk-form-width-small" type="number" id="{{ key }}" name="{{ key }}"
+                           value="{{ setting.value }}" min="1"
+                           {% if key == 'max_shifts_per_day_limit' %}max="3"{% endif %} required>
+                    <span class="uk-text-small uk-text-muted">{{ setting.unit }}</span>
+                </div>
+            </div>
+            {% endfor %}
+            <button class="uk-button uk-button-primary">Update Rota Settings</button>
+        </form>
+    </details>
+
+    <details class="setup-help">
+        <summary>When changes take effect</summary>
+{% filter markdown %}
+
+Immediately, for rotas generated from now on. An existing rota is not
+retrospectively changed - regenerate it if you want the new values applied.
+
+{% endfilter %}
+    </details>
+    {% else %}
+    <p class="uk-text-warning">Rota settings are not available. The database may need to be recreated with <code>flask createdb</code>.</p>
+    {% endif %}
+</div>
+
+<div class="uk-card uk-card-default uk-card-body setup-section">
+    <h3 class="uk-margin-remove-bottom">Add New Talk</h3>
+    <p class="uk-text-meta">Add a single talk by hand, for one that is not in the talks file.</p>
+
+    <details class="setup-form">
+        <summary>Add a talk</summary>
+        <form action="add_talk" method="post" class="uk-margin-small-top">
+            <div class="uk-margin-small">
+                <label class="uk-form-label" for="talk_id">Talk ID</label>
+                <input class="uk-input uk-form-width-small" type="number" name="talk_id" id="talk_id" min="1" required>
+                <div class="uk-text-small uk-text-muted">A numeric ID, e.g. 123. It is used for file naming.</div>
+            </div>
+
+            <div class="uk-grid-small uk-child-width-1-2@s" uk-grid>
+                <div>
+                    <label class="uk-form-label" for="title">Title</label>
+                    <input class="uk-input" type="text" name="title" id="title" required>
+                </div>
+                <div>
+                    <label class="uk-form-label" for="speaker">Speaker</label>
+                    <input class="uk-input" type="text" name="speaker" id="speaker" required>
+                </div>
+            </div>
+
+            <div class="uk-margin-small">
+                <label class="uk-form-label" for="description">Description</label>
+                <textarea class="uk-textarea" name="description" id="description" rows="3"></textarea>
+            </div>
+
+            <div class="uk-grid-small uk-child-width-1-3@s" uk-grid>
+                <div>
+                    <label class="uk-form-label" for="day">Day</label>
+                    <select class="uk-select" name="day" id="day" required>
+                        <option value="">Select day...</option>
+                        <option value="Friday">Friday</option>
+                        <option value="Saturday">Saturday</option>
+                        <option value="Sunday">Sunday</option>
+                        <option value="Monday">Monday</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="uk-form-label" for="start_time">Start Time</label>
+                    <input class="uk-input" type="time" name="start_time" id="start_time" required>
+                </div>
+                <div>
+                    <label class="uk-form-label" for="end_time">End Time</label>
+                    <input class="uk-input" type="time" name="end_time" id="end_time" required>
+                </div>
+            </div>
+
+            <div class="uk-margin-small">
+                <label class="uk-form-label" for="venue">Venue</label>
+                <input class="uk-input" type="text" name="venue" id="venue" required>
+            </div>
+
+            <div class="uk-grid-small uk-child-width-1-3@s" uk-grid>
+                <div>
+                    <label class="uk-form-label">
+                        <input class="uk-checkbox" type="checkbox" name="is_priority" value="1"> Priority Talk
+                    </label>
+                </div>
+                <div>
+                    <label class="uk-form-label">
+                        <input class="uk-checkbox" type="checkbox" name="is_rotaed" value="1"> Include in Rota
+                    </label>
+                </div>
+                <div>
+                    <label class="uk-form-label">
+                        <input class="uk-checkbox" type="checkbox" name="is_cleared" value="1"> Cleared for Release
+                    </label>
+                </div>
+            </div>
+
+            <div class="uk-margin uk-text-center">
+                <button class="uk-button uk-button-primary">Add Talk</button>
+            </div>
+        </form>
+    </details>
+</div>
+
+<div class="uk-card uk-card-default uk-card-body setup-section">
+    <h3 class="uk-margin-remove-bottom">Move the Database</h3>
+    <p class="uk-text-meta">Carry the talks, rota and recorders between the Cloud copy and the On-site copy.</p>
+
+    <p class="uk-margin-small-top">
+        <a class="uk-button uk-button-default" href="{{ url_for('download_database') }}">Download the database</a>
+    </p>
+
+    <details class="setup-form">
+        <summary class="setup-summary-danger">Replace this database with an uploaded one</summary>
+        <form action="upload_database" method=post enctype=multipart/form-data class="uk-margin-small-top">
+            <label for=database_file>Replace with</label>
+            <input name=file type=file id=database_file accept=".sqlite,.db,.sqlite3">
+            <p>
+                <label><input name=confirm type=checkbox value="yes" required> I understand this replaces all talks, rota and recorder data</label>
+            </p>
+            <button class="uk-button uk-button-danger">Replace the database</button>
+        </form>
+    </details>
+
+    <details class="setup-help">
+        <summary>What travels, and what does not</summary>
+{% filter markdown %}
+
+There are two copies of this app - the Cloud one and the On-site one (the badge
+in the navbar says which you are looking at). This is how the database moves
+between them.
+
+**Download** takes a consistent snapshot and hands you a `.sqlite` file. It is
+safe to do while the app is in use - it uses SQLite's own backup, not a plain
+file copy, so it cannot catch a half-finished write.
+
+What travels: the talks, the rota, recorders, editors, rota settings, and who
+has signed in. What does **not** travel: the audio. Recordings live in
+`/storage` and the app works out what has been recorded by looking for the
+files, so a database moved to a machine without them shows every talk as
+un-recorded. That is expected, not a fault.
+
+**Upload replaces everything.** There is no merge: the incoming talks, rota and
+recorders stand in for the ones here. The file is checked before anything is
+touched - it must be a real SQLite database, pass an integrity check, and not
+carry schema changes this version of the app is too old to understand - and a
+snapshot of the current database is saved into the instance directory first, so
+there is a way back. A restart is still needed afterwards to be certain every
+worker has let go of the old file.
+
+{% endfilter %}
+    </details>
+</div>
+
+<div class="uk-card uk-card-default uk-card-body setup-section">
+    <h3 class="uk-margin-remove-bottom">Replace Talks File</h3>
+    <p class="uk-text-meta">The list of talks, as a UTF-8 CSV. Uploading one deletes all previous talk data.</p>
+
+    <form action="talks" method=post enctype=multipart/form-data class="setup-inline-form">
+        <label for=talks_file>File</label>
+        <input name=file type=file id=talks_file accept=".csv">
+        <input name=form_name type=hidden value="upload_talks_list">
+        <button class="uk-button uk-button-primary uk-button-small">Upload</button>
+    </form>
+
+    <details class="setup-help">
+        <summary>Which columns the file needs</summary>
+{% filter markdown %}
+
+You'll probably get a list of talks in some sort of spreadsheet format from
+GBHQ. You'll normally need to do some prep work to get it ready to import:
+remove any talks that we don't want to record, rename the column headings to
+match the list below, and make sure that there is only one header line.
+
+Columns are matched by their heading; order doesn't matter. Extra columns and
+columns with typos in the heading are ignored.
+
+These seven columns are required:
+
+	id           Talk ID, e.g. "gb99-001" or just "1"
+	title        e.g. "My Great Talk"
+	speaker      e.g. "Dr Awesome"
+	day          e.g. "Friday"
+	start_time   e.g. "20:15", "8:15 PM"
+	end_time     e.g. "21:15"
+	venue        e.g. "A Field"
+
+These are optional, and default to empty or No if you leave them out:
+
+	description                              e.g. "A wonderful not-to-be-missed talk about owls"
+	is_priority                              is this a "must-record" talk?
+	is_rotaed                                should the rota be built around this talk?
+	is_cleared                               is it cleared for release?
+	has_explicit_warning_sticker
+	has_distressing_content_warning_sticker
+	has_technical_issues_sticker
+	has_copyright_removal_sticker
+	recorder_name
+	editor_name
+
+For the Yes/No columns you can use "Yes" or "No", "Y" or "N", "true" or "false", "1" or "0", or leave the cell blank for No.
+
+Times are read as a time of day and combined with the Day column, so the file still works next year. You can give a full "2026-08-29 20:15:00" timestamp if needed.
+
+Day names  must be one of Friday, Saturday, Sunday or Monday (case-sensitive)
+
+{% endfilter %}
+    </details>
+
+    <details class="setup-help">
+        <summary>What replacing the file does</summary>
+{% filter markdown %}
+
+If anything in the file can't be read, nothing is imported at all: you'll get a
+message telling you which row and column is wrong, and the existing talks are
+left exactly as they were. So a failed import is safe.
+
+Replacing the Talks File deletes all previous data: assignments, rotas, etc.
+Files on disk aren't deleted, so if any talk IDs change, the files will be the
+wrong ones. If you replace the talks file when the festival has started, the
+rota will be meaningless, so make sure that you've got a copy saved! Any changes
+that affect the rota will need to be accounted for manually.
+
+It's probably best to talk to Rob before replacing the talks file during the
+festival.
+
+{% endfilter %}
+    </details>
 </div>
 
 {# Only the festival server has a certificate to trust. Gated on "not cloud"
@@ -51,19 +402,22 @@ This page provides a range of tools that set up the application. Use with care: 
    should leave the instructions visible on the machine that needs them,
    and they are merely useless - not harmful - anywhere else. #}
 {% if deployment_env != 'cloud' %}
-<hr class="uk-divider-icon">
+<div class="uk-card uk-card-default uk-card-body setup-section">
+    <h3 class="uk-margin-remove-bottom">Trusting the On-Site Certificate</h3>
+    <p class="uk-text-meta">
+        Getting a front desk machine to stop warning about
+        <code>on-site.talks-processing.greenbelt.org.uk</code>. You need
+        administrator rights on the machine.
+    </p>
 
-<div class="uk-card uk-card-default uk-card-body">
-
+    <details class="setup-help">
+        <summary>Windows 10 and 11</summary>
 {% filter markdown %}
 
-### Trusting the On-Site Certificate (Windows 10 and 11)
+The server talks on port 80 and 443. No redirect. This just saves us the
+HTTPS-by-default gotcha.
 
-The server talks on port 80 and 443. No redirect. This just saves us the HTTPS-by-default gotcha. 
-
-The cert is signed by our own on-site CA. CA is valid until 2035. 
-
-You need local administrator rights on the machine.
+The cert is signed by our own on-site CA. CA is valid until 2035.
 
 #### The quick way
 
@@ -122,7 +476,12 @@ To check whether a machine is already done, in any PowerShell:
 
 Silence means it is not installed.
 
-### Trusting the On-Site Certificate (macOS)
+{% endfilter %}
+    </details>
+
+    <details class="setup-help">
+        <summary>macOS</summary>
+{% filter markdown %}
 
 Same certificate, same reasons; only the trust store differs. You need an
 admin account on the Mac.
@@ -166,338 +525,8 @@ To check a machine:
 An error means it is not installed.
 
 {% endfilter %}
-
+    </details>
 </div>
 {% endif %}
-
-
-<hr class="uk-divider-icon">
-
-<div class="uk-card uk-card-default uk-card-body">
-
-{% filter markdown %}
-### Upload All Talks Index File
-
-The All Talks USB stick has a PDF file on it which lists out what all of the talks are. We create this during the festival (usually based on the order form), and update it as talks are either added or removed from the list. 
-
-Uploading a file here will replace the existing one. 
-
-{% endfilter %}
-
-        <form action="put_alltalks_pdf" method=post enctype=multipart/form-data>
-                <label for=file>File</label>
-                <input name=file type=file id=file accept=".pdf">
-                <button>Submit</button>
-        </form>
-
-
-</div>
-
-<hr class="uk-divider-icon">
-
-<div class="uk-card uk-card-default uk-card-body">
-
-{% filter markdown %}
-### Festival Year
-
-Configure the year when Greenbelt Festival takes place. The system automatically calculates the Friday before the UK Summer Bank Holiday (last Monday in August) for that year.
-
-**Current Festival Date:** {{ config.GB_FRIDAY }}  
-**Current Short Year:** {{ config.GB_SHORT_YEAR }}
-
-The Friday date is automatically calculated based on the UK Summer Bank Holiday.
-
-{% endfilter %}
-
-        <form action="update_festival_year" method=post>
-                <label for=festival_year>Festival Year</label>
-                <input name=festival_year type=number id=festival_year value="{{ config.GB_FRIDAY[:4] }}" min="{{ current_year }}" max="{{ current_year + 10 }}" required>
-                <button>Update Festival Year</button>
-        </form>
-
-</div>
-
-<hr class="uk-divider-icon">
-
-<div class="uk-card uk-card-default uk-card-body">
-
-{% filter markdown %}
-### Rota Settings
-
-Configure the variables that control how the automatic rota generation works. Changes take effect immediately for new rota generations.
-
-{% endfilter %}
-
-        {% if rota_settings %}
-        <form action="update_rota_settings" method=post>
-            {% for key, setting in rota_settings.items() %}
-            <div class="uk-margin">
-                <label class="uk-form-label" for="{{ key }}">{{ setting.description }}</label>
-                <div class="uk-form-controls">
-                    <input class="uk-input" type="number" id="{{ key }}" name="{{ key }}" 
-                           value="{{ setting.value }}" min="1" 
-                           {% if key == 'max_shifts_per_day_limit' %}max="3"{% endif %} required>
-                    <span class="uk-text-small uk-text-muted">{{ setting.unit }}</span>
-                </div>
-            </div>
-            {% endfor %}
-            <button class="uk-button uk-button-primary">Update Rota Settings</button>
-        </form>
-        {% else %}
-        <p class="uk-text-warning">Rota settings are not available. The database may need to be recreated with <code>flask createdb</code>.</p>
-        {% endif %}
-
-</div>
-
-<hr class="uk-divider-icon">
-
-<div class="uk-card uk-card-default uk-card-body">
-
-{% filter markdown %}
-### Upload Icon
-
-The icon is used as the cover image for MP3 files.
-
-Upload a PNG or a JPEG at whatever size you have - it is resized to a square
-{{ config.COVER_ART_SIZE }}x{{ config.COVER_ART_SIZE }} PNG for you. A source that is not
-already square is padded out rather than cropped, so nothing is trimmed off
-the edges of the logo.
-
-Uploading a file here will replace the existing one.
-
-{% endfilter %}
-
-        <form action="upload_cover_image" method=post enctype=multipart/form-data>
-                <label for=file>File</label>
-                <input name=file type=file id=file accept=".png,.jpg,.jpeg">
-                <button>Submit</button>
-        </form>
-
-
-</div>
-
-<hr class="uk-divider-icon">
-
-<div class="uk-card uk-card-default uk-card-body">
-
-{% filter markdown %}
-### Upload Top and Tail Audio
-
-These MP3 files are automatically added to the beginning and end of each processed talk. Upload new versions here to replace the existing ones.
-
-The top file plays at the start of each talk, and the tail file plays at the end. Both should be short (typically 5-10 seconds).
-
-{% endfilter %}
-
-        <div class="uk-grid-small uk-child-width-1-2@s" uk-grid>
-            <div>
-                <h4>Top Audio (Intro)</h4>
-                <form action="upload_top_tail" method=post enctype=multipart/form-data>
-                    <label for=top_file>Top MP3 File</label>
-                    <input name=file type=file id=top_file accept=".mp3" required>
-                    <input name=file_type type=hidden value="top">
-                    <button class="uk-button uk-button-primary">Upload Top</button>
-                </form>
-            </div>
-            <div>
-                <h4>Tail Audio (Outro)</h4>
-                <form action="upload_top_tail" method=post enctype=multipart/form-data>
-                    <label for=tail_file>Tail MP3 File</label>
-                    <input name=file type=file id=tail_file accept=".mp3" required>
-                    <input name=file_type type=hidden value="tail">
-                    <button class="uk-button uk-button-primary">Upload Tail</button>
-                </form>
-            </div>
-        </div>
-
-</div>
-
-<hr class="uk-divider-icon">
-
-<div class="uk-card uk-card-default uk-card-body">
-
-{% filter markdown %}
-
-### Add New Talk
-
-Add a single talk to the database. This is useful for adding individual talks that aren't in the main CSV import.
-
-{% endfilter %}
-
-        <form action="add_talk" method="post">
-            <div class="uk-margin">
-                <label class="uk-form-label" for="talk_id">Talk ID</label>
-                <input class="uk-input" type="number" name="talk_id" id="talk_id" min="1" required>
-                <div class="uk-text-small uk-text-muted">Enter a numeric ID (e.g., 123). This will be used for file naming.</div>
-            </div>
-            
-            <div class="uk-grid-small uk-child-width-1-2@s" uk-grid>
-                <div>
-                    <label class="uk-form-label" for="title">Title</label>
-                    <input class="uk-input" type="text" name="title" id="title" required>
-                </div>
-                <div>
-                    <label class="uk-form-label" for="speaker">Speaker</label>
-                    <input class="uk-input" type="text" name="speaker" id="speaker" required>
-                </div>
-            </div>
-            
-            <div class="uk-margin">
-                <label class="uk-form-label" for="description">Description</label>
-                <textarea class="uk-textarea" name="description" id="description" rows="3"></textarea>
-            </div>
-            
-            <div class="uk-grid-small uk-child-width-1-3@s" uk-grid>
-                <div>
-                    <label class="uk-form-label" for="day">Day</label>
-                    <select class="uk-select" name="day" id="day" required>
-                        <option value="">Select day...</option>
-                        <option value="Friday">Friday</option>
-                        <option value="Saturday">Saturday</option>
-                        <option value="Sunday">Sunday</option>
-                        <option value="Monday">Monday</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="uk-form-label" for="start_time">Start Time</label>
-                    <input class="uk-input" type="time" name="start_time" id="start_time" required>
-                </div>
-                <div>
-                    <label class="uk-form-label" for="end_time">End Time</label>
-                    <input class="uk-input" type="time" name="end_time" id="end_time" required>
-                </div>
-            </div>
-            
-            <div class="uk-margin">
-                <label class="uk-form-label" for="venue">Venue</label>
-                <input class="uk-input" type="text" name="venue" id="venue" required>
-            </div>
-            
-            <div class="uk-grid-small uk-child-width-1-3@s" uk-grid>
-                <div>
-                    <label class="uk-form-label">
-                        <input class="uk-checkbox" type="checkbox" name="is_priority" value="1"> Priority Talk
-                    </label>
-                </div>
-                <div>
-                    <label class="uk-form-label">
-                        <input class="uk-checkbox" type="checkbox" name="is_rotaed" value="1"> Include in Rota
-                    </label>
-                </div>
-                <div>
-                    <label class="uk-form-label">
-                        <input class="uk-checkbox" type="checkbox" name="is_cleared" value="1"> Cleared for Release
-                    </label>
-                </div>
-            </div>
-            
-            <div class="uk-margin uk-text-center">
-                <button class="uk-button uk-button-primary">Add Talk</button>
-            </div>
-        </form>
-
-</div>
-
-<hr class="uk-divider-icon">
-
-<div class="uk-card uk-card-default uk-card-body">
-
-{% filter markdown %}
-
-### Move the Database
-
-There are two copies of this app - the Cloud one and the On-site one (the badge
-in the navbar says which you are looking at). This is how the database moves
-between them.
-
-**Download** takes a consistent snapshot and hands you a `.sqlite` file. It is
-safe to do while the app is in use - it uses SQLite's own backup, not a plain
-file copy, so it cannot catch a half-finished write.
-
-What travels: the talks, the rota, recorders, editors, rota settings, and who
-has signed in. What does **not** travel: the audio. Recordings live in
-`/storage` and the app works out what has been recorded by looking for the
-files, so a database moved to a machine without them shows every talk as
-un-recorded. That is expected, not a fault.
-
-**Upload replaces everything.** There is no merge: the incoming talks, rota and
-recorders stand in for the ones here. The file is checked before anything is
-touched - it must be a real SQLite database, pass an integrity check, and not
-carry schema changes this version of the app is too old to understand - and a
-snapshot of the current database is saved into the instance directory first, so
-there is a way back. A restart is still needed afterwards to be certain every
-worker has let go of the old file.
-
-{% endfilter %}
-
-	<p>
-		<a class="uk-button uk-button-default" href="{{ url_for('download_database') }}">Download the database</a>
-	</p>
-
-	<form action="upload_database" method=post enctype=multipart/form-data>
-		<label for=database_file>Replace with</label>
-		<input name=file type=file id=database_file accept=".sqlite,.db,.sqlite3">
-		<p>
-			<label><input name=confirm type=checkbox value="yes" required> I understand this replaces all talks, rota and recorder data</label>
-		</p>
-		<button class="uk-button uk-button-danger">Replace the database</button>
-	</form>
-</div>
-
-<div class="uk-card uk-card-default uk-card-body">
-
-{% filter markdown %}
-
-### Replace Talks File
-
-The Talks File is the list of talks. It must be a CSV file (with utf-8 encoding, otherwise accented characters won't work).
-
-You'll probably get a list of talks in some sort of spreadsheet format from GBHQ. You'll normally need to do some prep work to get it ready to import: remove any talks that we don't want to record, rename the column headings to match the list below, and make sure that there is only one header line.
-
-Columns are matched by their heading; order doesn't matter. Extra columns and columns with typos in the heading are ignored. 
-
-These seven columns are required:
-
-	id           Talk ID, e.g. "gb99-001" or just "1"
-	title        e.g. "My Great Talk"
-	speaker      e.g. "Dr Awesome"
-	day          e.g. "Friday"
-	start_time   e.g. "20:15", "8:15 PM"
-	end_time     e.g. "21:15"
-	venue        e.g. "A Field"
-
-These are optional, and default to empty or No if you leave them out:
-
-	description                              e.g. "A wonderful not-to-be-missed talk about owls"
-	is_priority                              is this a "must-record" talk?
-	is_rotaed                                should the rota be built around this talk?
-	is_cleared                               is it cleared for release?
-	has_explicit_warning_sticker
-	has_distressing_content_warning_sticker
-	has_technical_issues_sticker
-	has_copyright_removal_sticker
-	recorder_name
-	editor_name
-
-For the Yes/No columns you can use "Yes" or "No", "Y" or "N", "true" or "false", "1" or "0", or leave the cell blank for No.
-
-Times are read as a time of day and combined with the Day column, so the file still works next year. You can give a full "2026-08-29 20:15:00" timestamp if needed.
-
-Day names  must be one of Friday, Saturday, Sunday or Monday (case-sensitive)
-
-If anything in the file can't be read, nothing is imported at all: you'll get a message telling you which row and column is wrong, and the existing talks are left exactly as they were. So a failed import is safe.
-
-Replacing the Talks File deletes all previous data: assignments, rotas, etc. Files on disk aren't deleted, so if any talk IDs change, the files will be the wrong ones. If you replace the talks file when the festival has started, the rota will be meaningless, so make sure that you've got a copy saved! Any changes that affect the rota will need to be accounted for manually.
-
-It's probably best to talk to Rob before replacing the talks file during the festival. 
-{% endfilter %}
-
-	<form action="talks" method=post enctype=multipart/form-data>
-        	<label for=file>File</label>
-        	<input name=file type=file id=file accept=".csv">
-        	<input name=form_name type=hidden value="upload_talks_list">
-        	<button>Submit</button>
-	</form>
-</div>
 
 {% endblock %}

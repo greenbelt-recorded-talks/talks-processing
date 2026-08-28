@@ -128,3 +128,51 @@
 .file-actions > * {
 	margin-right: 5px;
 }
+
+/* Setup page sections.
+   The page is a stack of unrelated tools, most of them a wall of instructions
+   wrapped around a form. Everything but the section's name and one-line
+   summary sits behind a disclosure, so the page reads as a list of what is
+   here rather than a scroll through all of it at once. The cards do the
+   separating; the divider-icon rules between them were only adding height.
+   Both disclosures read as links rather than as another heading, so the
+   section's own name stays the only bold thing on the card. */
+.setup-section + .setup-section {
+	margin-top: 20px;
+}
+
+.setup-form > summary,
+.setup-help > summary {
+	cursor: pointer;
+	color: #1e87f0;
+}
+
+.setup-form > summary:hover,
+.setup-help > summary:hover {
+	color: #0f6ecd;
+}
+
+.setup-help > summary {
+	font-size: 0.875rem;
+}
+
+.setup-form,
+.setup-help {
+	margin-top: 12px;
+}
+
+/* Replacing the database is the one destructive thing behind a disclosure, so
+   its summary is coloured like the button it hides. */
+.setup-form > summary.setup-summary-danger,
+.setup-form > summary.setup-summary-danger:hover {
+	color: #f0506e;
+}
+
+/* A single-field upload is a label, a file picker and a button; on its own row
+   it reads better than stacked. */
+.setup-inline-form {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 8px;
+}
