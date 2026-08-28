@@ -1,5 +1,9 @@
 import io
+import json
+import os
+import re
 import subprocess
+import tempfile
 from datetime import datetime, timedelta
 
 from flask import current_app as app
@@ -332,6 +336,216 @@ def describe_audio_file(path):
         ("Sample rate", f"{info.sample_rate / 1000:g} kHz"),
         ("Channels", channels),
     ]
+
+
+# Measuring loudness means decoding the whole file, so this belongs on the
+# short produced assets - top.mp3 is four seconds - and never on a talk from
+# inside a request.
+LOUDNESS_TIMEOUT_SECONDS = 120
+
+_LOUDNORM_JSON = re.compile(r"\{[^{}]*\"input_i\".*?\}", re.S)
+
+
+def measure_loudness(path):
+    """The EBU R128 figures for an audio file, via ffmpeg's loudnorm filter.
+
+    Returns integrated (LUFS), true_peak (dBTP), lra (LU) and threshold.
+
+    Raises ValueError for anything that stops a number coming back, ffmpeg
+    not being installed included - that is the normal state of the
+    PythonAnywhere deployment, and it must not take the health page with it.
+    """
+    try:
+        result = subprocess.run(
+            ["ffmpeg", "-nostdin", "-hide_banner", "-i", path,
+             "-af", "loudnorm=print_format=json", "-f", "null", "-"],
+            capture_output=True,
+            text=True,
+            timeout=LOUDNESS_TIMEOUT_SECONDS,
+        )
+    except FileNotFoundError as exc:
+        raise ValueError("ffmpeg is not installed here, so levels cannot be "
+                         "measured") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise ValueError("Measuring the level took too long") from exc
+
+    found = _LOUDNORM_JSON.search(result.stderr)
+    if found is None:
+        raise ValueError("ffmpeg could not measure this file's level")
+
+    try:
+        measured = json.loads(found.group(0))
+        stats = {
+            "integrated": float(measured["input_i"]),
+            "true_peak": float(measured["input_tp"]),
+            "lra": float(measured["input_lra"]),
+            "threshold": float(measured["input_thresh"]),
+        }
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError("ffmpeg's level report could not be read") from exc
+
+    # A silent file measures as -inf, which is a real answer to a different
+    # question and poison to every calculation downstream.
+    if stats["integrated"] == float("-inf"):
+        raise ValueError("This file is silent")
+
+    return stats
+
+
+def audio_level_check(path, target_lufs, ceiling_dbtp, tolerance_lu=1.0):
+    """Where a produced audio asset sits against the level talks are cut to.
+
+    The useful verdict is not only how far off a file is, but whether it can
+    be put right by turning it up. A jingle mastered hard against the peak
+    ceiling has nowhere to go: reaching the target costs peak limiting, which
+    on a finished asset is a compromise rather than a correction. The two
+    cases read the same on a loudness meter and want different answers, so
+    they are separated here.
+
+    Returns a dict whose "status" is one of:
+      ok       - within tolerance of the target
+      quiet    - below target, and gain alone will fix it
+      loud     - above target; turning down always works
+      squashed - below target by more than the headroom allows
+      unknown  - could not be measured, and "message" says why
+    """
+    try:
+        stats = measure_loudness(path)
+    except ValueError as exc:
+        return {"status": "unknown", "message": str(exc), "fixable": False}
+
+    gain = target_lufs - stats["integrated"]
+    headroom = ceiling_dbtp - stats["true_peak"]
+    target = f"{target_lufs:g} LUFS"
+
+    level = {
+        "integrated": stats["integrated"],
+        "true_peak": stats["true_peak"],
+        "gain": gain,
+        "headroom": headroom,
+        "limiting": max(gain - headroom, 0.0),
+        "fixable": True,
+    }
+
+    if abs(gain) <= tolerance_lu:
+        level["status"] = "ok"
+        level["fixable"] = False
+        level["message"] = (
+            f"At the {target} target ({stats['integrated']:.1f} LUFS measured)."
+        )
+    elif gain < 0:
+        level["status"] = "loud"
+        level["message"] = (
+            f"{abs(gain):.1f} LU above the {target} target "
+            f"({stats['integrated']:.1f} LUFS measured)."
+        )
+    elif gain <= headroom:
+        level["status"] = "quiet"
+        level["message"] = (
+            f"{gain:.1f} LU below the {target} target "
+            f"({stats['integrated']:.1f} LUFS measured), and there is room to "
+            "turn it up."
+        )
+    else:
+        level["status"] = "squashed"
+        # A file can be past the ceiling already, which is a different
+        # sentence from having a little room left and not enough of it.
+        if headroom < 0:
+            peaks = (
+                f"its peaks are already {abs(headroom):.1f} dB above the "
+                f"{ceiling_dbtp:g} dBTP ceiling"
+            )
+        else:
+            peaks = (
+                f"its peaks leave only {headroom:.1f} dB of headroom under "
+                f"the {ceiling_dbtp:g} dBTP ceiling"
+            )
+        level["message"] = (
+            f"{gain:.1f} LU below the {target} target "
+            f"({stats['integrated']:.1f} LUFS measured), but {peaks}. "
+            f"Reaching the target means limiting peaks by about "
+            f"{level['limiting']:.1f} dB."
+        )
+        # Past a couple of dB the limiter stops catching stray peaks and
+        # starts flattening the thing, which a re-cut with headroom would
+        # avoid entirely. Worth saying so before somebody presses the button.
+        if level["limiting"] > 2.0:
+            level["message"] += (
+                " That is enough to hear: better re-cut with headroom if you "
+                "can, and use this if you cannot."
+            )
+
+    return level
+
+
+def _render_at_gain(source, destination, gain_db, limit_dbtp=None):
+    """Write `source` to `destination` with a fixed gain, optionally limited."""
+    chain = f"volume={gain_db:.2f}dB"
+    if limit_dbtp is not None:
+        # alimiter works on sample peaks, and inter-sample peaks sit a little
+        # above them, so it is set below the true-peak ceiling rather than on
+        # it. level=disabled because its default is to make the gain back up,
+        # which would undo the thing we are here to control.
+        chain += f",alimiter=limit={limit_dbtp - 0.5:.2f}dB:level=disabled"
+
+    result = subprocess.run(
+        ["ffmpeg", "-nostdin", "-hide_banner", "-y", "-i", source,
+         "-af", chain, "-map_metadata", "0",
+         "-c:a", "libmp3lame", "-b:a", "320k", destination],
+        capture_output=True,
+        text=True,
+        timeout=LOUDNESS_TIMEOUT_SECONDS,
+    )
+    if result.returncode != 0:
+        raise ValueError(
+            "ffmpeg could not re-level this file: "
+            + "\n".join(result.stderr.strip().splitlines()[-3:])
+        )
+
+
+def relevel_audio(path, target_lufs, ceiling_dbtp, tolerance_lu=0.3, attempts=3):
+    """MP3 bytes of `path` brought to the target level, and what it achieved.
+
+    Gain first, and a peak limiter only when the gain will not fit under the
+    ceiling without one. A produced jingle wants gain-matching rather than
+    compression, so the limiter is here to catch what does not fit, not to
+    shape anything.
+
+    Limiting costs loudness, and how much depends entirely on the material, so
+    the gain is solved for rather than calculated: render, measure, correct,
+    up to `attempts` times. Every attempt renders from the original, so the
+    limiter is never applied on top of its own output.
+
+    Re-encoding costs a generation of MP3, which is why it happens at 320k on
+    a file that is seconds long. Raises ValueError if the file cannot be
+    measured or rendered.
+
+    Returns (mp3_bytes, achieved_stats).
+    """
+    stats = measure_loudness(path)
+    gain = target_lufs - stats["integrated"]
+    rendered = None
+
+    with tempfile.TemporaryDirectory(prefix="gbtalks-relevel-") as work:
+        destination = os.path.join(work, "relevelled.mp3")
+
+        for _ in range(attempts):
+            # Decided from the original's peak each time: the limiter is
+            # needed or not, it does not creep in as the gain is corrected.
+            needs_limiter = (stats["true_peak"] + gain) > ceiling_dbtp
+            _render_at_gain(path, destination, gain,
+                            ceiling_dbtp if needs_limiter else None)
+
+            achieved = measure_loudness(destination)
+            with open(destination, "rb") as f:
+                rendered = (f.read(), achieved)
+
+            error = target_lufs - achieved["integrated"]
+            if abs(error) <= tolerance_lu:
+                break
+            gain += error
+
+    return rendered
 
 
 def describe_image_file(path):

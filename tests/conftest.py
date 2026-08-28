@@ -43,6 +43,7 @@ for _var, _subdir in [
     ("IMG_DIR", "images"),
     ("USB_GOLD_DIR", "usb_gold"),
     ("WEB_MP3_DIR", "web_mp3s"),
+    ("BACKUP_DIR", "backups"),
 ]:
     _path = _TEST_ROOT / _subdir
     _path.mkdir(parents=True, exist_ok=True)

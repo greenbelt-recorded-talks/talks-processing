@@ -28,6 +28,7 @@ from werkzeug.local import LocalProxy
 from werkzeug.utils import secure_filename
 
 from .libgbtalks import (
+    audio_level_check,
     calculate_greenbelt_friday,
     default_gb_friday,
     describe_file,
@@ -38,6 +39,7 @@ from .libgbtalks import (
     get_path_for_video_file,
     get_video_processing_status,
     normalise_cover_image,
+    relevel_audio,
 )
 from .models import Editor, Recorder, Talk, db
 from .talks_csv import TalksCsvError, parse_talks_csv
@@ -211,6 +213,9 @@ def critical_files():
             "name": "top.mp3",
             "path": os.path.join(app.config["UPLOAD_DIR"], "top.mp3"),
             "purpose": "Audio segment played at the start of each processed talk",
+            # Bolted onto every talk, so it wants to sit at the same loudness
+            # the talks are normalised to. Nothing else here has a level.
+            "level_check": True,
             "critical": True,
             "used_by": ["Audio processing pipeline"],
             "expected_type": "MP3 audio file",
@@ -224,6 +229,9 @@ def critical_files():
             "name": "tail.mp3",
             "path": os.path.join(app.config["UPLOAD_DIR"], "tail.mp3"),
             "purpose": "Audio segment played at the end of each processed talk",
+            # Bolted onto every talk, so it wants to sit at the same loudness
+            # the talks are normalised to. Nothing else here has a level.
+            "level_check": True,
             "critical": True,
             "used_by": ["Audio processing pipeline"],
             "expected_type": "MP3 audio file",
@@ -439,7 +447,14 @@ def perform_health_check():
             "detail_error": None,
             # Bumped when the file changes, so a replaced cover image is not
             # served from the browser cache.
-            "cache_key": None
+            "cache_key": None,
+            # How this file's loudness compares with the target talks are cut
+            # to, for the two audio assets that have one. Deliberately does
+            # not move the card's status or the page's: the pipeline has run
+            # for years on jingles that sit off target, so this is something
+            # to act on rather than a fault, and turning the whole page amber
+            # over it would only teach people to ignore amber.
+            "level": None
         }
 
         check_path = file_info["path"]
@@ -470,6 +485,14 @@ def perform_health_check():
             if file_status["readable"]:
                 file_status["details"], file_status["detail_error"] = describe_file(
                     check_path, file_info.get("preview")
+                )
+
+            if file_status["readable"] and file_info.get("level_check"):
+                file_status["level"] = audio_level_check(
+                    check_path,
+                    app.config["AUDIO_TARGET_LUFS"],
+                    app.config["AUDIO_TRUE_PEAK_DBTP"],
+                    app.config["AUDIO_LEVEL_TOLERANCE_LU"],
                 )
 
             if not file_status["readable"]:
@@ -684,6 +707,94 @@ def replace_critical_file():
         return redirect(url_for("health_check_page"))
 
     flash(f"Replaced {wanted['name']}", "success")
+
+    return redirect(url_for("health_check_page"))
+
+
+def _back_up_file(path, name):
+    """Copy a file into BACKUP_DIR under a timestamped name, and say where."""
+    backup_dir = app.config["BACKUP_DIR"]
+    os.makedirs(backup_dir, exist_ok=True)
+    stem, extension = os.path.splitext(name)
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    destination = os.path.join(backup_dir, f"{stem}-{stamp}{extension}")
+    shutil.copy2(path, destination)
+    return destination
+
+
+@app.route("/relevel_critical_file", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def relevel_critical_file():
+    """Bring one of the audio assets to the loudness talks are cut to.
+
+    This overwrites a carried-over critical file and cannot be undone from
+    the file itself - it costs a generation of MP3, and whatever the limiter
+    had to catch on the way - so the original is copied into BACKUP_DIR
+    first, and the new audio is rendered and measured before anything on disk
+    is touched. A failure at any point up to the swap leaves the file alone.
+
+    The name is resolved against critical_files() exactly as the confirm,
+    download and replace routes do, so a form cannot nominate a file of its
+    own choosing.
+    """
+
+    requested = request.form.get("name", "")
+    wanted = next((f for f in critical_files() if f["name"] == requested), None)
+
+    if wanted is None or not wanted.get("level_check"):
+        flash("Unknown file - nothing changed", "error")
+        return redirect(url_for("health_check_page"))
+
+    if not os.path.isfile(wanted["path"]):
+        flash(f"{wanted['name']} is not there to re-level", "error")
+        return redirect(url_for("health_check_page"))
+
+    try:
+        content, achieved = relevel_audio(
+            wanted["path"],
+            app.config["AUDIO_TARGET_LUFS"],
+            app.config["AUDIO_TRUE_PEAK_DBTP"],
+        )
+    except ValueError as e:
+        flash(f"Could not re-level {wanted['name']}: {e}", "error")
+        return redirect(url_for("health_check_page"))
+
+    try:
+        backup = _back_up_file(wanted["path"], wanted["name"])
+    except OSError as e:
+        flash(
+            f"Could not back up {wanted['name']}, so it has been left alone: {e}",
+            "error",
+        )
+        return redirect(url_for("health_check_page"))
+
+    # Staged beside the original and moved into place, so an interrupted write
+    # cannot leave a truncated top.mp3 - which would satisfy the health
+    # check's exists test and then break every conversion after it.
+    staged = None
+    try:
+        handle, staged = tempfile.mkstemp(
+            dir=os.path.dirname(wanted["path"]), suffix=".mp3"
+        )
+        with os.fdopen(handle, "wb") as f:
+            f.write(content)
+        shutil.copymode(wanted["path"], staged)
+        os.replace(staged, wanted["path"])
+        staged = None
+    except OSError as e:
+        flash(f"Could not write {wanted['name']}: {e}", "error")
+        return redirect(url_for("health_check_page"))
+    finally:
+        if staged is not None and os.path.exists(staged):
+            os.remove(staged)
+
+    flash(
+        f"{wanted['name']} re-levelled to {achieved['integrated']:.1f} LUFS, "
+        f"peaks at {achieved['true_peak']:.1f} dBTP. The file it replaced is "
+        f"at {backup}.",
+        "success",
+    )
 
     return redirect(url_for("health_check_page"))
 

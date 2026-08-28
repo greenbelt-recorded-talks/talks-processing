@@ -159,6 +159,17 @@
                     {% if file.detail_error %}
                     <p class="uk-text-small uk-text-warning uk-margin-remove">⚠ {{ file.detail_error }}</p>
                     {% endif %}
+                    {# Loudness against the target talks are cut to. Only the
+                       two jingles have one, and being off it is a thing to
+                       fix rather than a fault - hence its own line and its
+                       own button, and no effect on the card's status. #}
+                    {% if file.level %}
+                    <p class="uk-text-small uk-margin-remove
+                        {%- if file.level.status in ['ok', 'unknown'] %} uk-text-muted{% else %} uk-text-warning{% endif %}">
+                        {% if file.level.status == 'ok' %}✓{% elif file.level.status == 'unknown' %}♪{% else %}♪{% endif %}
+                        {{ file.level.message }}
+                    </p>
+                    {% endif %}
                     {% endif %}
                     {# A stale card's only issue is its staleness, which the line
                        above already says. Anything else is worth the room. #}
@@ -187,6 +198,19 @@
                             <button class="uk-button uk-button-primary uk-button-small"
                                     aria-label="{{ file.name }} is still correct">
                                 Still correct
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% if file.level and file.level.fixable %}
+                        <form action="{{ url_for('relevel_critical_file') }}" method="post" class="uk-display-inline"
+                              {# The verdict is on the card immediately above this
+                                 button; keeping it out of the dialog keeps an
+                                 apostrophe in a message from breaking the JS. #}
+                              onSubmit="return confirm('Re-level {{ file.name }} to the target level?\n\nThe file is rewritten in place, and a copy of the current one is kept in the backups directory.')">
+                            <input type="hidden" name="name" value="{{ file.name }}">
+                            <button class="uk-button uk-button-primary uk-button-small"
+                                    aria-label="Bring {{ file.name }} to the target level">
+                                ♪ Fix levels
                             </button>
                         </form>
                         {% endif %}
@@ -236,6 +260,11 @@
                     <details class="file-details">
                         <summary>Details</summary>
                         <dl class="uk-description-list uk-description-list-divider uk-text-small">
+                            {% if file.level and file.level.status != 'unknown' %}
+                            <dt>Loudness</dt>
+                            <dd>{{ '%.1f'|format(file.level.integrated) }} LUFS,
+                                peaks {{ '%.1f'|format(file.level.true_peak) }} dBTP</dd>
+                            {% endif %}
                             <dt>Expected Path</dt>
                             <dd><code>{{ file.path }}</code></dd>
                             <dt>Expected Type</dt>

@@ -352,6 +352,63 @@ check on its own without also being touched. Setup's own `upload_top_tail` and
 setup page, where there is nothing to look at, which is the whole reason for
 having the same thing on the card you have just previewed.
 
+### Jingle Levels
+
+`top.mp3` and `tail.mp3` are bolted onto every processed talk, so they want to
+sit at the loudness the talks themselves are cut to. `AUDIO_TARGET_LUFS`
+(default -13) and `AUDIO_TRUE_PEAK_DBTP` (default -2) are that pair, and the
+health check measures both jingles against them with `audio_level_check` in
+`libgbtalks.py`.
+
+Note this only bites once the jingles are levelled *separately* from the talk.
+While `convert_talks` normalises `top + body + tail` as one unit, loudnorm
+pulls the jingle to the target whatever level it arrived at, so re-levelling
+the source file changes almost nothing about the output. The check is here for
+the split, and because a jingle that cannot reach the target is worth knowing
+about before the split rather than after.
+
+The verdict separates two cases that read the same on a meter and want
+different answers: a file that is quiet **with** peak headroom can simply be
+turned up (`quiet`), and one that is quiet **without** it (`squashed`) can only
+reach the target by having its peaks limited. Both current jingles are the
+second kind - they are mastered at -18.5 and -17.2 LUFS with true peaks at
+-1.5 and -1.1 dBTP, which is essentially no headroom at all. Reaching -13
+costs the top about 5.9 dB of limiting and the tail about 5.1 dB, enough to
+flatten a four-second sting. The message says so, and past 2 dB it suggests a
+re-cut instead.
+
+Being off target does **not** move the card's status or the page's. The
+pipeline has run for years on jingles that sit off target, so this is something
+to act on rather than a fault, and turning the whole page amber over it would
+only teach people to ignore amber.
+
+`POST /relevel_critical_file` is the fix. It resolves the name against
+`critical_files()` like the confirm, download and replace routes, and only
+entries carrying `level_check` are eligible.
+
+`relevel_audio` applies a fixed gain, and a peak limiter *only* when the gain
+will not otherwise fit under the ceiling - a produced jingle wants
+gain-matching, not compression. Limiting costs loudness by an amount that
+depends entirely on the material, so the gain is **solved for** rather than
+calculated: render, measure, correct, up to three times, each attempt starting
+from the original so the limiter never acts on its own output. In practice it
+lands within 0.3 LU.
+
+The order in the route is load-bearing: the new audio is rendered and measured
+**before** anything on disk is touched, then the original is copied to
+`BACKUP_DIR`, then the replacement is staged in the destination directory and
+`os.replace`d into place. A failure at any point leaves the file alone, and an
+interrupted write cannot leave a truncated `top.mp3` - which would satisfy the
+health check's exists test and then break every conversion after it.
+
+Re-levelling costs a generation of MP3 (hence 320k on a file that is seconds
+long) and whatever the limiter caught, and there is no undo from the file
+itself. The backup is the way back.
+
+Measuring shells out to ffmpeg, which the PythonAnywhere deployment does not
+have. `measure_loudness` turns that into a `ValueError` and the check reports
+status `unknown` rather than taking the health page down with it.
+
 ### Moving the Database Between Deployments
 
 There are two deployments - the PythonAnywhere one and the festival server -

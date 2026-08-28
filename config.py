@@ -22,6 +22,7 @@ class Config:
     IMG_DIR = os.getenv("IMG_DIR", "/storage/images")
     USB_GOLD_DIR = os.getenv("USB_GOLD_DIR", "/storage/usb_gold")
     WEB_MP3_DIR = os.getenv("WEB_MP3_DIR", "/storage/web_mp3s")
+    BACKUP_DIR = os.getenv("BACKUP_DIR", "/storage/backups")
 
 
     TALKS_DIRS = {
@@ -57,6 +58,20 @@ class Config:
     # Embedded in every processed MP3, so it is worth keeping small. Uploads
     # are resized to this square regardless of what was handed in.
     COVER_ART_SIZE = int(os.getenv("COVER_ART_SIZE", "300"))
+
+    # Audio levels
+    # The loudness every finished talk is aimed at, and the peak ceiling it
+    # must not cross. These are the figures convert-talks normalises to, and
+    # the same pair the health check measures top.mp3 and tail.mp3 against -
+    # a jingle that sits well off this target is audibly wrong against the
+    # speech it is bolted to, and only shows up once the MP3s are cut.
+    AUDIO_TARGET_LUFS = float(os.getenv("AUDIO_TARGET_LUFS", "-13"))
+    AUDIO_TRUE_PEAK_DBTP = float(os.getenv("AUDIO_TRUE_PEAK_DBTP", "-2"))
+
+    # How far off target a file may sit before the health check mentions it.
+    # Loudness measurement of a clip only a few seconds long is not accurate
+    # to a fraction of a LU, and nobody can hear 1 LU on a jingle anyway.
+    AUDIO_LEVEL_TOLERANCE_LU = float(os.getenv("AUDIO_LEVEL_TOLERANCE_LU", "1"))
 
     # Deployment environment
     # PythonAnywhere sets these in web workers and consoles alike; nothing on
