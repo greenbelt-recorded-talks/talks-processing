@@ -1,10 +1,13 @@
-"""Which talks `flask convert-talks` picks up.
+"""Which talks `flask convert-talks` picks up, and how the normalise step fails.
 
 The audio work itself is not exercised here - `process_talk` is stubbed out,
-so what these cover is the selection step that decides what gets handed to it.
+so what these cover is the selection step that decides what gets handed to it,
+plus `normalise_audio`, whose whole job is turning a failed ffmpeg-normalize
+into something that says so.
 """
 
 import os
+import subprocess
 
 import pytest
 from flask import current_app as app
@@ -238,3 +241,75 @@ class TestProcessTalkFailures:
 
         assert done == ["020"]
         assert "FAILED" not in capsys.readouterr().out
+
+
+class TestNormaliseAudio:
+    """A failed ffmpeg-normalize has to raise, and say what it said."""
+
+    def test_a_non_zero_exit_raises_with_the_stderr_tail(self, monkeypatch, tmp_path):
+        def _fail(command, **kwargs):
+            raise subprocess.CalledProcessError(
+                1, command, stderr="ERROR: Invalid loudness target\n"
+            )
+
+        monkeypatch.setattr(commands.subprocess, "run", _fail)
+
+        with pytest.raises(RuntimeError) as raised:
+            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"))
+
+        assert "exited 1" in str(raised.value)
+        assert "Invalid loudness target" in str(raised.value)
+
+    def test_a_timeout_raises_rather_than_hanging_the_lock(self, monkeypatch, tmp_path):
+        def _hang(command, **kwargs):
+            raise subprocess.TimeoutExpired(command, kwargs["timeout"], stderr=b"")
+
+        monkeypatch.setattr(commands.subprocess, "run", _hang)
+
+        with pytest.raises(RuntimeError, match="did not finish within"):
+            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"))
+
+    def test_a_missing_ffmpeg_normalize_says_which_tool_is_missing(
+            self, monkeypatch, tmp_path):
+        def _absent(command, **kwargs):
+            raise FileNotFoundError(2, "No such file or directory")
+
+        monkeypatch.setattr(commands.subprocess, "run", _absent)
+
+        with pytest.raises(RuntimeError, match="ffmpeg-normalize is not on PATH"):
+            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"))
+
+    def test_a_clean_exit_that_wrote_nothing_still_raises(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(
+            commands.subprocess, "run", lambda command, **kwargs: None
+        )
+
+        with pytest.raises(RuntimeError, match="wrote no output"):
+            commands.normalise_audio("in.wav", str(tmp_path / "out.wav"))
+
+    def test_a_written_output_is_accepted_quietly(self, monkeypatch, tmp_path):
+        output = tmp_path / "out.wav"
+
+        def _succeed(command, **kwargs):
+            output.write_bytes(b"RIFF")
+
+        monkeypatch.setattr(commands.subprocess, "run", _succeed)
+
+        commands.normalise_audio("in.wav", str(output))
+
+    def test_the_call_carries_a_timeout_and_checks_its_exit(self, monkeypatch, tmp_path):
+        seen = {}
+        output = tmp_path / "out.wav"
+
+        def _record(command, **kwargs):
+            seen.update(kwargs, command=command)
+            output.write_bytes(b"RIFF")
+
+        monkeypatch.setattr(commands.subprocess, "run", _record)
+
+        commands.normalise_audio("in.wav", str(output))
+
+        assert seen["check"] is True
+        assert seen["timeout"] == commands.NORMALIZE_TIMEOUT_SECONDS
+        assert seen["capture_output"] is True
+        assert seen["command"][0] == "ffmpeg-normalize"

@@ -4,6 +4,7 @@ import pprint
 import re
 import shutil
 import subprocess
+import tempfile
 import traceback
 from datetime import datetime
 from multiprocessing import Pool
@@ -30,6 +31,96 @@ EDITED_FILE_RE = re.compile(r"^gb(?P<year>\d{2})-(?P<id>\d{3})_EDITED\.mp3$")
 PROCESSED_FILE_RE = re.compile(r"^GB(?P<year>\d{2})_(?P<id>\d{3})_.*\.mp3$")
 
 
+# ffmpeg-normalize makes two full passes over an uncompressed copy of the talk,
+# so an hour-long one takes a few minutes. This is not a performance budget, it
+# is a deadlock guard: convert_talks holds a SingleInstance lock for its whole
+# lifetime, so a single wedged ffmpeg would stop every later cron run from
+# converting anything at all, silently, for the rest of the festival. A talk
+# lost to the timeout is one talk; a lock held forever is all of them.
+NORMALIZE_TIMEOUT_SECONDS = 3600
+
+
+def normalise_audio(input_path, output_path):
+    """Normalise input_path onto output_path, raising on anything but success.
+
+    The call used to be a bare subprocess.call, whose return code nothing
+    looked at. Execution then carried on into AudioSegment.from_file() on an
+    output that might never have been written - and because the temp paths
+    were derived from the talk id, a leftover file from an earlier failed
+    attempt at the *same* talk would be picked up and published as that
+    talk's audio. Failing here instead costs one talk and says why.
+
+    ffmpeg-normalize is also chatty on stderr - a progress bar, plus a pair of
+    warnings on every talk we have ever fed it - so its output is captured and
+    only surfaced when something actually went wrong. Sent straight to the
+    cron logger, as before, a real failure looked exactly like a normal run.
+    """
+    command = [
+        "ffmpeg-normalize",
+        input_path,
+        "-o",
+        output_path,
+        "--loudness-range-target",
+        "3",
+        "-t",
+        "-13",
+        "-f",
+        "-ar",
+        "44100",
+    ]
+
+    try:
+        subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=NORMALIZE_TIMEOUT_SECONDS,
+            check=True,
+        )
+    except FileNotFoundError as error:
+        # It lives in the venv's bin, which is on PATH only because
+        # conversion_cron.sh sources the activate script. A venv rebuilt
+        # without it looks exactly like this.
+        raise RuntimeError(
+            "ffmpeg-normalize is not on PATH - is the virtualenv active?"
+        ) from error
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(
+            "ffmpeg-normalize exited "
+            + str(error.returncode)
+            + " for "
+            + input_path
+            + "\n"
+            + _last_lines(error.stderr)
+        ) from error
+    except subprocess.TimeoutExpired as error:
+        raise RuntimeError(
+            "ffmpeg-normalize did not finish within "
+            + str(NORMALIZE_TIMEOUT_SECONDS)
+            + "s for "
+            + input_path
+            + "\n"
+            + _last_lines(error.stderr)
+        ) from error
+
+    # check=True covers a non-zero exit, not a zero exit that wrote nothing.
+    # pydub's complaint about a missing input is opaque enough to be worth
+    # pre-empting with one that names the step that should have created it.
+    if not os.path.exists(output_path):
+        raise RuntimeError(
+            "ffmpeg-normalize succeeded but wrote no output for " + input_path
+        )
+
+
+def _last_lines(output, count=20):
+    """The tail of a captured stream, for putting in an exception message."""
+    if not output:
+        return "(no output)"
+    if isinstance(output, bytes):
+        output = output.decode("utf-8", "replace")
+    return "\n".join(output.strip().splitlines()[-count:])
+
+
 def process_talk(talk_id):
     """Convert one edited talk, logging any failure rather than raising.
 
@@ -50,33 +141,29 @@ def _process_talk(talk_id):
 
     talk = db.session.get(Talk, talk_id)
 
-    # Add the top and tail, create a high-quality mp3
-    hq_mp3 = top + AudioSegment.from_file(get_path_for_file(talk.id, "edited")) + tail
+    # Both intermediates are a full uncompressed copy of the talk - about
+    # 600MB each for an hour - and they live and die with this directory,
+    # whether the block is left normally or by an exception. The old code
+    # named them after the talk id and removed them on the happy path only,
+    # so any failure after the export stranded both, and the next attempt at
+    # that talk found them waiting.
+    with tempfile.TemporaryDirectory(prefix="gbtalks-" + str(talk.id) + "-") as work:
+        # Add the top and tail, create a high-quality mp3
+        hq_mp3 = (
+            top + AudioSegment.from_file(get_path_for_file(talk.id, "edited")) + tail
+        )
 
-    # Export a WAV file of the top/tailed audio into /tmp for further processing
-    toptail_path = "/tmp/toptailed" + str(talk.id) + ".wav"
-    hq_mp3.export(toptail_path, format="wav")
+        # Export a WAV of the top/tailed audio for further processing
+        toptail_path = os.path.join(work, "toptailed.wav")
+        hq_mp3.export(toptail_path, format="wav")
 
-    # Normalise to a fixed level
-    normalized_path = "/tmp/normalized" + str(talk.id) + ".wav"
-    subprocess.call(
-        [
-            "ffmpeg-normalize",
-            toptail_path,
-            "-o",
-            normalized_path,
-            "--loudness-range-target",
-            "3",
-            "-t",
-            "-13",
-            "-f",
-            "-ar",
-            "44100",
-        ]
-    )
+        # Normalise to a fixed level
+        normalized_path = os.path.join(work, "normalized.wav")
+        normalise_audio(toptail_path, normalized_path)
 
-    # Load the normalised file back in
-    hq_mp3 = AudioSegment.from_file(normalized_path)
+        # Load the normalised file back in. Everything downstream works from
+        # this, in memory, so the temp directory is done with here.
+        hq_mp3 = AudioSegment.from_file(normalized_path)
 
     # Create a reduced-bitrate MP3 from the normalized file
     hq_mp3.export(
@@ -104,17 +191,11 @@ def _process_talk(talk_id):
         )
     mp3.save()
 
-
-
-    # Clean up
-    if os.path.exists(toptail_path):
-        os.remove(toptail_path)
-
-    if os.path.exists(normalized_path):
-        os.remove(normalized_path)
-
     # Copy the file to the web_mp3 directory with filename format gbXX-XXXmp3.mp3
-    shutil.copy(get_path_for_file(str(talk.id), "processed", talk.title, talk.speaker), get_path_for_file(str(talk.id), "web_mp3"))
+    shutil.copy(
+        get_path_for_file(str(talk.id), "processed", talk.title, talk.speaker),
+        get_path_for_file(str(talk.id), "web_mp3"),
+    )
 
     # Create files for later CD burning
     cd_dir = get_cd_dir_for_talk(talk.id)
