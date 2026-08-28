@@ -1,3 +1,10 @@
+# Port 80 and port 443 are both first-class ways in, and there is deliberately
+# no redirect between them. A machine whose trust store has not been set up
+# yet - a volunteer's own laptop, a replacement built mid-festival - still gets
+# a working site over HTTP instead of a certificate warning it cannot dismiss
+# its way past. For the same reason there is no HSTS header: one visit would
+# pin HTTPS in the browser and take the fallback away.
+
 server {
     listen 80;
     server_name gbtalks.local
@@ -5,6 +12,45 @@ server {
                 on-site.talks-processing.greenbelt.org.uk;
 
     client_max_body_size 1G;
+
+    # Has to be served over plain HTTP as well as HTTPS: a machine that does
+    # not yet hold the CA certificate cannot fetch it over a connection that
+    # certificate is what makes trustworthy.
+    location = /gbtalks-ca.crt {
+        alias /etc/ssl/certs/gbtalks-ca.crt;
+        default_type application/x-x509-ca-cert;
+    }
+
+    location / {
+        include uwsgi_params;
+        uwsgi_pass unix:/tmp/gbtalks.sock;
+    }
+}
+
+server {
+    # http2 as a listen parameter rather than the newer standalone "http2 on;"
+    # directive, which arrived in nginx 1.25.1. Noble ships 1.24.
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name gbtalks.local
+                talks-processing.greenbelt.org.uk
+                on-site.talks-processing.greenbelt.org.uk;
+
+    # Issued by the internal CA in the playbook. Nothing here is renewed
+    # automatically: the certificates are good for ten years, and reissuing
+    # early would silently break every machine that trusts the current CA.
+    ssl_certificate     /etc/ssl/certs/gbtalks.crt;
+    ssl_certificate_key /etc/ssl/private/gbtalks.key;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1h;
+
+    client_max_body_size 1G;
+
+    location = /gbtalks-ca.crt {
+        alias /etc/ssl/certs/gbtalks-ca.crt;
+        default_type application/x-x509-ca-cert;
+    }
 
     location / {
         include uwsgi_params;

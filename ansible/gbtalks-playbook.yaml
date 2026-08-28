@@ -95,6 +95,94 @@
         mode: '0644'
 
 
+- name: Issue the on-site TLS certificate
+  hosts: localhost
+  become_user: root
+  become: true
+
+  # Self-signed, via a small internal CA, because the on-site box sits on a
+  # private festival LAN with no inbound route from the internet - so there is
+  # no way to answer an ACME challenge and get a publicly trusted certificate.
+  #
+  # A CA that signs a server certificate, rather than one self-signed
+  # certificate doing both jobs, purely so the two can be replaced
+  # independently. The CA certificate is installed by hand into the trust
+  # store of every Windows machine; the server certificate is not. Reissuing
+  # the server certificate - a new name, a rebuild - therefore costs one
+  # playbook run, while reissuing the CA costs a visit to every machine.
+  #
+  # Which is why every task below is guarded by creates:. An unguarded run
+  # would quietly mint a new CA and break every client at once. To rotate on
+  # purpose, delete the files by hand first and expect to redo the Windows
+  # side; the setup page has those instructions.
+
+  vars:
+    gbtalks_ca_key: /etc/ssl/private/gbtalks-ca.key
+    gbtalks_ca_cert: /etc/ssl/certs/gbtalks-ca.crt
+    gbtalks_tls_key: /etc/ssl/private/gbtalks.key
+    gbtalks_tls_cert: /etc/ssl/certs/gbtalks.crt
+    gbtalks_tls_ext: /etc/ssl/gbtalks-tls.ext
+
+  tasks:
+    - name: Copy the certificate extensions
+      ansible.builtin.copy:
+        src: gbtalks-tls.ext
+        dest: "{{ gbtalks_tls_ext }}"
+        owner: root
+        group: root
+        mode: '0644'
+    # Ten years, and no renewal machinery, on purpose. This trust anchor is
+    # distributed by hand, so an expiry is an outage that has to be fixed at
+    # every desk - far worse than a long-lived key on a LAN that is rebuilt
+    # from this playbook every year anyway.
+    - name: Generate the internal CA
+      ansible.builtin.command:
+        cmd: >
+          openssl req -x509 -nodes -newkey rsa:4096 -sha256 -days 3650
+          -keyout {{ gbtalks_ca_key }}
+          -out {{ gbtalks_ca_cert }}
+          -subj "/O=Greenbelt Recorded Talks/CN=Greenbelt Recorded Talks On-Site CA"
+        creates: "{{ gbtalks_ca_cert }}"
+    # Key, request and signature in one guarded step: the intermediate CSR is
+    # a throwaway, and splitting it across tasks would need a guard of its own
+    # that could leave a half-issued certificate behind on a failed run.
+    - name: Issue the server certificate from the internal CA
+      ansible.builtin.shell:
+        cmd: |
+          set -e
+          openssl req -nodes -newkey rsa:2048 -sha256 \
+            -keyout {{ gbtalks_tls_key }} \
+            -out /tmp/gbtalks-tls.csr \
+            -subj "/O=Greenbelt Recorded Talks/CN=on-site.talks-processing.greenbelt.org.uk"
+          openssl x509 -req -in /tmp/gbtalks-tls.csr \
+            -CA {{ gbtalks_ca_cert }} \
+            -CAkey {{ gbtalks_ca_key }} \
+            -CAcreateserial \
+            -out {{ gbtalks_tls_cert }} \
+            -days 3650 -sha256 \
+            -extfile {{ gbtalks_tls_ext }}
+          rm -f /tmp/gbtalks-tls.csr
+        creates: "{{ gbtalks_tls_cert }}"
+    - name: Lock down the private keys
+      ansible.builtin.file:
+        path: "{{ item }}"
+        owner: root
+        group: root
+        mode: '0600'
+      loop:
+        - "{{ gbtalks_ca_key }}"
+        - "{{ gbtalks_tls_key }}"
+    # World-readable because nginx serves this one to clients at
+    # /gbtalks-ca.crt so a new machine can fetch its trust anchor. It is a
+    # public certificate; only the keys above are secret.
+    - name: Publish the CA certificate
+      ansible.builtin.file:
+        path: "{{ gbtalks_ca_cert }}"
+        owner: root
+        group: root
+        mode: '0644'
+
+
 - name: Install the talks-processing application
   hosts: localhost
   become_user: gbtalks

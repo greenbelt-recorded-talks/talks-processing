@@ -46,6 +46,96 @@ This page provides a range of tools that set up the application. Use with care: 
 {% endfilter %}
 </div>
 
+<hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
+### Trusting the On-Site Certificate (Windows 10 and 11)
+
+The on-site server answers on both `http://` and `https://`, and there is **no
+redirect between them**. Plain HTTP keeps working exactly as it always has, so
+nothing below is urgent and nothing breaks if a machine skips it.
+
+What it buys you is the browser treating the site as secure: no "Not secure"
+warning next to the address bar, no nagging on the login form, and the
+secure-context-only browser features working.
+
+The certificate is signed by our own small certificate authority rather than a
+public one, because the on-site box is on a private festival network that
+Let's Encrypt cannot reach to verify. So each machine has to be told, once,
+that our CA is trustworthy. It is a two-minute job per machine and it survives
+reboots, updates and new festivals - the CA is good for ten years.
+
+You need local administrator rights on the machine.
+
+#### The quick way
+
+Open **PowerShell as Administrator** (right-click Start, "Terminal
+(Admin)" or "Windows PowerShell (Admin)"), and paste both lines:
+
+    Invoke-WebRequest -Uri http://on-site.talks-processing.greenbelt.org.uk/gbtalks-ca.crt -OutFile $env:TEMP\gbtalks-ca.crt
+
+    Import-Certificate -FilePath $env:TEMP\gbtalks-ca.crt -CertStoreLocation Cert:\LocalMachine\Root
+
+That is the whole job. Close every browser window and reopen, then visit
+[https://on-site.talks-processing.greenbelt.org.uk/](https://on-site.talks-processing.greenbelt.org.uk/)
+- you should get a padlock and no warning.
+
+#### The clicking way
+
+If PowerShell is not an option:
+
+1. Download [gbtalks-ca.crt](/gbtalks-ca.crt). Windows may warn about
+   downloading a certificate file; that is expected, keep it.
+2. Double-click the downloaded file, then **Install Certificate**.
+3. Store Location: choose **Local Machine**, not Current User. Accept the
+   UAC prompt.
+4. Choose **Place all certificates in the following store** - *not* the
+   automatic option it offers first - then **Browse** and pick **Trusted Root
+   Certification Authorities**.
+5. Next, Finish. Windows asks you to confirm installing a root certificate;
+   the thumbprint it shows is ours. Yes.
+6. Close every browser window and reopen.
+
+#### Gotchas
+
+These are the ones that actually catch people out:
+
+- **Local Machine, not Current User.** A Current User install only covers the
+  account that did it, so the next volunteer to log in gets the warning back.
+  The front desk machines are shared; always use Local Machine.
+- **Do not accept "Automatically select the certificate store."** It files
+  the certificate under Personal, nothing changes, and the install looks like
+  it succeeded. This is the single most common failure.
+- **Restart the browser properly.** Chrome and Edge keep background processes
+  alive after the last window closes - check the system tray and quit from
+  there, or just reboot.
+- **Use the name, not the address.** The certificate covers
+  `on-site.talks-processing.greenbelt.org.uk` and `gbtalks.local`, but
+  deliberately no IP address, because the server's address is handed out by
+  the venue's DHCP and changes. `https://10.something` will always warn; that
+  is not a broken install.
+- **Chrome and Edge need doing once between them** - they share the Windows
+  certificate store. Firefox has its own, but reads the Windows one by
+  default. If Firefox alone still complains, set
+  `security.enterprise_roots.enabled` to `true` in `about:config`.
+- **A rebuilt server means a new CA.** If the server is rebuilt from scratch
+  mid-festival, every machine needs this doing again, and the old entry
+  removed first. Routine playbook runs do *not* regenerate the CA, so a normal
+  deploy is safe.
+
+To check whether a machine is already done, in any PowerShell:
+
+    certutil -store Root | findstr /i "Greenbelt"
+
+Silence means it is not installed.
+
+{% endfilter %}
+
+</div>
+
 
 <hr class="uk-divider-icon">
 

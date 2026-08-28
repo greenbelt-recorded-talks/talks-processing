@@ -1,0 +1,29 @@
+# X.509 extensions for the on-site server certificate, applied when the
+# internal CA signs it in the playbook.
+#
+# subjectAltName is the whole point of this file. Chrome and Edge stopped
+# reading the Common Name years ago and look only here, so a name that is
+# missing from the list below produces a certificate warning no amount of
+# trusting the CA will silence.
+
+basicConstraints = CA:FALSE
+keyUsage = critical, digitalSignature, keyEncipherment
+extendedKeyUsage = serverAuth
+subjectAltName = @alt_names
+
+# Deliberately names only, no IP entries. eno1 holds a DHCP lease, so any
+# address baked in here would be wrong the first time the lease moved, and
+# reissuing the certificate is the one operation that costs a visit to every
+# Windows machine. Clients reach the box by name via the dnsmasq play.
+#
+# talks-processing.greenbelt.org.uk is the PythonAnywhere instance, which
+# dnsmasq forwards upstream and which has a real certificate of its own. It is
+# listed because nginx answers for it too, so that a hosts-file override
+# pointing it at this box - the obvious fallback if dnsmasq is unavailable -
+# does not throw a warning.
+[alt_names]
+DNS.1 = on-site.talks-processing.greenbelt.org.uk
+DNS.2 = talks-processing.greenbelt.org.uk
+DNS.3 = gbtalks.local
+DNS.4 = gbtalks
+DNS.5 = localhost
