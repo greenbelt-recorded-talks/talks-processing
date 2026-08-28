@@ -122,6 +122,49 @@ To check whether a machine is already done, in any PowerShell:
 
 Silence means it is not installed.
 
+### Trusting the On-Site Certificate (macOS)
+
+Same certificate, same reasons; only the trust store differs. You need an
+admin account on the Mac.
+
+#### The quick way
+
+In **Terminal**, two lines:
+
+    curl -O http://on-site.talks-processing.greenbelt.org.uk/gbtalks-ca.crt
+
+    sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain gbtalks-ca.crt
+
+It asks for your password, then possibly again in a dialogue. Quit and reopen
+the browser, then visit
+[https://on-site.talks-processing.greenbelt.org.uk/](https://on-site.talks-processing.greenbelt.org.uk/).
+
+#### The clicking way
+
+1. Download [gbtalks-ca.crt](/gbtalks-ca.crt) and double-click it. Keychain
+   Access opens.
+2. If it asks which keychain, choose **System**, not Login.
+3. Find **Greenbelt Recorded Talks On-Site CA** in the System keychain,
+   double-click it, expand **Trust**, and set *When using this certificate* to
+   **Always Trust**. Close the window and authenticate.
+4. Quit and reopen the browser - Cmd-Q, not just closing the window.
+
+#### Gotchas
+
+- **Adding is not trusting.** Dropping the certificate into the keychain
+  leaves it marked "not trusted"; step 3 is the part that matters, and the one
+  people skip. The `security` command above does both at once.
+- **System, not Login.** A Login install only covers that user account.
+- Safari and Chrome use the system keychain. Firefox has its own - set
+  `security.enterprise_roots.enabled` to `true` in `about:config`.
+- **A rebuilt server means a new CA**, here as on Windows.
+
+To check a machine:
+
+    security find-certificate -c "Greenbelt Recorded Talks On-Site CA" /Library/Keychains/System.keychain
+
+An error means it is not installed.
+
 {% endfilter %}
 
 </div>
