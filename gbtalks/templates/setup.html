@@ -75,6 +75,22 @@ reboots, updates and new festivals - the CA is good for ten years.
 
 You need local administrator rights on the machine.
 
+#### Signing in has to be enabled for HTTPS first
+
+**Do this once, centrally, before telling anyone to switch.** Google is told
+where to send people back to after they sign in, and that address includes the
+scheme - so the `https://` callback is a *different* address from the `http://`
+one we have always used, and Google rejects anything not on its list.
+
+Until `https://on-site.talks-processing.greenbelt.org.uk/login/google/authorized`
+is added to the Authorized redirect URIs of the OAuth client in the Google
+Cloud console, signing in over HTTPS fails with **Error 400:
+redirect_uri_mismatch**. Adding it is additive - the existing `http://` entry
+keeps working - so there is no window where one is broken to fix the other.
+
+If someone hits that error, they are not stuck: the same page over `http://`
+signs in normally.
+
 #### The quick way
 
 Open **PowerShell as Administrator** (right-click Start, "Terminal
@@ -371,6 +387,50 @@ Add a single talk to the database. This is useful for adding individual talks th
 </div>
 
 <hr class="uk-divider-icon">
+
+<div class="uk-card uk-card-default uk-card-body">
+
+{% filter markdown %}
+
+### Move the Database
+
+There are two copies of this app - the Cloud one and the On-site one (the badge
+in the navbar says which you are looking at). This is how the database moves
+between them.
+
+**Download** takes a consistent snapshot and hands you a `.sqlite` file. It is
+safe to do while the app is in use - it uses SQLite's own backup, not a plain
+file copy, so it cannot catch a half-finished write.
+
+What travels: the talks, the rota, recorders, editors, rota settings, and who
+has signed in. What does **not** travel: the audio. Recordings live in
+`/storage` and the app works out what has been recorded by looking for the
+files, so a database moved to a machine without them shows every talk as
+un-recorded. That is expected, not a fault.
+
+**Upload replaces everything.** There is no merge: the incoming talks, rota and
+recorders stand in for the ones here. The file is checked before anything is
+touched - it must be a real SQLite database, pass an integrity check, and not
+carry schema changes this version of the app is too old to understand - and a
+snapshot of the current database is saved into the instance directory first, so
+there is a way back. A restart is still needed afterwards to be certain every
+worker has let go of the old file.
+
+{% endfilter %}
+
+	<p>
+		<a class="uk-button uk-button-default" href="{{ url_for('download_database') }}">Download the database</a>
+	</p>
+
+	<form action="upload_database" method=post enctype=multipart/form-data>
+		<label for=database_file>Replace with</label>
+		<input name=file type=file id=database_file accept=".sqlite,.db,.sqlite3">
+		<p>
+			<label><input name=confirm type=checkbox value="yes" required> I understand this replaces all talks, rota and recorder data</label>
+		</p>
+		<button class="uk-button uk-button-danger">Replace the database</button>
+	</form>
+</div>
 
 <div class="uk-card uk-card-default uk-card-body">
 
