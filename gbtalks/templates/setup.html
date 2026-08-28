@@ -47,7 +47,7 @@ This page provides a range of tools that set up the application. Use with care: 
 </div>
 
 {# Only the festival server has a certificate to trust. Gated on "not cloud"
-   rather than "is onsite" on purpose: an unset or mistyped DEPLOYMENT_ENV
+   rather than "is onsite": an unset or mistyped DEPLOYMENT_ENV
    should leave the instructions visible on the machine that needs them,
    and they are merely useless - not harmful - anywhere else. #}
 {% if deployment_env != 'cloud' %}
@@ -59,37 +59,11 @@ This page provides a range of tools that set up the application. Use with care: 
 
 ### Trusting the On-Site Certificate (Windows 10 and 11)
 
-The on-site server answers on both `http://` and `https://`, and there is **no
-redirect between them**. Plain HTTP keeps working exactly as it always has, so
-nothing below is urgent and nothing breaks if a machine skips it.
+The server talks on port 80 and 443. No redirect. This just saves us the HTTPS-by-default gotcha. 
 
-What it buys you is the browser treating the site as secure: no "Not secure"
-warning next to the address bar, no nagging on the login form, and the
-secure-context-only browser features working.
-
-The certificate is signed by our own small certificate authority rather than a
-public one, because the on-site box is on a private festival network that
-Let's Encrypt cannot reach to verify. So each machine has to be told, once,
-that our CA is trustworthy. It is a two-minute job per machine and it survives
-reboots, updates and new festivals - the CA is good for ten years.
+The cert is signed by our own on-site CA. CA is valid until 2035. 
 
 You need local administrator rights on the machine.
-
-#### Signing in has to be enabled for HTTPS first
-
-**Do this once, centrally, before telling anyone to switch.** Google is told
-where to send people back to after they sign in, and that address includes the
-scheme - so the `https://` callback is a *different* address from the `http://`
-one we have always used, and Google rejects anything not on its list.
-
-Until `https://on-site.talks-processing.greenbelt.org.uk/login/google/authorized`
-is added to the Authorized redirect URIs of the OAuth client in the Google
-Cloud console, signing in over HTTPS fails with **Error 400:
-redirect_uri_mismatch**. Adding it is additive - the existing `http://` entry
-keeps working - so there is no window where one is broken to fix the other.
-
-If someone hits that error, they are not stuck: the same page over `http://`
-signs in normally.
 
 #### The quick way
 
@@ -100,7 +74,7 @@ Open **PowerShell as Administrator** (right-click Start, "Terminal
 
     Import-Certificate -FilePath $env:TEMP\gbtalks-ca.crt -CertStoreLocation Cert:\LocalMachine\Root
 
-That is the whole job. Close every browser window and reopen, then visit
+Close every browser window and reopen, then visit
 [https://on-site.talks-processing.greenbelt.org.uk/](https://on-site.talks-processing.greenbelt.org.uk/)
 - you should get a padlock and no warning.
 
@@ -133,11 +107,6 @@ These are the ones that actually catch people out:
 - **Restart the browser properly.** Chrome and Edge keep background processes
   alive after the last window closes - check the system tray and quit from
   there, or just reboot.
-- **Use the name, not the address.** The certificate covers
-  `on-site.talks-processing.greenbelt.org.uk` and `gbtalks.local`, but
-  deliberately no IP address, because the server's address is handed out by
-  the venue's DHCP and changes. `https://10.something` will always warn; that
-  is not a broken install.
 - **Chrome and Edge need doing once between them** - they share the Windows
   certificate store. Firefox has its own, but reads the Windows one by
   default. If Firefox alone still complains, set
