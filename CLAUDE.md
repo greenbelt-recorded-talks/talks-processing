@@ -352,6 +352,55 @@ check on its own without also being touched. Setup's own `upload_top_tail` and
 setup page, where there is nothing to look at, which is the whole reason for
 having the same thing on the card you have just previewed.
 
+### Moving the Database Between Deployments
+
+There are two deployments - the PythonAnywhere one and the festival server -
+and the database moves between them as a file. `GET /download_database` and
+`POST /upload_database` on the setup page are that, and there is deliberately
+no merge: the incoming talks, rota and recorders replace the ones here, because
+two divergent copies of a rota cannot be reconciled by anything but a human.
+
+The copy is taken with SQLite's **online backup API** (`sqlite3.Connection
+.backup`, via `snapshot_database`), not `shutil.copy`. uWSGI is writing to the
+file, and a plain read can catch a transaction half-written and produce a file
+that opens cleanly while being subtly wrong. The same call takes the "here is
+what you overwrote" snapshot on the way in, which is the only way back from an
+upload.
+
+`instance/gbtalks.sqlite` is on `journal_mode=delete`, so there are no `-wal` /
+`-shm` sidecars to move alongside it. If that ever changes to WAL, a plain file
+copy starts silently losing recent commits and this becomes the only safe path.
+
+The upload stages the file **inside the instance directory** so the install is
+an `os.replace` within one filesystem - atomic, with no moment where a worker
+can see a half-written database. `mkstemp` makes it private to its owner, hence
+the `shutil.copymode` from the file being replaced.
+
+`inspect_database_file` splits its findings into *problems* (do not install)
+and *notes* (install, but say this). A database from **newer** code is a
+problem: its schema carries changes this code cannot read and there is no
+down-migration path. One that is **behind** is only a note - that is what
+`flask migrate` is for. `DATABASE_REQUIRED_TABLES` is the four model tables
+and deliberately not `schema_migrations`: that table is not a model, only
+`flask migrate` creates it, so a database straight from `flask createdb` has
+never had one and requiring it would reject a good file. `user` and
+`flask_dance_oauth` are likewise not required, because the login flow creates
+those rows on first sign-in.
+
+After the swap the route calls `db.session.remove()` **before**
+`db.engine.dispose()`. The session's identity map describes rows in a database
+that no longer exists, and its connection is an open handle on the moved-aside
+inode, so disposing the pool alone leaves it serving the old file. With both,
+the replacement takes effect immediately; the flash still asks for a restart,
+which is what covers a uWSGI configured with more than one worker.
+
+What does **not** travel is the audio. Recording status is `os.path.exists`
+against `UPLOAD_DIR` / `PROCESSED_DIR`, not a column, so a database moved to a
+machine without the files shows every talk as un-recorded. That is expected.
+Nor does `GB_FRIDAY`: it comes from the environment, and a database whose talks
+are from a different year than the receiving deployment's `GB_FRIDAY` will
+generate filenames that match nothing on disk.
+
 ### Deployment Badge
 The navbar carries a badge saying which deployment you are looking at - `Cloud`
 on PythonAnywhere, `On-site` on the festival server. Detection is a sniff for

@@ -1,6 +1,8 @@
 import csv
 import os
 import shutil
+import sqlite3
+import tempfile
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -10,6 +12,7 @@ from flask import (
     current_app,
     flash,
     jsonify,
+    make_response,
     redirect,
     render_template,
     request,
@@ -741,6 +744,255 @@ def upload_top_tail():
             flash("File must be an MP3", "error")
     else:
         flash("No file selected", "error")
+
+    return redirect(url_for("setup"))
+
+
+# The tables a file has to have before it can be called a gbtalks database.
+# Three absences are deliberate. user and flask_dance_oauth are created by
+# db.create_all() but a database without them still works, because the login
+# flow makes those rows on first sign-in. schema_migrations is not a model at
+# all - only `flask migrate` creates it - so a database straight from
+# `flask createdb` has never had one, and demanding it would reject a perfectly
+# good file.
+DATABASE_REQUIRED_TABLES = ("talks", "recorders", "editors", "rota_settings")
+
+# Every SQLite file starts with this, including the ones too damaged to open.
+SQLITE_MAGIC = b"SQLite format 3\x00"
+
+
+def database_path():
+    """The SQLite file behind the running app, or None if it is not SQLite.
+
+    Read from the engine rather than the config because
+    SQLALCHEMY_DATABASE_URI is a relative URI by default and Flask-SQLAlchemy
+    is the thing that resolves it against the instance directory.
+    """
+
+    url = db.engine.url
+
+    if url.get_backend_name() != "sqlite" or not url.database:
+        return None
+
+    return url.database
+
+
+def snapshot_database(source_path, destination_path):
+    """Copy a SQLite database using SQLite's own online backup.
+
+    Not shutil.copy: uwsgi is writing to this file, and a plain read can catch
+    a transaction half-written and produce a file that opens cleanly while
+    being subtly wrong. The backup API takes a consistent snapshot instead,
+    without needing to stop the app.
+    """
+
+    source = sqlite3.connect(source_path)
+    try:
+        destination = sqlite3.connect(destination_path)
+        try:
+            source.backup(destination)
+        finally:
+            destination.close()
+    finally:
+        source.close()
+
+
+def inspect_database_file(path):
+    """What is wrong with this file, and what is merely worth saying.
+
+    Returns (problems, notes). A non-empty problems list means do not install
+    it. Notes are for things the person needs to know but that do not make the
+    file unusable - chiefly a database from an older deployment that will want
+    `flask migrate` once it is in place.
+    """
+
+    from .commands import MIGRATIONS
+
+    problems = []
+    notes = []
+
+    try:
+        with open(path, "rb") as f:
+            header = f.read(len(SQLITE_MAGIC))
+    except OSError as e:
+        return [f"Could not read the uploaded file: {e}"], notes
+
+    if header != SQLITE_MAGIC:
+        return ["That is not a SQLite database file"], notes
+
+    # Read-only, so a malformed file cannot be modified by the act of checking
+    # it, and so this can never be pointed at the live database destructively.
+    try:
+        connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.Error as e:
+        return [f"Could not open that database: {e}"], notes
+
+    try:
+        integrity = connection.execute("PRAGMA integrity_check").fetchone()
+        if not integrity or integrity[0] != "ok":
+            problems.append("It fails SQLite's integrity check")
+
+        tables = {
+            row[0]
+            for row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'")
+        }
+        missing = [t for t in DATABASE_REQUIRED_TABLES if t not in tables]
+
+        if missing:
+            problems.append("It is missing the " + ", ".join(missing) + " table(s)")
+        elif "schema_migrations" not in tables:
+            notes.append("It has no migration history - run `flask migrate` after restarting")
+        else:
+            known = {migration.version for migration in MIGRATIONS}
+            applied = {
+                row[0] for row in connection.execute("SELECT version FROM schema_migrations")
+            }
+            # Ahead is refused: the file's schema has changes this code does not
+            # know how to read, and there is no down-migration path from here.
+            # Behind is fine - that is what flask migrate is for.
+            ahead = sorted(applied - known)
+            behind = sorted(known - applied)
+
+            if ahead:
+                problems.append(
+                    "It has migrations this version of the app does not know about ("
+                    + ", ".join(ahead)
+                    + ") - deploy the newer code before loading it"
+                )
+            if behind:
+                notes.append(
+                    "It is missing "
+                    + ", ".join(behind)
+                    + " - run `flask migrate` after restarting"
+                )
+    except sqlite3.DatabaseError as e:
+        problems.append(f"Could not read that database: {e}")
+    finally:
+        connection.close()
+
+    return problems, notes
+
+
+@app.route("/download_database", methods=["GET"])
+@login_required
+@current_user_is_team_leader
+def download_database():
+    """Download a consistent snapshot of the database.
+
+    This is how the database moves between the cloud and on-site deployments.
+    It carries the talks, the rota, recorders, editors, rota settings and the
+    signed-in users - everything except the audio, which lives in /storage and
+    has to travel separately.
+    """
+
+    path = database_path()
+
+    if path is None:
+        flash("The database is not SQLite, so it cannot be downloaded as a file", "error")
+        return redirect(url_for("setup"))
+
+    with tempfile.TemporaryDirectory() as workspace:
+        snapshot = os.path.join(workspace, "snapshot.sqlite")
+        try:
+            snapshot_database(path, snapshot)
+        except sqlite3.Error as e:
+            flash(f"Could not snapshot the database: {e}", "error")
+            return redirect(url_for("setup"))
+
+        with open(snapshot, "rb") as f:
+            payload = f.read()
+
+    filename = f"gbtalks-{app.config['GB_SHORT_YEAR']}-{datetime.now():%Y%m%d-%H%M}.sqlite"
+
+    response = make_response(payload)
+    response.headers["Content-Type"] = "application/vnd.sqlite3"
+    response.headers["Content-Disposition"] = f"attachment; filename={filename}"
+
+    return response
+
+
+@app.route("/upload_database", methods=["POST"])
+@login_required
+@current_user_is_team_leader
+def upload_database():
+    """Replace the database with an uploaded copy.
+
+    A replacement, never a merge: the incoming talks, rota and recorders stand
+    in for the ones here, and there is no sensible way to reconcile two of
+    them. That makes it the most destructive thing on the setup page, so it
+    needs the confirmation box ticked, and it takes a snapshot of what it is
+    about to overwrite before doing it. The snapshot is the only way back.
+    """
+
+    if request.form.get("confirm") != "yes":
+        flash("Tick the confirmation box before replacing the database", "error")
+        return redirect(url_for("setup"))
+
+    file = request.files.get("file")
+
+    if not file or not file.filename:
+        flash("No file selected", "error")
+        return redirect(url_for("setup"))
+
+    path = database_path()
+
+    if path is None:
+        flash("The database is not SQLite, so it cannot be replaced with a file", "error")
+        return redirect(url_for("setup"))
+
+    instance_dir = os.path.dirname(path)
+
+    # Staged beside the live database so the install is a rename within one
+    # filesystem, which is atomic - there is no moment where the app can see a
+    # half-written database.
+    handle, staged = tempfile.mkstemp(dir=instance_dir, prefix="incoming-", suffix=".sqlite")
+    os.close(handle)
+
+    try:
+        file.save(staged)
+
+        problems, notes = inspect_database_file(staged)
+
+        if problems:
+            flash("Database not replaced. " + " ".join(problems), "error")
+            return redirect(url_for("setup"))
+
+        previous = os.path.join(
+            instance_dir, f"replaced-{datetime.now():%Y%m%d-%H%M%S}.sqlite"
+        )
+
+        try:
+            snapshot_database(path, previous)
+        except sqlite3.Error as e:
+            flash(f"Database not replaced - could not back up the current one first: {e}", "error")
+            return redirect(url_for("setup"))
+
+        # mkstemp makes the file private to its owner; the live database is
+        # readable more widely and should stay however it was.
+        shutil.copymode(path, staged)
+        os.replace(staged, path)
+        staged = None
+    except OSError as e:
+        flash(f"Database not replaced: {e}", "error")
+        return redirect(url_for("setup"))
+    finally:
+        if staged is not None and os.path.exists(staged):
+            os.remove(staged)
+
+    # Both halves matter. The session's identity map describes rows in a
+    # database that no longer exists, and its connection is still an open
+    # handle on the moved-aside inode - so it has to go before the pool is
+    # disposed, or it keeps serving the old file.
+    db.session.remove()
+    db.engine.dispose()
+
+    message = (
+        f"Database replaced. The previous one is saved as {os.path.basename(previous)} "
+        "in the instance directory. Restart the application to be sure every "
+        "worker is using the new file."
+    )
+
+    flash(message + (" " + " ".join(notes) if notes else ""), "success")
 
     return redirect(url_for("setup"))
 
