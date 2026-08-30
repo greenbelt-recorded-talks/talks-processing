@@ -17,6 +17,13 @@
 # It also drops cancelled talks and talks from other festivals, neither of
 # which the conversion step checks.
 #
+# The all-talks index PDF goes on the sticks alongside the talks, and lives in
+# the gold dir itself - that is where the setup page's upload writes it and
+# where the health check looks for it. So it is not copied from anywhere; it is
+# simply exempt from the sweep below, which would otherwise remove it for not
+# being a talk. Last year's index is not exempt: the name carries the year, so
+# a GB25 index in a GB26 gold dir is swept like anything else that is stale.
+#
 # Everything excluded is named on the way past, because a talk missing from
 # the sticks because somebody unticked a box is worth seeing rather than
 # silently obeying.
@@ -57,6 +64,11 @@ if [[ ! -d $PROCESSED_DIR ]]; then
 fi
 
 $dry_run || mkdir -p "$GOLD_DIR" || exit 1
+
+# Matches put_alltalks_pdf and the health check's critical_files entry, both of
+# which build this name from GB_SHORT_YEAR.
+
+index_pdf="GB$year-AllTalksIndex.pdf"
 
 # Cancelled is checked as well as cleared, matching the products CSV export.
 # coalesce() because a database from an older schema can have these null.
@@ -110,6 +122,9 @@ stale=()
 for path in "$GOLD_DIR"/*; do
     [[ -f $path ]] || continue
     name=${path##*/}
+    if [[ $name == "$index_pdf" ]]; then
+        continue
+    fi
     keep=false
     for w in "${wanted[@]}"; do
         [[ $w == "$name" ]] && { keep=true; break; }
@@ -126,6 +141,16 @@ report() {
 }
 
 echo "GB$year: ${#wanted[@]} talks for the sticks, out of ${#sellable[@]} cleared and uncancelled in the database."
+
+# Worth a line either way. A stick without the index is not obviously wrong
+# until somebody plugs one in and goes looking for the talk list, and nothing
+# here can supply it - it comes from the setup page.
+
+if [[ -f $GOLD_DIR/$index_pdf ]]; then
+    echo "All-talks index $index_pdf is in place - keeping it."
+else
+    echo "All-talks index $index_pdf is MISSING - upload it on the setup page, or the sticks go out without a talk list."
+fi
 report "Converted but NOT cleared, or cancelled - leaving these off:" "${not_sellable[@]}"
 report "From another festival - leaving these off:" "${other_festival[@]}"
 report "Not a processed talk filename - ignoring:" "${unrecognised[@]}"
@@ -157,4 +182,8 @@ done
 ( cd "$PROCESSED_DIR" && rsync -a -- "${wanted[@]}" "$GOLD_DIR/" ) || exit 1
 
 echo
-echo "Gold dir $GOLD_DIR now holds $(ls -1 "$GOLD_DIR" | wc -l) talks."
+shopt -s nullglob
+gold_talks=("$GOLD_DIR"/*.mp3)
+shopt -u nullglob
+
+echo "Gold dir $GOLD_DIR now holds ${#gold_talks[@]} talks."
