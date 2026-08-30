@@ -7,6 +7,8 @@ if (( $EUID != 0 )); then
     exit
 fi
 
+USB_TOOLS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Then, check that the USB gold dir is there and has at least 50 files in it
 
 if ! ls /storage/usb_gold > /dev/null; then 
@@ -22,7 +24,7 @@ fi
 # If any USBs are mounted, error out - that's not right
 
 echo -n "There are "
-/home/gbtalks/talks-processing/usb_tools/count_connected_usbs.sh
+"$USB_TOOLS_DIR/count_connected_usbs.sh"
 echo " USB drives connected. Press any key to continue, or Ctrl+C to quit"
 
 read
@@ -34,5 +36,5 @@ rsync /storage/usb_gold/* /dev/shm/usb_gold
 
 echo "Starting work"
 
-lsblk -JO | jq '.blockdevices[] | select(.tran == "usb") | .path' | tr -d '"' | xargs -P20 -I {} /home/gbtalks/talks-processing/usb_tools/make_single_all_talks_usb.sh {}
+"$USB_TOOLS_DIR/list_usb_disks.sh" | xargs -P20 -I {} "$USB_TOOLS_DIR/make_single_all_talks_usb.sh" {}
 
