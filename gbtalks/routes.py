@@ -1,4 +1,5 @@
 import csv
+import io
 import os
 import shutil
 import sqlite3
@@ -2870,111 +2871,125 @@ def delete_talk_file():
     )
 
 
+# The columns the GB website's importer expects, and the directory the MP3s
+# live in on that server. Both are the website's shape, not ours.
+WEBSITE_EXPORT_HEADER = [
+    "Title", "Description", "Talk ID", "Talk Variation ID", "Media", "Price",
+    "Virtual", "Downloadable", "Shipping Class", "MP3 Filename", "MP3 URL",
+    "Speakers", "Festival", "Date and Time", "Panel", "Venue", "Categories",
+    "Talks Category", "Talks Category2", "Talks Category3",
+    "Parental Advisory", "Explicit Content", "Copyright", "Technical",
+]
+
+WEBSITE_DOWNLOAD_DIR = "/home/greenbeltorg/digital_downloads/"
+
+
+def website_talk_reference(talk):
+    """The website's id for a talk, eg GB26-001."""
+
+    return "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(talk.id).zfill(3)
+
+
+def website_talk_row(talk):
+    """The row describing the talk itself, shared by both exports."""
+
+    mp3_filename = os.path.basename(
+        get_path_for_file(talk.id, "processed", talk.title, talk.speaker)
+    )
+
+    return [
+        talk.title,
+        talk.description,
+        website_talk_reference(talk),
+        "", "", "", "", "", "",
+        mp3_filename,
+        WEBSITE_DOWNLOAD_DIR + mp3_filename,
+        talk.speaker,
+        "20" + app.config["GB_SHORT_YEAR"],
+        talk.start_time.strftime("%A %d %B %Y, %I:%M %p"),
+        "No",
+        talk.venue,
+        "Talks",
+        "", "", "",
+        "Yes" if talk.has_distressing_content_warning_sticker else "",
+        "Yes" if talk.has_explicit_warning_sticker else "",
+        "Yes" if talk.has_copyright_removal_sticker else "",
+        "Yes" if talk.has_technical_issues_sticker else "",
+    ]
+
+
+def website_csv_response(rows, filename):
+    """Send rows as a CSV download.
+
+    pyexcel is imported here rather than at the top of the module because these
+    two routes are its only user, and an import failure should take out the
+    export rather than the whole app.
+    """
+
+    import pyexcel as pe
+
+    buffer = io.StringIO()
+    pe.Sheet(rows).save_to_memory("csv", buffer)
+    output = make_response(buffer.getvalue())
+    output.headers["Content-Disposition"] = "attachment; filename=" + filename
+    output.headers["Content-type"] = "text/csv"
+    return output
+
+
 @app.route("/talks_archive.csv", methods=["GET"])
 def talks_archive():
     """ CSV download of talks products for import into the GB website """
 
-    import io
+    rows = [WEBSITE_EXPORT_HEADER]
 
-    import pyexcel as pe
-    from flask import make_response
+    for talk in Talk.query.all():
+        rows.append(website_talk_row(talk))
 
-    talks = [["Title", "Description", "Talk ID", "Talk Variation ID", "Media", "Price", "Virtual", "Downloadable", "Shipping Class", "MP3 Filename", "MP3 URL", "Speakers", "Festival", "Date and Time", "Panel", "Venue", "Categories", "Talks Category", "Talks Category2", "Talks Category3", "Parental Advisory", "Explicit Content", "Copyright", "Technical"]]
-
-    for t in Talk.query.all():
-        talks.append([
-            t.title,
-            t.description,
-            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3),
-            "", "", "", "", "", "",
-            get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
-            "/home/greenbeltorg/digital_downloads/" + get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
-            t.speaker,
-            "20" + app.config["GB_SHORT_YEAR"],
-            t.start_time.strftime("%A %d %B %Y, %I:%M %p"),
-            "No",
-            t.venue,
-            "Talks",
-            "","","",
-            "Yes" if t.has_distressing_content_warning_sticker else "",
-            "Yes" if t.has_explicit_warning_sticker else "",
-            "Yes" if t.has_copyright_removal_sticker else "",
-            "Yes" if t.has_technical_issues_sticker else ""
-        ])
-
-    sheet = pe.Sheet(talks)
-    io = io.StringIO()
-    sheet.save_to_memory("csv", io)
-    output = make_response(io.getvalue())
-    output.headers["Content-Disposition"] = "attachment; filename=talks_archive.csv"
-    output.headers["Content-type"] = "text/csv"
-    return output
+    return website_csv_response(rows, "talks_archive.csv")
 
 
 @app.route("/talks_products.csv", methods=["GET"])
 def talks_products():
     """ CSV download of talks products for import into the GB website """
 
-    import io
+    rows = [WEBSITE_EXPORT_HEADER]
 
-    import pyexcel as pe
-    from flask import make_response
+    for talk in Talk.query.filter(
+        Talk.is_cleared.is_(True), Talk.is_cancelled.is_(False)
+    ).all():
+        reference = website_talk_reference(talk)
+        talk_row = website_talk_row(talk)
+        mp3_filename = talk_row[WEBSITE_EXPORT_HEADER.index("MP3 Filename")]
 
-    talks = [["Title", "Description", "Talk ID", "Talk Variation ID", "Media", "Price", "Virtual", "Downloadable", "Shipping Class", "MP3 Filename", "MP3 URL", "Speakers", "Festival", "Date and Time", "Panel", "Venue", "Categories", "Talks Category", "Talks Category2", "Talks Category3", "Parental Advisory", "Explicit Content", "Copyright", "Technical"]]
-
-    for t in Talk.query.filter(Talk.is_cleared.is_(True), Talk.is_cancelled.is_(False)).all():
-        talks.append([
-            t.title,
-            t.description,
-            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3),
-            "", "", "", "", "", "",
-            get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
-            "/home/greenbeltorg/digital_downloads/" + get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
-            t.speaker,
-            "20" + app.config["GB_SHORT_YEAR"],
-            t.start_time.strftime("%A %d %B %Y, %I:%M %p"),
-            "No",
-            t.venue,
-            "Talks",
-            "","","",
-            "Yes" if t.has_distressing_content_warning_sticker else "",
-            "Yes" if t.has_explicit_warning_sticker else "",
-            "Yes" if t.has_copyright_removal_sticker else "",
-            "Yes" if t.has_technical_issues_sticker else ""
-        ])
-        talks.append(
-        [
+        # The talk, then the two things the shop sells it as. Each variation row
+        # is padded to the full width: the trailing columns are all empty, but a
+        # short row would silently shift its values if a column were ever added.
+        rows.append(talk_row)
+        rows.append([
             "", "",
-            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3) + "-DL",
-            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3),
+            reference + "-DL",
+            reference,
             "download",
             3,
             "yes", "yes",
             "",
-            get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
-            "/home/greenbeltorg/digital_downloads/" + get_path_for_file(t.id, "processed", t.title, t.speaker).split('/')[-1],
-            "", "", "", "", "", "", "", "", "", "", ""
+            mp3_filename,
+            WEBSITE_DOWNLOAD_DIR + mp3_filename,
+            *[""] * 13,
         ])
-        talks.append(
-        [
+        rows.append([
             "", "",
-            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3) + "-MS",
-            "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(t.id).zfill(3),
+            reference + "-MS",
+            reference,
             "memory-stick",
             3,
             "", "",
-            "memory-stick"
-            "","",
-            "", "", "", "", "", "", "", "", "", "", ""
-            ])
+            "memory-stick",
+            "", "",
+            *[""] * 13,
+        ])
 
-    sheet = pe.Sheet(talks)
-    io = io.StringIO()
-    sheet.save_to_memory("csv", io)
-    output = make_response(io.getvalue())
-    output.headers["Content-Disposition"] = "attachment; filename=talks_products.csv"
-    output.headers["Content-type"] = "text/csv"
-    return output
+    return website_csv_response(rows, "talks_products.csv")
 
 
 @app.route("/logout")
