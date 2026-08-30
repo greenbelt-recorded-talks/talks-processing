@@ -2712,21 +2712,84 @@ def uploadrecordernotes():
     return redirect(url_for(source_path))
 
 
-@app.route("/deletetalk", methods=["POST"])
+# The kinds of file a talk can have on disk. A file_type arriving in a request
+# is looked up here and the path comes from the helpers - a name in a form is
+# never a path, for the same reason the critical-file routes resolve theirs
+# against critical_files().
+TALK_FILE_TYPES = ("raw", "edited", "processed", "web_mp3", "recorder_notes", "video")
+
+
+def talk_file_path(talk, file_type):
+    """Where one of a talk's files lives, or None if that is not a kind we keep."""
+
+    if file_type == "video":
+        # Only one container is accepted on the way in, so there is only one
+        # path a talk's video can be at.
+        return get_path_for_video_file(talk.id, SUPPORTED_RAW_VIDEO_EXTENSIONS[0])
+
+    if file_type in TALK_FILE_TYPES:
+        # get_path_for_file concatenates the id for recorder notes rather than
+        # formatting it, so it wants the string form.
+        return get_path_for_file(str(talk.id), file_type, talk.title, talk.speaker)
+
+    return None
+
+
+@app.route("/delete_talk_file", methods=["POST"])
 @login_required
 @current_user_is_team_leader
-def deletetalk():
-    """Delete a talk file"""
+def delete_talk_file():
+    """Delete one of a talk's files from disk.
 
-    file_type = request.form.get("file_type")
+    A talk has several files - the raw upload and any video it was extracted
+    from, the edited version, the processed MP3, the web MP3, the recorder's
+    notes - and this removes exactly one of them, named by `file_type`.
+
+    Nothing in the database changes, and that is the whole design: recording
+    status is `os.path.exists` against the storage directories rather than a
+    column, so removing the file *is* the state change. The talk stays.
+
+    Form in, JSON out. talks.html's "Delete Processed File" button posts here
+    from JavaScript and reloads.
+    """
+
     talk_id = request.form.get("talk_id")
+    file_type = request.form.get("file_type")
 
-    talk = db.session.get(Talk, talk_id)
+    talk = db.session.get(Talk, talk_id) if talk_id else None
+    if talk is None:
+        return jsonify({"success": False, "error": f"No talk with id {talk_id!r}"}), 404
 
-    os.remove(get_path_for_file(talk_id, file_type, talk.title, talk.speaker))
+    path = talk_file_path(talk, file_type)
+    if path is None:
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": f"Unknown file type {file_type!r}",
+                    "file_types": list(TALK_FILE_TYPES),
+                }
+            ),
+            400,
+        )
 
-    source_path = request.referrer.split("/")[-1]
-    return redirect(url_for(source_path))
+    if not os.path.isfile(path):
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": f"Talk {talk.id} has no {file_type} file",
+                    "path": path,
+                }
+            ),
+            404,
+        )
+
+    os.remove(path)
+
+    return jsonify(
+        {"success": True, "talk_id": talk.id, "file_type": file_type, "path": path}
+    )
 
 
 @app.route("/talks_archive.csv", methods=["GET"])

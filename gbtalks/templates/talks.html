@@ -129,7 +129,8 @@
                                 <p><audio controls src="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}"></audio></p>
         			<p><a href="{{ url_for("getfile", file_type="processed", talk_id=talk.id) }}">Download</a></p>
 				<hr class="uk-divider-icon"/>
-				<form action=deletetalk method=post onSubmit="return confirm('Are you sure you want to delete the processed file for talk {{ talk.id }}?')">
+				<form class="js-delete-file" action="{{ url_for('delete_talk_file') }}" method=post
+					data-confirm="Are you sure you want to delete the processed file for talk {{ talk.id }}?">
 					<input name=file_type type=hidden value="processed">
 					<input name=talk_id type=hidden value="{{talk.id}}">
 					<button style="color:red">Delete Processed File</button>
@@ -227,6 +228,43 @@ document.addEventListener('DOMContentLoaded', function() {
     // afterFilter fires once UIkit has finished applying a filter change.
     filter.addEventListener('afterFilter', updateSummary);
     updateSummary();
+
+    // /delete_talk_file answers with JSON rather than a redirect, so the form
+    // is submitted by hand. On success the page is reloaded: what a card shows
+    // is rendered from whether the file is on disk, so a reload is what redraws
+    // it, and it is what the old redirect-to-referrer amounted to anyway.
+    for (const form of document.querySelectorAll('form.js-delete-file')) {
+        form.addEventListener('submit', function(event) {
+            event.preventDefault();
+
+            if (!confirm(form.dataset.confirm)) {
+                return;
+            }
+
+            const button = form.querySelector('button');
+            button.disabled = true;
+
+            function failed(message) {
+                button.disabled = false;
+                UIkit.notification({message: message, status: 'danger'});
+            }
+
+            fetch(form.action, {method: 'POST', body: new FormData(form)})
+                .then(response => response.json().then(
+                    data => ({ok: response.ok, data: data})
+                ))
+                .then(function(result) {
+                    if (result.ok) {
+                        window.location.reload();
+                    } else {
+                        failed(result.data.error || 'The file could not be deleted');
+                    }
+                })
+                // A rejected json() is the login redirect being followed to a
+                // page of HTML, so say something truer than "not valid JSON".
+                .catch(() => failed('The file could not be deleted - are you still signed in?'));
+        });
+    }
 });
 </script>
 {% endblock %}

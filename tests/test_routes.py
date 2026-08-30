@@ -395,3 +395,122 @@ class TestRawFileScan:
         page = auth_client.get("/editing").get_data(as_text=True)
 
         assert "Not Recorded This Year" not in page
+
+
+class TestDeleteTalkFile:
+    """POST /delete_talk_file - removes one of a talk's files from disk."""
+
+    @pytest.fixture
+    def storage(self, app):
+        """The storage directories, emptied of anything a test left behind."""
+        directories = [
+            Path(app.config[name])
+            for name in ("UPLOAD_DIR", "PROCESSED_DIR", "WEB_MP3_DIR", "IMG_DIR")
+        ]
+        yield directories
+        for directory in directories:
+            for leftover in directory.iterdir():
+                if leftover.is_file():
+                    leftover.unlink()
+
+    def path_for(self, app, talk, file_type):
+        from gbtalks.routes import talk_file_path
+
+        with app.app_context():
+            return Path(talk_file_path(talk, file_type))
+
+    def test_requires_a_team_leader(self, client, make_talk, app, storage):
+        talk = make_talk(talk_id=1)
+        path = self.path_for(app, talk, "raw")
+        path.touch()
+
+        response = client.post(
+            "/delete_talk_file", data={"talk_id": 1, "file_type": "raw"}
+        )
+
+        assert response.status_code in (302, 401)
+        assert path.exists(), "the file went even though the caller was anonymous"
+
+    @pytest.mark.parametrize(
+        "file_type", ["raw", "edited", "processed", "web_mp3", "recorder_notes", "video"]
+    )
+    def test_deletes_one_kind_of_file(
+        self, auth_client, make_talk, app, storage, file_type
+    ):
+        talk = make_talk(talk_id=1)
+        path = self.path_for(app, talk, file_type)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.touch()
+
+        response = auth_client.post(
+            "/delete_talk_file", data={"talk_id": 1, "file_type": file_type}
+        )
+
+        assert response.status_code == 200
+        assert response.get_json()["success"] is True
+        assert not path.exists()
+
+    def test_leaves_the_talks_other_files_alone(
+        self, auth_client, make_talk, app, storage
+    ):
+        """A talk has several files; deleting one must not take the rest."""
+        talk = make_talk(talk_id=1)
+        raw = self.path_for(app, talk, "raw")
+        edited = self.path_for(app, talk, "edited")
+        raw.touch()
+        edited.touch()
+
+        auth_client.post("/delete_talk_file", data={"talk_id": 1, "file_type": "raw"})
+
+        assert not raw.exists()
+        assert edited.exists()
+
+    def test_the_talk_itself_survives(self, auth_client, db, make_talk, app, storage):
+        talk = make_talk(talk_id=1, title="Still Here")
+        self.path_for(app, talk, "raw").touch()
+
+        auth_client.post("/delete_talk_file", data={"talk_id": 1, "file_type": "raw"})
+
+        assert db.session.get(Talk, 1).title == "Still Here"
+
+    def test_unknown_file_type_is_rejected(self, auth_client, make_talk, app, storage):
+        talk = make_talk(talk_id=1)
+        raw = self.path_for(app, talk, "raw")
+        raw.touch()
+
+        response = auth_client.post(
+            "/delete_talk_file", data={"talk_id": 1, "file_type": "../../etc/passwd"}
+        )
+
+        assert response.status_code == 400
+        assert raw.exists()
+
+    def test_missing_file_is_a_404(self, auth_client, make_talk, storage):
+        make_talk(talk_id=1)
+
+        response = auth_client.post(
+            "/delete_talk_file", data={"talk_id": 1, "file_type": "raw"}
+        )
+
+        assert response.status_code == 404
+        assert response.get_json()["success"] is False
+
+    def test_unknown_talk_is_a_404(self, auth_client, storage):
+        response = auth_client.post(
+            "/delete_talk_file", data={"talk_id": 99, "file_type": "raw"}
+        )
+
+        assert response.status_code == 404
+
+    def test_the_talks_page_delete_button_posts_here(
+        self, auth_client, make_talk, app, storage
+    ):
+        """The button is wired to this route. /deletetalk is gone; a template
+        reverted to it would render fine and 404 on click, so check for it."""
+        talk = make_talk(talk_id=1)
+        self.path_for(app, talk, "processed").touch()
+
+        page = auth_client.get("/talks").get_data(as_text=True)
+
+        assert 'action="/delete_talk_file"' in page
+        assert "action=deletetalk" not in page

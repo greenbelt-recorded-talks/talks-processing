@@ -201,6 +201,35 @@ unset produces an empty rota.
 - Processed MP3s in `PROCESSED_DIR` and `WEB_MP3_DIR`
 - CD preparation files in `CD_DIR`
 
+#### Deleting one of a talk's files
+
+A talk has several files - raw, the video it may have been extracted from,
+edited, processed, web MP3, recorder's notes - and `POST /delete_talk_file`
+removes exactly one of them, named by `file_type` alongside `talk_id`. Form in,
+JSON out.
+
+The only button on it so far is "Delete Processed File" on the talks page. It
+posts from JavaScript (`form.js-delete-file` in `talks.html`) because the route
+answers with JSON rather than a redirect, and reloads on success - a card's
+contents are rendered from whether the file is on disk, so a reload is what
+redraws it. A failure raises a UIkit notification carrying the route's `error`
+and leaves the page alone.
+
+The database is untouched, deliberately. Recording status is `os.path.exists`
+against the storage directories rather than a column, so removing the file *is*
+the state change; the talk row stays.
+
+`TALK_FILE_TYPES` and `talk_file_path` in `routes.py` are the one place that
+says which kinds exist and where each lives. A `file_type` from a request is
+looked up there and the path comes from the `get_path_for_*` helpers - a name
+in a form is never a path, the same rule the critical-file routes follow with
+`critical_files()`. An unknown kind is a 400, a missing file a 404, so a caller
+that thinks it deleted something did.
+
+It replaces `POST /deletetalk`, which is **gone**. That one redirected to the
+referrer, did not check the type (anything unrecognised was a 500 on an unbound
+`path`) and did not check the file was there. `talks.html` was its only caller.
+
 ### Audio Processing (`gbtalks/commands.py`)
 The `convert_talks` command processes edited audio files:
 1. Adds top/tail audio segments
