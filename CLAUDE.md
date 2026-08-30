@@ -257,6 +257,24 @@ that is not coming. Note that removing the processed file of a talk with no
 edited file is a real loss - the message says so, and it is the same loss the
 stale details would have been.
 
+#### Re-processing after a replacement edited file
+
+The same thing from the other end: uploading a new *edited* file leaves the
+processed MP3 standing for the previous edit, and `convert_talks` skips a talk
+that already has one - so without this the re-edit would never be built and
+nobody would find out until the USB sticks were playing. `POST /uploadtalk`
+therefore calls the same `discard_processed_file` when `file_type` is
+`edited`, after the move, so a failed upload cannot delete anything.
+
+There is no `previous_details` dance here: the title and speaker have not
+changed, so the file to delete is the one the talk's own details name. Only
+the processed MP3 is removed - `process_talk` overwrites the web MP3 and
+rebuilds the CD directory from scratch, so those come back with it.
+
+Only `/uploadtalk` does this. `uploadtalk_ajax` and the chunked upload are the
+front desk's, which posts `raw` and nothing else; wiring an edited upload to
+either of them would bring the stale-processed-file problem back with it.
+
 ### Audio Processing (`gbtalks/commands.py`)
 The `convert_talks` command processes edited audio files:
 1. Adds top/tail audio segments

@@ -296,6 +296,104 @@ class TestEditTalkDiscardsProcessedFile:
         assert "once the talk is cleared" in response.get_data(as_text=True)
 
 
+class TestUploadingAnEditedFileDiscardsProcessedFile:
+    """A replacement edited file has to reach the MP3 people are given.
+
+    convert_talks only converts a talk that has no processed file, so leaving
+    the old one there means the new edit is never built and nobody finds out
+    until they play the USB stick.
+    """
+
+    @pytest.fixture
+    def storage(self, app):
+        directories = [
+            Path(app.config[name]) for name in ("UPLOAD_DIR", "PROCESSED_DIR")
+        ]
+        yield directories
+        for directory in directories:
+            for leftover in directory.iterdir():
+                if leftover.is_file():
+                    leftover.unlink()
+
+    def processed_path(self, app, talk_id=1, title="Old Title", speaker="Sam Speaker"):
+        from gbtalks.libgbtalks import get_path_for_file
+
+        with app.app_context():
+            return Path(get_path_for_file(str(talk_id), "processed", title, speaker))
+
+    @pytest.fixture
+    def talk(self, make_talk, app, storage):
+        """A cleared talk that has already been edited and converted."""
+        talk = make_talk(talk_id=1, title="Old Title", is_cleared=True)
+        Path(app.config["UPLOAD_DIR"], "gb26-001_EDITED.mp3").write_bytes(b"old edit")
+        self.processed_path(app).write_bytes(b"built from the old edit")
+        return talk
+
+    def upload(self, auth_client, file_type="edited", content=b"a longer new edit"):
+        import io
+
+        return auth_client.post(
+            "/uploadtalk",
+            data={
+                "talk_id": "1",
+                "file_type": file_type,
+                "file": (io.BytesIO(content), "talk.mp3"),
+            },
+            content_type="multipart/form-data",
+            headers={"Referer": "http://localhost/talks"},
+            follow_redirects=True,
+        )
+
+    def test_it_removes_the_processed_file(self, auth_client, app, talk):
+        processed = self.processed_path(app)
+
+        self.upload(auth_client)
+
+        assert not processed.exists(), "the old one would suppress the rebuild"
+
+    def test_the_new_edited_file_is_in_place(self, auth_client, app, talk):
+        self.upload(auth_client)
+
+        edited = Path(app.config["UPLOAD_DIR"], "gb26-001_EDITED.mp3")
+        assert edited.read_bytes() == b"a longer new edit"
+
+    def test_it_says_so(self, auth_client, app, talk):
+        page = self.upload(auth_client).get_data(as_text=True)
+
+        assert "rebuilt from the new edited file" in page
+
+    def test_a_raw_upload_leaves_it_alone(self, auth_client, app, talk):
+        """Only the edited file is what the processed MP3 is built from."""
+        processed = self.processed_path(app)
+
+        self.upload(auth_client, file_type="raw", content=b"a raw recording")
+
+        assert processed.exists()
+
+    def test_no_processed_file_is_not_an_error(
+        self, auth_client, make_talk, app, storage
+    ):
+        make_talk(talk_id=1, title="Old Title", is_cleared=True)
+
+        response = self.upload(auth_client)
+
+        page = response.get_data(as_text=True)
+        assert response.status_code == 200
+        assert "Successfully uploaded edited file" in page
+        assert "processed file has been removed" not in page
+
+    def test_says_when_the_talk_is_not_cleared(
+        self, auth_client, make_talk, app, storage
+    ):
+        """convert_talks only converts cleared talks, so do not promise sooner."""
+        make_talk(talk_id=1, title="Old Title", is_cleared=False)
+        self.processed_path(app).write_bytes(b"built from the old edit")
+
+        page = self.upload(auth_client).get_data(as_text=True)
+
+        assert "once the talk is cleared" in page
+
+
 class TestTalksPage:
     def test_lists_talks_in_start_time_order(self, auth_client, make_talk):
         make_talk(talk_id=2, title="Later Talk", start="15:00", end="16:00")

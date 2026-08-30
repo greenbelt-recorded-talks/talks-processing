@@ -133,7 +133,7 @@ def talks():
     )
 
 
-def discard_processed_file(talk, title, speaker):
+def discard_processed_file(talk, title, speaker, rebuild_note="with the new details"):
     """Delete a talk's processed MP3 so the cron job rebuilds it.
 
     The processed file carries the talk's details: the title and speaker are
@@ -148,6 +148,12 @@ def discard_processed_file(talk, title, speaker):
     where it would go on suppressing the rebuild for good, since convert_talks
     matches a processed file to a talk by the id in its name and ignores the
     rest.
+
+    A replacement edited file is the same situation arriving from the other
+    end: the details are unchanged, but the processed MP3 is now the *old*
+    edit. *title* and *speaker* are then simply the talk's own, since nothing
+    has been renamed. *rebuild_note* finishes the sentence about the rebuild,
+    so the caller can say which of the two happened.
 
     Returns a line about what happened for the caller to flash, or None if
     there was no processed file to begin with.
@@ -169,7 +175,7 @@ def discard_processed_file(talk, title, speaker):
     if not talk.is_cleared:
         return "Its processed file has been removed; it will be rebuilt once the talk is cleared."
 
-    return "Its processed file has been removed and will be rebuilt with the new details."
+    return f"Its processed file has been removed and will be rebuilt {rebuild_note}."
 
 
 @app.route("/edit_talk", methods=["GET","POST"])
@@ -1984,7 +1990,21 @@ If you are the nearest team leader, check the contents of the existing file and 
             # Handle regular audio files
             target_path = get_path_for_file(talk_id, file_type, talk.title, talk.speaker)
             shutil.move(uploaded_file_path, target_path)
-            flash(f"Successfully uploaded {file_type} file for Talk {talk_id}: {talk.title}", "success")
+            message = f"Successfully uploaded {file_type} file for Talk {talk_id}: {talk.title}"
+
+            # A new edited file leaves the processed MP3 standing for the old
+            # edit, and nothing re-converts a talk that already has one - so
+            # the replacement would never reach the USB sticks. Take the old
+            # one away and let the cron job build it again. Done after the
+            # move, so a failed upload cannot delete anything.
+            if file_type == "edited":
+                reprocessing = discard_processed_file(
+                    talk, talk.title, talk.speaker, "from the new edited file"
+                )
+                if reprocessing:
+                    message += ". " + reprocessing
+
+            flash(message, "success")
     else:
         flash("No file selected", "error")
 
