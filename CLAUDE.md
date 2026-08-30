@@ -195,6 +195,53 @@ deleted.
 `is_rotaed` is what the rota generator builds around. A file with that column
 unset produces an empty rota.
 
+### Website Exports
+
+CSV going the other way: `GET /talks_archive.csv` and `GET /talks_products.csv`
+are what the Greenbelt website's importer is fed, and are the only reason
+`pyexcel` is in `requirements.txt`.
+
+Both write the same 24 columns - `WEBSITE_EXPORT_HEADER` in `routes.py` - and
+share `website_talk_reference`, `website_talk_row` and `website_csv_response`,
+because they differ only in which talks they list and in what the products
+export adds around each one.
+
+**`talks_archive.csv`** is one row per talk, every talk in the database.
+**`talks_products.csv`** is the cleared, uncancelled ones, each as three rows:
+the talk itself, then a `-DL` download variation and a `-MS` memory-stick
+variation, both priced 3 and both pointing back at the talk's reference
+(`GB26-001`) as their parent. The variation rows are padded to the full 24
+columns. That changes nothing about the output - pyexcel pads a short row to
+the widest one, and the columns in question are all empty - but it means a
+column added in the middle of the header cannot silently shift their values.
+
+Two things about the columns are not what their names suggest. **"MP3 URL" is
+not a URL**: it is `/home/greenbeltorg/digital_downloads/` plus the filename, a
+path on the website's own server. And it names the **processed** MP3
+(`GB26_001_Title_Speaker.mp3`), not the `WEB_MP3_DIR` copy
+(`gb26-001mp3.mp3`), so it is the processed files that have to be uploaded
+there for the import to resolve.
+
+Neither export checks that the MP3 it names exists. That is deliberate - the
+website is sent the full set and sorts out what it can use - but it does mean a
+row can name a file that was never built, and `talks_archive.csv` will list
+cancelled and uncleared talks alongside the rest. Nothing in the database says
+whether a talk has been converted; recording status is `os.path.exists` against
+the storage directories, so a filter would have to go to disk. The place that
+*does* narrow the set is `usb_tools/make_usb_gold.sh`, which is where "what we
+are allowed to hand out" is defined - see its header.
+
+`pyexcel` is imported inside `website_csv_response` rather than at the top of
+`routes.py`, as it was inside both routes before them. These two routes are its
+only user, so keeping the import local means an environment without pyexcel
+loses the export rather than failing to start the app at all.
+
+Both routes are linked from the talks page, beside the "Showing N talks"
+summary, and both are **unauthenticated** - they sit in
+`CURRENTLY_UNAUTHENTICATED` in `tests/test_routes.py` alongside the three rota
+views. Talk titles, descriptions, speakers and content warnings are therefore
+readable by anyone who can reach the site.
+
 ### File Structure
 - Raw recordings stored in `UPLOAD_DIR` with `_RAW` suffix
 - Edited files stored in `UPLOAD_DIR` with `_EDITED` suffix  
