@@ -230,6 +230,33 @@ It replaces `POST /deletetalk`, which is **gone**. That one redirected to the
 referrer, did not check the type (anything unrecognised was a 500 on an unbound
 `path`) and did not check the file was there. `talks.html` was its only caller.
 
+#### Re-processing after an edit
+
+The processed MP3 carries the talk's details - title and speaker in its
+filename, those plus the description in its ID3 tags - so editing any of the
+three leaves it wrong. `POST /edit_talk` therefore deletes it, via
+`discard_processed_file` in `routes.py`, and the five-minute cron job rebuilds
+it from the edited file with the new details.
+
+The path has to be built from the **old** title and speaker, which is why
+`edit_talk` captures them into `previous_details` before assigning the new
+values. This is the whole subtlety: `convert_talks` matches a processed file to
+a talk by the id in its name (`PROCESSED_FILE_RE`) and ignores the rest, so a
+file left under the old title still counts as talk 020 being done and the talk
+would never be rebuilt. Deleting the file the *new* name points at would delete
+nothing and leave that in place for good.
+
+Only title, speaker and description trigger it. A corrected start time or a
+sticker changes nothing about the MP3, so there is nothing to redo. The
+deletion happens after the commit, so a rejected edit cannot delete anything,
+and the edited file it will be rebuilt from is never touched.
+
+`convert_talks` only converts a talk that is cleared and has an edited file, so
+the flash message says which of those is missing rather than promising a file
+that is not coming. Note that removing the processed file of a talk with no
+edited file is a real loss - the message says so, and it is the same loss the
+stale details would have been.
+
 ### Audio Processing (`gbtalks/commands.py`)
 The `convert_talks` command processes edited audio files:
 1. Adds top/tail audio segments

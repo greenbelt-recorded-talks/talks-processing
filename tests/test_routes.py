@@ -161,6 +161,141 @@ class TestEditTalkPage:
         assert "Talk 99999 not found" in response.get_data(as_text=True)
 
 
+class TestEditTalkDiscardsProcessedFile:
+    """Editing the details on the MP3 should make the cron job rebuild it.
+
+    convert_talks matches a processed file to a talk by the id in its name and
+    ignores the rest, so a file left under the old title would go on standing
+    in for the talk and it would never be rebuilt.
+    """
+
+    @pytest.fixture
+    def storage(self, app):
+        directories = [
+            Path(app.config[name]) for name in ("UPLOAD_DIR", "PROCESSED_DIR")
+        ]
+        yield directories
+        for directory in directories:
+            for leftover in directory.iterdir():
+                if leftover.is_file():
+                    leftover.unlink()
+
+    def processed_path(self, app, talk_id, title, speaker):
+        from gbtalks.libgbtalks import get_path_for_file
+
+        with app.app_context():
+            return Path(get_path_for_file(str(talk_id), "processed", title, speaker))
+
+    def form(self, **overrides):
+        fields = {
+            "talk_id": "1",
+            "title": "Old Title",
+            "description": "A description",
+            "speaker": "Sam Speaker",
+            "day": "Saturday",
+            "start_time": "10:00",
+            "end_time": "11:00",
+            "is_cleared": "on",
+        }
+        fields.update(overrides)
+        return fields
+
+    @pytest.fixture
+    def talk(self, make_talk, app, storage):
+        """A cleared talk with an edited file and a processed file."""
+        talk = make_talk(talk_id=1, title="Old Title", is_cleared=True)
+        Path(app.config["UPLOAD_DIR"], "gb26-001_EDITED.mp3").touch()
+        self.processed_path(app, 1, "Old Title", "Sam Speaker").touch()
+        return talk
+
+    def test_a_new_title_removes_the_file_named_after_the_old_one(
+        self, auth_client, app, talk
+    ):
+        old = self.processed_path(app, 1, "Old Title", "Sam Speaker")
+
+        auth_client.post("/edit_talk", data=self.form(title="New Title"))
+
+        assert not old.exists(), "the stale file would suppress the rebuild for good"
+
+    def test_a_new_speaker_removes_it_too(self, auth_client, app, talk):
+        old = self.processed_path(app, 1, "Old Title", "Sam Speaker")
+
+        auth_client.post("/edit_talk", data=self.form(speaker="Others"))
+
+        assert not old.exists()
+
+    def test_a_new_description_removes_it(self, auth_client, app, talk):
+        """The description is not in the filename, but it is in the ID3 tags."""
+        old = self.processed_path(app, 1, "Old Title", "Sam Speaker")
+
+        auth_client.post("/edit_talk", data=self.form(description="Rewritten"))
+
+        assert not old.exists()
+
+    def test_a_new_time_leaves_it_alone(self, auth_client, app, talk):
+        """Nothing about the time reaches the MP3, so there is nothing to redo."""
+        old = self.processed_path(app, 1, "Old Title", "Sam Speaker")
+
+        auth_client.post("/edit_talk", data=self.form(start_time="14:00", end_time="15:00"))
+
+        assert old.exists()
+
+    def test_the_edited_file_survives(self, auth_client, app, talk):
+        """Deleting the source is how a rename would destroy the recording."""
+        auth_client.post("/edit_talk", data=self.form(title="New Title"))
+
+        assert Path(app.config["UPLOAD_DIR"], "gb26-001_EDITED.mp3").exists()
+
+    def test_the_edit_still_applies(self, auth_client, db, app, talk):
+        auth_client.post("/edit_talk", data=self.form(title="New Title"))
+
+        assert db.session.get(Talk, 1).title == "New Title"
+
+    def test_it_says_so(self, auth_client, app, talk):
+        response = auth_client.post(
+            "/edit_talk", data=self.form(title="New Title"), follow_redirects=True
+        )
+
+        assert "rebuilt with the new details" in response.get_data(as_text=True)
+
+    def test_no_processed_file_is_not_an_error(
+        self, auth_client, make_talk, app, storage
+    ):
+        make_talk(talk_id=1, title="Old Title", is_cleared=True)
+
+        response = auth_client.post(
+            "/edit_talk", data=self.form(title="New Title"), follow_redirects=True
+        )
+
+        page = response.get_data(as_text=True)
+        assert response.status_code == 200
+        assert "Successfully updated talk" in page
+        assert "processed file has been removed" not in page
+
+    def test_says_when_there_is_nothing_to_rebuild_from(
+        self, auth_client, make_talk, app, storage
+    ):
+        """Removing the file without an edited file to redo it from is a loss."""
+        make_talk(talk_id=1, title="Old Title", is_cleared=True)
+        self.processed_path(app, 1, "Old Title", "Sam Speaker").touch()
+
+        response = auth_client.post(
+            "/edit_talk", data=self.form(title="New Title"), follow_redirects=True
+        )
+
+        assert "no edited file to rebuild it from" in response.get_data(as_text=True)
+
+    def test_says_when_the_talk_is_not_cleared(self, auth_client, app, talk):
+        """convert_talks only converts cleared talks, so do not promise sooner."""
+        response = auth_client.post(
+            "/edit_talk",
+            data=self.form(title="New Title", is_cleared=""),
+            follow_redirects=True,
+        )
+
+        assert "once the talk is cleared" in response.get_data(as_text=True)
+
+
 class TestTalksPage:
     def test_lists_talks_in_start_time_order(self, auth_client, make_talk):
         make_talk(talk_id=2, title="Later Talk", start="15:00", end="16:00")

@@ -132,6 +132,46 @@ def talks():
         recorders=recorders,
     )
 
+
+def discard_processed_file(talk, title, speaker):
+    """Delete a talk's processed MP3 so the cron job rebuilds it.
+
+    The processed file carries the talk's details: the title and speaker are
+    in its filename, and those plus the description are in its ID3 tags. An
+    edit to any of them leaves it wrong, and nothing re-converts a talk that
+    already has one - so the way to get the new details onto the MP3 is to
+    take the old one away and let `convert_talks` build it again.
+
+    *title* and *speaker* are the values from **before** the edit, because
+    they are what the file on disk is named after. Passing the new ones would
+    look for a file that does not exist yet and leave the stale one in place -
+    where it would go on suppressing the rebuild for good, since convert_talks
+    matches a processed file to a talk by the id in its name and ignores the
+    rest.
+
+    Returns a line about what happened for the caller to flash, or None if
+    there was no processed file to begin with.
+    """
+
+    path = get_path_for_file(str(talk.id), "processed", title, speaker)
+
+    if not os.path.isfile(path):
+        return None
+
+    os.remove(path)
+
+    # The rebuild is the cron job's to do, and it only converts a talk that is
+    # cleared and has an edited file. Say which of those is missing rather
+    # than promising a file that is not coming.
+    if not os.path.isfile(get_path_for_file(str(talk.id), "edited")):
+        return "Its processed file has been removed, but there is no edited file to rebuild it from."
+
+    if not talk.is_cleared:
+        return "Its processed file has been removed; it will be rebuilt once the talk is cleared."
+
+    return "Its processed file has been removed and will be rebuilt with the new details."
+
+
 @app.route("/edit_talk", methods=["GET","POST"])
 @login_required
 @current_user_is_team_leader
@@ -163,6 +203,11 @@ def edit_talk():
             flash(f"Talk {talk_id} not found", "error")
             return redirect(url_for("talks"))
 
+        # Captured before the assignments below. The processed file is named
+        # after the title and speaker as they were, so once the row has been
+        # changed these are the only way left to find it on disk.
+        previous_details = (talk.title, talk.speaker, talk.description)
+
         try:
             # Parse datetime fields with error handling
             start_datetime = gb_time_to_datetime(request.form.get("day"), request.form.get("start_time"))
@@ -189,7 +234,20 @@ def edit_talk():
             talk.is_cleared = True if request.form.get("is_cleared") else False
 
             db.session.commit()
-            flash(f"Successfully updated talk: '{talk.title}'", "success")
+
+            message = f"Successfully updated talk: '{talk.title}'"
+
+            # Only the details that reach the MP3 are worth a rebuild - a
+            # corrected start time or a sticker changes nothing about the file.
+            # Done after the commit, so a failed edit cannot delete anything.
+            if (talk.title, talk.speaker, talk.description) != previous_details:
+                reprocessing = discard_processed_file(
+                    talk, previous_details[0], previous_details[1]
+                )
+                if reprocessing:
+                    message += ". " + reprocessing
+
+            flash(message, "success")
             return redirect(url_for("talks") + "#talk_" +  talk_id)
 
         except ValueError:
