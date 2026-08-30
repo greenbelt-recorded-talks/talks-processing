@@ -24,6 +24,20 @@ class Config:
     WEB_MP3_DIR = os.getenv("WEB_MP3_DIR", "/storage/web_mp3s")
     BACKUP_DIR = os.getenv("BACKUP_DIR", "/storage/backups")
 
+    # Hand large files to nginx (X-Accel-Redirect) instead of pushing them
+    # through uWSGI. See send_stored_file in libgbtalks.py for what this buys
+    # and why it is off by default: it only works behind an nginx carrying the
+    # matching internal locations, so nothing may assume it. The festival
+    # server turns it on in its systemd unit, which is exactly the process
+    # that runs behind that nginx; the dev server, the tests and
+    # PythonAnywhere leave it off and get send_file.
+    X_ACCEL_REDIRECT = os.getenv("X_ACCEL_REDIRECT", "").lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
 
     TALKS_DIRS = {
         "raw": {

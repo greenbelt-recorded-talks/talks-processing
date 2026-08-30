@@ -248,6 +248,64 @@ readable by anyone who can reach the site.
 - Processed MP3s in `PROCESSED_DIR` and `WEB_MP3_DIR`
 - CD preparation files in `CD_DIR`
 
+#### Serving a talk's audio
+
+`GET /getfile` is what every `<audio>` player and Download link on the talks
+page points at, and on the festival server it does **not** send the file
+itself. It hands it to nginx: Flask still does the auth check and still decides
+which file you get, then names it in an `X-Accel-Redirect` header and returns
+no body. `send_stored_file` in `libgbtalks.py` is the switch.
+
+The talks page renders a player per file per talk - around 180 of them - and
+each one probes its file for a duration on page load. Serving those through
+uWSGI is what made the page unusable. With `processes = 1` the transfers
+serialise, and nginx's response buffering drains the **whole** file out of the
+worker even after the browser has cancelled, so a probe that needs the first
+few hundred KB of an MP3 header costs the entire 150 MB. One page load is
+~20 GB and several minutes; every player times out and shows **00:00**.
+
+Which is why this only became visible at GB26 despite being there for years.
+On HTTP/1.1 the browser's cancel closes the connection, nginx notices and drops
+the upstream request early. On HTTP/2 it is an `RST_STREAM` on a connection
+that is still open, nginx does not propagate it, and every probe pays in full.
+Measured over GB26: **8.9 MB per request on HTTP/1.1 against 48.8 MB on
+HTTP/2**. HTTP/2 only negotiates over TLS, so a single machine moving from the
+`http://` URL to the `https://` one was enough to break every player on the
+page for it - and, at 1,173 worker-seconds in a day against 34-78 for everyone
+else, to slow the site down for everybody else too. The port 80 and port 443
+server blocks are both first-class with no redirect between them, so which one
+you are on is a matter of what you typed.
+
+`X_ACCEL_REDIRECT` is **off by default**, because it only works behind an nginx
+carrying the matching `internal` locations. The festival server turns it on in
+`gbtalks-uwsgi.conf` with a systemd `Environment=`, which is exactly the process
+that runs behind that nginx; `.env` would be the wrong place, because the dev
+server reads that too and has no nginx to hand anything to. The dev server, the
+tests and PythonAnywhere all take the `send_file` branch, and so does any file
+that is not in one of the directories `X_ACCEL_LOCATIONS` lists - a path nginx
+has not been told about is served by the app rather than 404ing.
+
+`x_accel_uri` matches only files sitting **directly** in one of those
+directories, which is how every one of them is used and leaves no room for a
+traversal. The internal locations are unreachable from the network in any case:
+a request straight to `/_storage/...` is a 404, and Flask remains the only
+thing that decides which file you get. The paths in `gbtalks-nginx` mirror
+`config.py`'s defaults, so overriding `UPLOAD_DIR` and friends means moving
+them too.
+
+`content_disposition` is not decoration. `Headers.set(..., filename=...)`
+quotes the name but does not encode it, and `character_mapping` puts a
+full-width colon in the filename of every processed talk whose title has a
+colon in it. Sent raw that cannot be encoded latin-1 and takes the request down
+inside the WSGI server with a `UnicodeEncodeError` - so the header carries the
+RFC 5987 `filename*=UTF-8''...` form with an ASCII name beside it, which is
+what `send_file` does for us on the other branch. The two branches emit
+byte-identical headers.
+
+Nothing else was moved onto this. `critical_file` serves four files that are
+seconds long, and `download_database` a SQLite file; neither is worth the
+coupling to an nginx config.
+
 #### Deleting one of a talk's files
 
 A talk has several files - raw, the video it may have been extracted from,

@@ -1,15 +1,20 @@
 import io
 import json
+import mimetypes
 import os
 import re
 import subprocess
 import tempfile
+import unicodedata
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
+from flask import abort, send_file
 from flask import current_app as app
 from mutagen import MutagenError
 from mutagen.mp3 import MP3
 from PIL import Image, UnidentifiedImageError
+from werkzeug.http import dump_options_header
 
 # One implementation, shared with config.Config's GB_FRIDAY default. Re-exported
 # here because this is where the rest of the app has always imported it from.
@@ -106,6 +111,117 @@ def get_path_for_file(talk_id, file_type, title=None, speaker=None):
         )
 
     return path
+
+
+# Where nginx has been told it may serve each storage directory from. The
+# prefixes are internal URIs, not routes: they exist only inside nginx, and
+# ansible/gbtalks-nginx has to carry a matching `internal` location for each.
+# Anything not listed here falls back to being served through the app.
+X_ACCEL_LOCATIONS = (
+    ("UPLOAD_DIR", "/_storage/uploads/"),
+    ("PROCESSED_DIR", "/_storage/processed/"),
+    ("IMG_DIR", "/_storage/images/"),
+    ("WEB_MP3_DIR", "/_storage/web_mp3s/"),
+)
+
+
+def x_accel_uri(path):
+    """The internal nginx URI for a file in one of the storage directories.
+
+    None for anything else, which is what makes this safe to hand a path: a
+    file nginx has not been told about is served through the app instead.
+    Only files sitting directly in one of the directories qualify, which is
+    how every one of them is used and leaves no room for a traversal.
+    """
+    real = os.path.realpath(path)
+    for config_key, prefix in X_ACCEL_LOCATIONS:
+        if os.path.dirname(real) == os.path.realpath(app.config[config_key]):
+            return prefix + quote(os.path.basename(real), safe="")
+
+    return None
+
+
+def content_disposition(filename, attachment=False):
+    """A Content-Disposition header naming a file, non-ASCII names included.
+
+    This is what send_file does for us on the other branch, reproduced because
+    Headers.set does not: it quotes the option but does not encode it, so the
+    full-width colon character_mapping puts in every processed filename with a
+    colon in its title reaches the WSGI server as a raw non-latin-1 character
+    and takes the request down with a UnicodeEncodeError.
+
+    An ASCII name gets a plain `filename=`. Anything else gets both: a
+    stripped-down `filename=` for clients that only understand that, and the
+    RFC 5987 `filename*=UTF-8''...` carrying the real name.
+    """
+    disposition = "attachment" if attachment else "inline"
+
+    try:
+        filename.encode("ascii")
+    except UnicodeEncodeError:
+        # NFKD then dropping what will not fit: the full-width colon decomposes
+        # to an ordinary one, so the fallback name stays readable.
+        simple = unicodedata.normalize("NFKD", filename)
+        simple = simple.encode("ascii", "ignore").decode("ascii")
+        names = {
+            "filename": simple,
+            "filename*": "UTF-8''" + quote(filename, safe="!#$&+-.^_`|~"),
+        }
+    else:
+        names = {"filename": filename}
+
+    return dump_options_header(disposition, names)
+
+
+def send_stored_file(path, as_attachment=False):
+    """Serve a file out of one of the storage directories.
+
+    Behind nginx this hands the file over rather than pushing it through
+    uWSGI: Flask still does the auth check and still decides which file you
+    get, then names it in an X-Accel-Redirect header and returns no body.
+
+    That matters because the talks page renders an <audio> player for every
+    file of every talk, and each one probes its file for a duration on page
+    load. With `processes = 1` those transfers serialise, and nginx's response
+    buffering drains the whole file out of the worker even after the browser
+    has cancelled - so a probe that needs the first few hundred KB of an MP3
+    header costs the entire 150 MB. On HTTP/1.1 the cancel closes the
+    connection and nginx drops the upstream request early; on HTTP/2 it is an
+    RST_STREAM on a connection that is still open, nginx does not propagate
+    it, and every probe pays in full. Measured across GB26: 8.9 MB per request
+    on HTTP/1.1 against 48.8 MB on HTTP/2. One machine moving to the https URL
+    was enough to make every player on the page give up and show 00:00.
+
+    nginx serves the file from disk and answers the range requests natively,
+    so the app is out of the byte path entirely and a probe costs it nothing.
+    """
+    if not app.config["X_ACCEL_REDIRECT"]:
+        return send_file(path, as_attachment=as_attachment)
+
+    internal_uri = x_accel_uri(path)
+    if internal_uri is None:
+        return send_file(path, as_attachment=as_attachment)
+
+    # send_file's own 404, kept here because nginx would otherwise answer a
+    # missing file from an internal location we never meant to expose at all.
+    if not os.path.isfile(path):
+        abort(404)
+
+    response = app.response_class()
+    response.headers["X-Accel-Redirect"] = internal_uri
+    response.headers["Content-Type"] = (
+        mimetypes.guess_type(path)[0] or "application/octet-stream"
+    )
+    response.headers["Content-Disposition"] = content_disposition(
+        os.path.basename(path), attachment=as_attachment
+    )
+    # The body stays empty and goes no further than nginx, which throws the
+    # whole of it away - Content-Length: 0 and all - and answers from the file
+    # instead, filling in its own length and the Content-Range on a partial
+    # request. Content-Type and Content-Disposition are the headers that
+    # survive, which is why they are set here and the length is not worth
+    # trying to remove.
+    return response
 
 
 def get_path_for_video_file(talk_id, file_extension):

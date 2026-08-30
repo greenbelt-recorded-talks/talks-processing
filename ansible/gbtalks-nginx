@@ -21,6 +21,26 @@ server {
         default_type application/x-x509-ca-cert;
     }
 
+    # The talks page renders an <audio> player for every file of every talk,
+    # and each one probes its file for a duration on page load. Serving those
+    # through uWSGI is what made the page unusable: with processes = 1 the
+    # transfers serialise, and the buffering below drains the whole 150 MB file
+    # out of the worker even after the browser has cancelled - so the players
+    # all time out and show 00:00. Flask does the auth check and names the file
+    # in an X-Accel-Redirect header; these locations are where it lands.
+    #
+    # internal, so none of this is reachable from the network - a request for
+    # /_storage/... straight off the wire is a 404. Flask is the only way in,
+    # and it is still the thing deciding which file you get.
+    #
+    # The paths mirror config.py's defaults. Override UPLOAD_DIR and friends in
+    # the environment and these have to move with them, or the app will hand
+    # nginx a name it cannot resolve.
+    location /_storage/uploads/   { internal; alias /storage/uploads/; }
+    location /_storage/processed/ { internal; alias /storage/processed/; }
+    location /_storage/images/    { internal; alias /storage/images/; }
+    location /_storage/web_mp3s/  { internal; alias /storage/web_mp3s/; }
+
     location / {
         include uwsgi_params;
         uwsgi_pass unix:/tmp/gbtalks.sock;
@@ -51,6 +71,26 @@ server {
         alias /etc/ssl/certs/gbtalks-ca.crt;
         default_type application/x-x509-ca-cert;
     }
+
+    # The talks page renders an <audio> player for every file of every talk,
+    # and each one probes its file for a duration on page load. Serving those
+    # through uWSGI is what made the page unusable: with processes = 1 the
+    # transfers serialise, and the buffering below drains the whole 150 MB file
+    # out of the worker even after the browser has cancelled - so the players
+    # all time out and show 00:00. Flask does the auth check and names the file
+    # in an X-Accel-Redirect header; these locations are where it lands.
+    #
+    # internal, so none of this is reachable from the network - a request for
+    # /_storage/... straight off the wire is a 404. Flask is the only way in,
+    # and it is still the thing deciding which file you get.
+    #
+    # The paths mirror config.py's defaults. Override UPLOAD_DIR and friends in
+    # the environment and these have to move with them, or the app will hand
+    # nginx a name it cannot resolve.
+    location /_storage/uploads/   { internal; alias /storage/uploads/; }
+    location /_storage/processed/ { internal; alias /storage/processed/; }
+    location /_storage/images/    { internal; alias /storage/images/; }
+    location /_storage/web_mp3s/  { internal; alias /storage/web_mp3s/; }
 
     location / {
         include uwsgi_params;

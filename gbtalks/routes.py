@@ -41,6 +41,7 @@ from .libgbtalks import (
     get_video_processing_status,
     normalise_cover_image,
     relevel_audio,
+    send_stored_file,
 )
 from .models import Editor, Recorder, Talk, db
 from .talks_csv import TalksCsvError, parse_talks_csv
@@ -1848,7 +1849,10 @@ def getfile():
 
     talk = db.session.get(Talk, talk_id)
 
-    return send_file(
+    # Every <audio> player on the talks page points here, so this is the one
+    # route where the difference between nginx serving the file and uWSGI
+    # serving it decides whether the page works at all. See send_stored_file.
+    return send_stored_file(
         get_path_for_file(talk_id, file_type, talk.title, talk.speaker),
         as_attachment=True,
     )
