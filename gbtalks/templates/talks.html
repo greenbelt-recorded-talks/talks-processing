@@ -6,8 +6,17 @@
 
 <div id="talks-filter" uk-filter="target: .js-filter">
 
-    <div class="uk-card uk-card-default uk-card-body uk-padding-small uk-margin-small-bottom uk-text-center">
-        <span class="uk-text-bold" id="talks-summary">{% if talks %}Showing all {{ talks|length }} talk{{ '' if talks|length == 1 else 's' }}{% else %}No talks loaded{% endif %}</span>
+    <div class="uk-card uk-card-default uk-card-body uk-padding-small uk-margin-small-bottom">
+        <div class="uk-grid-small uk-flex-middle uk-flex-center uk-flex-between@s" uk-grid>
+            <div class="uk-text-center uk-text-left@s">
+                <span class="uk-text-bold" id="talks-summary">{% if talks %}Showing all {{ talks|length }} talk{{ '' if talks|length == 1 else 's' }}{% else %}No talks loaded{% endif %}</span>
+            </div>
+            <div class="uk-text-center uk-text-right@s">
+                <span class="uk-text-meta uk-margin-small-right">Website export</span>
+                <a class="uk-button uk-button-default uk-button-small" href="{{ url_for('talks_products') }}" title="Cleared, uncancelled talks with their download and memory stick variations, for import into the Greenbelt website">Products CSV</a>
+                <a class="uk-button uk-button-default uk-button-small" href="{{ url_for('talks_archive') }}" title="Every talk in the database, for import into the Greenbelt website archive">Archive CSV</a>
+            </div>
+        </div>
     </div>
 
     <div class="uk-grid-small uk-grid-divider uk-child-width-auto" uk-grid>
