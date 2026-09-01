@@ -7,6 +7,14 @@
 
 server {
     listen 80;
+    # Clients resolve gbtalks.local over mDNS, which answers with this
+    # machine's AAAA records alongside its A record, and browsers try the
+    # IPv6 one first. Without this line the only thing listening on [::]:80
+    # is the distribution's default site, so every one of those requests got
+    # the nginx welcome page rather than the app - the site looked down over
+    # HTTP while working perfectly over HTTPS, which has listened on both
+    # families all along.
+    listen [::]:80;
     server_name gbtalks.local
                 talks-processing.greenbelt.org.uk
                 on-site.talks-processing.greenbelt.org.uk;
