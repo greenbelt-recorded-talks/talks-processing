@@ -747,3 +747,42 @@ class TestDeleteTalkFile:
 
         assert 'action="/delete_talk_file"' in page
         assert "action=deletetalk" not in page
+
+
+class TestWebsiteExports:
+    """Both exports list the same talks: the cleared, uncancelled ones."""
+
+    @pytest.mark.parametrize("route", ["/talks_archive.csv", "/talks_products.csv"])
+    def test_uncleared_and_cancelled_talks_are_left_out(
+        self, client, make_talk, route
+    ):
+        make_talk(talk_id=1, title="Cleared Talk", is_cleared=True)
+        make_talk(talk_id=2, title="Uncleared Talk")
+        make_talk(
+            talk_id=3, title="Cancelled Talk", is_cleared=True, is_cancelled=True
+        )
+
+        csv = client.get(route).get_data(as_text=True)
+
+        assert "Cleared Talk" in csv
+        assert "Uncleared Talk" not in csv
+        assert "Cancelled Talk" not in csv
+
+    def test_the_products_export_adds_two_variations_per_talk(
+        self, app, client, make_talk
+    ):
+        make_talk(talk_id=1, is_cleared=True)
+
+        csv = client.get("/talks_products.csv").get_data(as_text=True)
+        reference = "GB" + app.config["GB_SHORT_YEAR"] + "-001"
+
+        assert reference + "-DL" in csv
+        assert reference + "-MS" in csv
+
+    def test_the_archive_export_is_one_row_per_talk(self, client, make_talk):
+        make_talk(talk_id=1, is_cleared=True)
+
+        csv = client.get("/talks_archive.csv").get_data(as_text=True)
+
+        assert "-DL" not in csv
+        assert "-MS" not in csv

@@ -202,12 +202,17 @@ are what the Greenbelt website's importer is fed, and are the only reason
 `pyexcel` is in `requirements.txt`.
 
 Both write the same 24 columns - `WEBSITE_EXPORT_HEADER` in `routes.py` - and
-share `website_talk_reference`, `website_talk_row` and `website_csv_response`,
-because they differ only in which talks they list and in what the products
-export adds around each one.
+share `website_export_talks`, `website_talk_reference`, `website_talk_row` and
+`website_csv_response`, because they differ only in what the products export
+adds around each talk.
 
-**`talks_archive.csv`** is one row per talk, every talk in the database.
-**`talks_products.csv`** is the cleared, uncancelled ones, each as three rows:
+Both list the **same talks**: the cleared, uncancelled ones, which is
+`website_export_talks`. A talk that is not cleared, or is cancelled, is not one
+we may hand out, so it belongs in neither. The archive export used to list
+every talk in the database, cancelled and uncleared included.
+
+**`talks_archive.csv`** is one row per talk.
+**`talks_products.csv`** gives each talk three rows:
 the talk itself, then a `-DL` download variation and a `-MS` memory-stick
 variation, both priced 3 and both pointing back at the talk's reference
 (`GB26-001`) as their parent. The variation rows are padded to the full 24
@@ -224,12 +229,12 @@ there for the import to resolve.
 
 Neither export checks that the MP3 it names exists. That is deliberate - the
 website is sent the full set and sorts out what it can use - but it does mean a
-row can name a file that was never built, and `talks_archive.csv` will list
-cancelled and uncleared talks alongside the rest. Nothing in the database says
-whether a talk has been converted; recording status is `os.path.exists` against
-the storage directories, so a filter would have to go to disk. The place that
-*does* narrow the set is `usb_tools/make_usb_gold.sh`, which is where "what we
-are allowed to hand out" is defined - see its header.
+row can name a file that was never built. Nothing in the database says whether
+a talk has been converted; recording status is `os.path.exists` against the
+storage directories, so that filter would have to go to disk, unlike the
+cleared/uncancelled one. The place that narrows on the files themselves is
+`usb_tools/make_usb_gold.sh`, which is where "what we are allowed to hand out"
+is defined - see its header.
 
 `pyexcel` is imported inside `website_csv_response` rather than at the top of
 `routes.py`, as it was inside both routes before them. These two routes are its

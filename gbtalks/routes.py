@@ -2894,6 +2894,18 @@ def website_talk_reference(talk):
     return "GB" + app.config["GB_SHORT_YEAR"] + "-" + str(talk.id).zfill(3)
 
 
+def website_export_talks():
+    """The talks both exports list: the cleared, uncancelled ones.
+
+    A talk that is not cleared, or is cancelled, is not one we may hand out, so
+    it has no business in either export.
+    """
+
+    return Talk.query.filter(
+        Talk.is_cleared.is_(True), Talk.is_cancelled.is_(False)
+    ).all()
+
+
 def website_talk_row(talk):
     """The row describing the talk itself, shared by both exports."""
 
@@ -2946,7 +2958,7 @@ def talks_archive():
 
     rows = [WEBSITE_EXPORT_HEADER]
 
-    for talk in Talk.query.all():
+    for talk in website_export_talks():
         rows.append(website_talk_row(talk))
 
     return website_csv_response(rows, "talks_archive.csv")
@@ -2958,9 +2970,7 @@ def talks_products():
 
     rows = [WEBSITE_EXPORT_HEADER]
 
-    for talk in Talk.query.filter(
-        Talk.is_cleared.is_(True), Talk.is_cancelled.is_(False)
-    ).all():
+    for talk in website_export_talks():
         reference = website_talk_reference(talk)
         talk_row = website_talk_row(talk)
         mp3_filename = talk_row[WEBSITE_EXPORT_HEADER.index("MP3 Filename")]
