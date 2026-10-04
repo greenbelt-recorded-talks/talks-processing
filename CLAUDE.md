@@ -434,6 +434,69 @@ re-converts a talk that already has a processed file, so a mid-festival change
 leaves a split archive until the processed MP3s are deleted and the cron job
 rebuilds them.
 
+### USB Sticks
+
+`usb_tools/` is where the finished talks become the thing people actually buy.
+Three stages, each with its own script:
+
+| | |
+|---|---|
+| `make_usb_gold.sh` | rebuilds `/storage/usb_gold` from the database - the authoritative "what we are allowed to hand out" set. See its header. |
+| `make_all_talks_usbs.sh` | stages the gold dir in `/dev/shm`, fans out across every connected stick, summarises. `--partial` for a mid-festival preload. |
+| `make_single_all_talks_usb.sh` | one stick: mount, rsync, unmount, **mount again and read it back**, label. Twenty of these at a time. |
+
+**Every stick is verified after writing, and the run exits non-zero if any
+failed.** This is not belt and braces, it is the whole point. The copy is
+`rsync --delete`, so a stick that *is* written is correct by construction - the
+only failure mode left is a stick that is not written at all, which keeps last
+year's talks and last year's `GREENBELT` label and is indistinguishable from a
+good one. At GB26 two sticks carrying the GB25 set reached a customer, and
+nothing in the toolchain had been in a position to notice: `xargs -P20`
+collapses twenty exit codes into one, and a single `copy failed` line among
+sixty scrolls past unread.
+
+The verification unmounts before re-reading, deliberately. Checking the
+still-mounted filesystem reads the page cache and agrees with itself. It
+compares **names and sizes only** - see `stick_verify.sh` for why checksums
+would be the reason somebody stopped running it.
+
+`fatlabel` runs last, and only on a stick that passed, so an unlabelled stick
+is a visible sign that this one went wrong.
+
+#### Tracking sticks by serial number
+
+`/dev/sdc` is whatever was in the port at the time - on 30 August 2026 that
+letter meant two different sticks either side of 19:28 - so sticks are tracked
+by the serial number `lsblk` reports. `stick_log.sh` writes two CSVs under
+`USB_LOG_DIR` (`/storage/usb_logs`):
+
+- `run-<stamp>.csv`, one line per stick per run. `make_all_talks_usbs.sh`
+  reads its own children's outcomes back out of this, because their exit codes
+  do not survive xargs.
+- `registry.csv`, appended to and never rewritten, which is what answers "what
+  was on the one with this serial?" when a stick comes back in the post.
+
+Column order in both is load-bearing: everything before `result` is a field
+that cannot contain a comma, because `summarise_run` parses rows with a plain
+`IFS=, read`. The free-text columns come after it.
+
+#### Checking stock
+
+`check_usbs.sh` mounts every connected stick **read-only** and reports which
+festival's talks are on it, recording each one in the registry. Run it on stock
+before a run and on anything that comes back. Nothing about a stick's outside
+says which year it holds: both years are labelled `GREENBELT`, and the 2025
+mail-order batch is a different model and capacity from the on-site one, so not
+even "ours look like this" holds.
+
+#### Tests
+
+`usb_tools/test_stick_verify.sh` and `usb_tools/test_stick_log.sh` run
+standalone - no root, no hardware. They are not in the pytest suite and CI does
+not run them. The comparison and the log parsing live in sourceable files
+(`stick_verify.sh`, `stick_log.sh`) specifically so they can be exercised
+against ordinary directories instead of twenty sticks and a hub.
+
 ### Migration System
 Custom migration framework in `gbtalks/commands.py`:
 - Tracks applied migrations in `schema_migrations` table

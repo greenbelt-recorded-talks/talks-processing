@@ -295,6 +295,7 @@
         - /storage/processed
         - /storage/web_mp3s
         - /storage/usb_gold
+        - /storage/usb_logs
         - /storage/cds
         - /usb_gold
 
