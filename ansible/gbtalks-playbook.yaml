@@ -218,10 +218,15 @@
     # and the Dockerfile uses gunicorn, so only this deployment wants it. It
     # compiles from source, which is why the play installs gcc, python3.13-dev
     # and libpcre2-dev. pcre3 is gone from Ubuntu 26.04.
+    #
+    # --no-cache-dir because pip otherwise reuses a wheel it built earlier,
+    # linked against whatever libraries the machine had then - which is how a
+    # rebuilt venv came back still needing the removed libpcre.so.3.
     - name: Install uWSGI in the venv
       ansible.builtin.pip:
         name: uwsgi
         virtualenv: /home/gbtalks/talks-processing/.ve
+        extra_args: --no-cache-dir
     - name: Configure the uwsgi service
       ansible.builtin.copy:
         src: gbtalks-uwsgi.conf
