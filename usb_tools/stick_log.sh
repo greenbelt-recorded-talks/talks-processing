@@ -1,42 +1,26 @@
 #!/bin/bash
 
-# Stick identification and run logging. Sourced by the other scripts here, not
-# run on its own.
+# Stick identification and run logging. Sourced, not run.
 #
-# Sticks are tracked by serial number, because that is the only thing about one
-# that survives being unplugged. /dev/sdc is just whatever was in the port at
-# the time: on 30 August 2026 that letter meant one stick before 19:28 and a
-# different one after, which is exactly the sort of thing that makes "which
-# stick got what?" unanswerable a month later.
+# Sticks are keyed on serial number: /dev/sdc is only whatever was in the port
+# at the time. Two CSVs under USB_LOG_DIR:
 #
-# Two files get written, both CSV, both under USB_LOG_DIR:
+#   run-<stamp>.csv  one line per stick per run, read back by summarise_run
+#   registry.csv     every stick ever seen, append-only
 #
-#   run-<stamp>.csv  one run, one line per stick. make_all_talks_usbs.sh reads
-#                    its own children's lines back out of this, because xargs
-#                    discards their exit codes and twenty of them interleave
-#                    their output anyway.
-#
-#   registry.csv     every stick ever seen, appended to and never rewritten.
-#                    This is the file that answers "what was on the one with
-#                    this serial?" when a stick comes back in the post.
-#
-# Both are written under flock: twenty children append to the same file at
-# once, and a line interleaved halfway through another is worse than no line.
+# Both under flock - twenty children append at once.
 
 USB_LOG_DIR="${USB_LOG_DIR:-/storage/usb_logs}"
 USB_REGISTRY="${USB_REGISTRY:-$USB_LOG_DIR/registry.csv}"
 
-# Field order is not cosmetic. make_all_talks_usbs.sh reads its summary back
-# out of the run log with a plain `IFS=, read`, so every column before `result`
-# is one that cannot contain a comma - a timestamp, a device path, a serial, an
-# integer. The free-text ones, model and detail, come after it, where a comma
-# inside a quoted field can only run into the part already read.
+# summarise_run parses these with a plain `IFS=, read`, so every column before
+# `result` has to be comma-free. The free-text ones come after it.
 
 RUN_LOG_HEADER='time,device,serial,size_bytes,result,files,model,detail'
 REGISTRY_HEADER='time,serial,size_bytes,festival,result,model,detail'
 
-# lsblk prints nothing at all for a device it cannot read, so every one of
-# these falls back rather than returning an empty field that looks like data.
+# lsblk prints nothing for a device it cannot read, hence the fallbacks - an
+# empty field would look like data.
 
 stick_serial() {
     local serial
@@ -56,26 +40,16 @@ stick_size() {
     echo "${size:-0}"
 }
 
-# The volume label a stick for a given festival should carry.
-#
-# FAT allows eleven characters, and "GREENBELT" plus a two-digit year is
-# exactly eleven. The year is on it so that a stick from a previous festival is
-# obvious in a file manager, rather than only to somebody who plugs it into
-# this machine and reads the filenames. Up to GB26 every year was labelled
-# plain GREENBELT, which is how two sticks holding the GB25 talks could sit in
-# the GB26 stock looking exactly like the rest of it.
-#
-# Refuses anything that is not a two-digit year rather than quietly writing
-# "GREENBELT" and losing the distinction again.
+# The volume label for a festival. GREENBELT plus a two-digit year is exactly
+# the eleven characters FAT allows. Refuses anything else rather than quietly
+# writing a bare GREENBELT, which is what made GB25 and GB26 stock identical.
 
 volume_label() {
     [[ $1 =~ ^[0-9]{2}$ ]] || return 1
     echo "GREENBELT$1"
 }
 
-# Minimal RFC 4180 quoting. Model strings hold spaces, and the detail field
-# holds whatever went wrong, which is the one field most likely to contain a
-# comma just when somebody is trying to read the log.
+# Minimal RFC 4180 quoting.
 
 csv_row() {
     local out='' field
@@ -90,9 +64,8 @@ csv_row() {
     echo "$out"
 }
 
-# Append one row, creating the file with its header if it is not there yet.
-# The lock is on the file itself, so two different logs never wait on each
-# other.
+# Append one row, writing the header first if the file is new. The lock is on
+# the file itself, so the two logs never wait on each other.
 
 log_append() {
     local file=$1 header=$2; shift 2
@@ -107,11 +80,8 @@ log_append() {
     } 9>>"$file"
 }
 
-# One stick, one outcome. Called by make_single_all_talks_usb.sh as it
-# finishes, and by check_usbs.sh when auditing stock.
-#
-# USB_RUN_LOG is set by make_all_talks_usbs.sh so that every child of one run
-# writes to the same file; a stick done on its own just skips that half.
+# One stick, one outcome. USB_RUN_LOG is set by make_all_talks_usbs.sh so every
+# child of a run writes to the same file; a stick done on its own skips it.
 
 log_stick() {
     local device=$1 result=$2 files=$3 detail=$4
@@ -130,13 +100,11 @@ log_stick() {
         "$now" "$serial" "$size" "GB${USB_FESTIVAL_YEAR:-??}" "$result" "$model" "$detail"
 }
 
-# Read a run log back and work out what happened, filling RUN_WRITTEN,
-# RUN_FAILURES and RUN_UNACCOUNTED. Returns non-zero unless every stick that
-# was connected came back ok.
+# Fill RUN_WRITTEN, RUN_FAILURES and RUN_UNACCOUNTED from a run log. Non-zero
+# unless every connected stick came back ok.
 #
-# RUN_UNACCOUNTED is the sticks that logged nothing at all. A child killed
-# partway through - or one that never started - leaves no line behind, and
-# saying nothing must not be mistaken for saying it went fine.
+# RUN_UNACCOUNTED is sticks that logged nothing: a child killed partway through
+# leaves no line, and silence is not success.
 
 summarise_run() {
     local file=$1 expected=$2

@@ -436,90 +436,67 @@ rebuilds them.
 
 ### USB Sticks
 
-`usb_tools/` is where the finished talks become the thing people actually buy.
-Three stages, each with its own script:
+`usb_tools/`, in the order they run:
 
 | | |
 |---|---|
-| `make_usb_gold.sh` | rebuilds `/storage/usb_gold` from the database - the authoritative "what we are allowed to hand out" set. See its header. |
-| `make_all_talks_usbs.sh` | stages the gold dir in `/dev/shm`, fans out across every connected stick, summarises. `--partial` for a mid-festival preload. |
-| `make_single_all_talks_usb.sh` | one stick: mount, rsync, unmount, **mount again and read it back**, label. Twenty of these at a time. |
+| `make_usb_gold.sh` | rebuilds `/storage/usb_gold` from the database. See its header. |
+| `make_all_talks_usbs.sh` | stages the gold dir in `/dev/shm`, writes every connected stick, summarises. `--partial` for a mid-festival preload. |
+| `make_single_all_talks_usb.sh` | one stick: mount, rsync, unmount, remount, verify, label. Twenty at a time. |
+| `check_usbs.sh` | read-only audit of what is actually on the connected sticks. |
 
-**Every stick is verified after writing, and the run exits non-zero if any
-failed.** This is not belt and braces, it is the whole point. The copy is
-`rsync --delete`, so a stick that *is* written is correct by construction - the
-only failure mode left is a stick that is not written at all, which keeps last
-year's talks and, before the label carried a year, looked exactly like a good
-one. At GB26 two sticks carrying the GB25 set reached a customer, and
-nothing in the toolchain had been in a position to notice: `xargs -P20`
-collapses twenty exit codes into one, and a single `copy failed` line among
-sixty scrolls past unread.
+At GB26 two sticks holding the GB25 talks reached a customer. The copy is
+`rsync --delete`, so a stick that gets written is right; these were sticks that
+were never written, and nothing could tell them from the rest - same contents
+layout, same `GREENBELT` label. Nothing reported it either, because `xargs
+-P20` collapses twenty exit codes into one. The verification, the run summary,
+the serial log and the year in the label all come from that.
 
-The verification unmounts before re-reading, deliberately. Checking the
-still-mounted filesystem reads the page cache and agrees with itself. It
-compares **names and sizes only** - see `stick_verify.sh` for why checksums
-would be the reason somebody stopped running it.
+#### Verification
 
-#### The volume label
+Each stick is unmounted after the copy and remounted before being read back.
+Checking it while still mounted reads the page cache and agrees with itself.
 
-Sticks are labelled **`GREENBELT<yy>`** — `GREENBELT26`, which is exactly the
-eleven characters FAT allows. `volume_label` in `stick_log.sh` is the one place
-that builds it, and it refuses anything that is not a two-digit year rather
-than falling back to a bare `GREENBELT` and losing the distinction again.
+Names and sizes, no checksums: hashing 3.3 GB back off twenty sticks costs more
+than the write. Unexpected files are the signal that matters - they mean a copy
+that never happened.
 
-Up to GB26 every year was labelled plain `GREENBELT`. That is precisely how two
-sticks holding the GB25 talks sat in the GB26 stock looking like the rest of
-it: a wrong stick was only identifiable by plugging it into this machine and
-reading the filenames. With the year on the label it is identifiable in a file
-manager, or in a box, by anyone.
+`make_all_talks_usbs.sh` exits non-zero if any stick fails or reports nothing.
 
-**This is not retroactive.** Every stick written before this change says
-`GREENBELT`, including all of GB26's. Re-running `make_all_talks_usbs.sh` over
-stock still in hand relabels it; sticks already posted cannot be.
+#### Volume label
 
-`fatlabel` runs last, and only on a stick that passed verification, so a stick
-still carrying the old label is one that did not pass.
+`GREENBELT<yy>`, eleven characters, which is FAT's limit. Built only by
+`volume_label` in `stick_log.sh`, which rejects anything but a two-digit year.
+`fatlabel` runs last, so a stick still carrying the old label is one that
+failed.
 
-#### Tracking sticks by serial number
+Not retroactive: everything written before this says plain `GREENBELT`, GB26
+included. Re-running over stock still in hand relabels it.
 
-`/dev/sdc` is whatever was in the port at the time - on 30 August 2026 that
-letter meant two different sticks either side of 19:28 - so sticks are tracked
-by the serial number `lsblk` reports. `stick_log.sh` writes two CSVs under
+#### Serial numbers
+
+`/dev/sdc` is whatever was in the port at the time - on 30 August 2026 it meant
+two different sticks either side of 19:28. `stick_log.sh` writes two CSVs under
 `USB_LOG_DIR` (`/storage/usb_logs`):
 
-- `run-<stamp>.csv`, one line per stick per run. `make_all_talks_usbs.sh`
-  reads its own children's outcomes back out of this, because their exit codes
-  do not survive xargs.
-- `registry.csv`, appended to and never rewritten, which is what answers "what
-  was on the one with this serial?" when a stick comes back in the post.
+- `run-<stamp>.csv` - one line per stick per run. `summarise_run` reads the
+  children's outcomes back out of it, since xargs loses their exit codes.
+- `registry.csv` - append-only, keyed on serial.
 
-Column order in both is load-bearing: everything before `result` is a field
-that cannot contain a comma, because `summarise_run` parses rows with a plain
-`IFS=, read`. The free-text columns come after it.
+Column order matters: everything before `result` has to be comma-free, because
+`summarise_run` parses rows with a plain `IFS=, read`.
 
 #### Checking stock
 
-`check_usbs.sh` mounts every connected stick **read-only** and reports which
-festival's talks are on it, recording each one in the registry. Run it on stock
-before a run and on anything that comes back.
-
-It goes on the contents, not the label, and says so when the two disagree — a
-stick with the right talks and a stale label is safe to send but worth
-relabelling, and until the GB26 stock has been through a run again that will be
-all of it.
-
-Do not fall back on judging a stick by its model: the 2025 mail-order batch is
-a different make and capacity (8.05 GB `VendorCo ProductCode`) from the on-site
-one (15.9 GB `USB Flash Disk 1100`), so "ours look like this" has already been
-wrong once.
+`check_usbs.sh` goes on contents, not the label, and flags a disagreement.
+Don't go by the model either - the 2025 mail-order batch is 8.05 GB `VendorCo
+ProductCode`, the on-site one 15.9 GB `USB Flash Disk 1100`.
 
 #### Tests
 
-`usb_tools/test_stick_verify.sh` and `usb_tools/test_stick_log.sh` run
-standalone - no root, no hardware. They are not in the pytest suite and CI does
-not run them. The comparison and the log parsing live in sourceable files
-(`stick_verify.sh`, `stick_log.sh`) specifically so they can be exercised
-against ordinary directories instead of twenty sticks and a hub.
+`usb_tools/test_stick_log.sh` and `test_stick_verify.sh`. No root, no hardware,
+not in the pytest suite, not run by CI. The logic they cover sits in
+`stick_log.sh` and `stick_verify.sh` so it can be run against plain directories.
 
 ### Migration System
 Custom migration framework in `gbtalks/commands.py`:

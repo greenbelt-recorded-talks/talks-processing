@@ -16,15 +16,9 @@
 # This used to be two scripts, and preload_usbs.sh went unnoticed for a week
 # after the talks moved to a RAM staging dir that only this one created.
 #
-# Every stick is read back after it is written, and the run ends with a count
-# of how many passed against how many were connected. Before GB26 it ended with
-# xargs exiting and nothing else: twenty children interleaved their output, one
-# "copy failed" line among sixty scrolled past, and the run looked exactly like
-# a clean one. Two sticks carrying the 2025 talks went out to a customer.
-#
-# The outcome of every stick, by serial number, goes to $USB_LOG_DIR. Serial
-# numbers because that is the only durable name a stick has - /dev/sdc is
-# whatever was in the port at the time.
+# Every stick is read back after writing, and the run ends with a count of how
+# many passed against how many were connected, plus a per-stick record in
+# $USB_LOG_DIR keyed on serial number. See CLAUDE.md for why.
 
 GOLD_DIR=/storage/usb_gold
 STAGED_DIR=/dev/shm/usb_gold
@@ -117,10 +111,9 @@ else
     exit 1
 fi
 
-# Take the device list once and use that same list for both the count below
-# and the fan-out at the bottom. Calling list_usb_disks.sh twice means the
-# number on screen is from a different moment than the sticks actually written,
-# and the difference is invisible.
+# One device list for both the count below and the fan-out at the bottom.
+# Calling list_usb_disks.sh twice means the number on screen is from a
+# different moment than the sticks written, and nothing shows the difference.
 
 mapfile -t devices < <("$USB_TOOLS_DIR/list_usb_disks.sh")
 
@@ -148,18 +141,15 @@ read
 mkdir -p "$STAGED_DIR"
 rsync -a --delete "$GOLD_DIR/" "$STAGED_DIR/" || exit 1
 
-# Every child appends its outcome to this file, and the summary below is read
-# back out of it. The children's exit codes are not enough on their own: xargs
-# collapses twenty of them into one status, and twenty children interleaving
-# their output means a single "copy failed" line scrolls past unread. That is
-# how the 2026 run finished with nobody aware that anything had gone wrong.
+# Children append their outcomes here and the summary below reads them back.
+# Their exit codes are not enough: xargs collapses twenty into one status, and
+# a lone "copy failed" line among sixty scrolls past unread.
 
 export USB_RUN_LOG="$USB_LOG_DIR/run-$(date +%Y%m%d-%H%M%S).csv"
 export USB_FESTIVAL_YEAR="$year"
 
-# Fail here rather than at the end. The summary below is read back out of the
-# run log, so a log that cannot be written turns every stick into "reported
-# nothing at all" and a perfectly good run into an alarming one.
+# Fail here, not at the end: a log that cannot be written turns every stick
+# into "reported nothing at all" and a good run into an alarming one.
 
 if ! mkdir -p "$USB_LOG_DIR"; then
     echo "Cannot create $USB_LOG_DIR - there would be no record of which stick got what."
@@ -171,8 +161,7 @@ echo "Starting work - logging to $USB_RUN_LOG"
 printf '%s\n' "${devices[@]}" \
     | xargs -P20 -I {} "$USB_TOOLS_DIR/make_single_all_talks_usb.sh" {}
 
-# Summary. Anything that did not write a line is counted too: a child killed
-# partway through leaves no outcome, and silence must not read as success.
+# Sticks that wrote no line are counted too - silence is not success.
 
 echo
 echo "=============================================================="

@@ -5,23 +5,15 @@
 #   check_usbs.sh              check against this calendar year's festival
 #   check_usbs.sh --year 25    check against a particular festival
 #
-# This exists because of GB26, where two sticks carrying the 2025 talks went
-# out to a customer. Sticks now carry the festival year in their volume label,
-# but that only helps from the first run that writes one - everything written
-# before says plain GREENBELT - and a label is a claim about a stick rather
-# than a fact about it. This goes on the contents, and says so when the label
-# disagrees with them.
+# Goes on the contents, and says so when the label disagrees. Sticks carry the
+# festival year in their label now, but only from the first run that writes
+# one, and a label is a claim rather than a fact. Nor does the model help: the
+# 2025 mail-order batch is a different make and capacity from the on-site one.
 #
-# Do not fall back on judging a stick by its model either: the 2025 mail-order
-# batch is a different make and capacity from the on-site one, so "ours look
-# like this" has already been wrong once.
+# Run it on stock before a run and on anything that comes back.
 #
-# Use it on stock before a run, and on anything that comes back afterwards.
-# Every stick checked is recorded in the registry by serial number, so a stick
-# that turns up again later has a history.
-#
-# Mounts are read-only throughout. A stick that is already wrong should not be
-# modified by the act of finding out.
+# Every stick checked goes into the registry by serial, so one that turns up
+# again has a history. Mounts are read-only throughout.
 
 set -u
 
@@ -92,8 +84,8 @@ for device in "${devices[@]}"; do
         continue
     fi
 
-    # Count the talks by the festival their filenames claim, and keep anything
-    # that is not a talk separately rather than ignoring it.
+    # Count talks by the festival their filenames claim; keep non-talks apart
+    # rather than ignoring them.
 
     declare -A talks=()
     indexes=''
@@ -129,9 +121,8 @@ for device in "${devices[@]}"; do
         (( ok++ ))
         log_stick "$device" audit-ok "${talks[$year]}" "$summary"
 
-        # Contents are right, so this one is safe to send - but the label is
-        # what somebody sorting a box of sticks will go on. Sticks written
-        # before the label carried the year all say plain GREENBELT.
+        # Safe to send, but the label is what somebody sorting a box goes on.
+        # Anything written before the label carried a year says GREENBELT.
 
         if [[ $fslabel != "$expected_label" ]]; then
             echo "    note: labelled '${fslabel:-<none>}', should be '$expected_label'"

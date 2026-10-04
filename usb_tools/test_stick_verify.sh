@@ -1,12 +1,7 @@
 #!/bin/bash
 
-# Tests for stick_verify.sh. Run it directly:
-#
-#   usb_tools/test_stick_verify.sh
-#
-# Two ordinary directories stand in for the staging dir and a mounted stick,
-# which is the whole reason the comparison lives in its own file. No root, no
-# hardware, no USB hub.
+# Tests for stick_verify.sh. Run it directly. Two ordinary directories stand in
+# for the staging dir and a mounted stick, so no root and no hardware.
 
 set -u
 
@@ -28,7 +23,7 @@ check() {
     fi
 }
 
-# A plausible gold set: this year's talks plus this year's index.
+# A gold set: talks plus the index.
 make_gold() {
     local dir=$1 year=$2 n
     mkdir -p "$dir"

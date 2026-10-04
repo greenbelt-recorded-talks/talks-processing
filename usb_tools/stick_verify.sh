@@ -2,18 +2,15 @@
 
 # Comparing what is on a stick against what should be. Sourced, not run.
 #
-# Separate from make_single_all_talks_usb.sh so it can be exercised against two
-# ordinary directories, which is the only way to test it without twenty sticks
-# and a hub: see test_stick_verify.sh beside it.
+# Split out so it can be tested against two ordinary directories - see
+# test_stick_verify.sh.
 #
-# Names and sizes only, deliberately - no checksums. The failures this is here
-# to catch are a copy that did not happen and a file that should not be there,
-# and both of those are visible in a directory listing. Hashing 3.3 GB back off
-# twenty sticks over one USB bus would cost more than the write did, and would
-# be the reason somebody stopped running it.
+# Names and sizes, no checksums. Both failures worth catching show up in a
+# directory listing, and hashing 3.3 GB back off twenty sticks would cost more
+# than the write.
 
-# Populate STAGED (filename -> size in bytes) from the top level of a
-# directory. Global, because bash cannot return a map.
+# Populate STAGED (filename -> size) from a directory's top level. Global,
+# because bash cannot return a map.
 
 staged_files() {
     local dir=$1 path
@@ -24,13 +21,11 @@ staged_files() {
     done < <(find "$dir" -maxdepth 1 -type f -print0)
 }
 
-# Compare a mounted stick against STAGED, filling three arrays and returning
-# non-zero if any of them has anything in it.
+# Compare a mounted stick against STAGED. Non-zero if any of the three arrays
+# comes back non-empty.
 #
-# VERIFY_UNEXPECTED is the one that matters most. Missing and wrong-size files
-# mean a copy that went wrong, which at least has a chance of being noticed;
-# unexpected files mean a copy that never touched the stick at all, which is
-# what put a previous festival's talks in the post.
+# VERIFY_UNEXPECTED matters most: missing and wrong-size files mean a copy that
+# went wrong, unexpected ones mean a copy that never happened.
 
 verify_stick() {
     local mountpoint=$1 name path

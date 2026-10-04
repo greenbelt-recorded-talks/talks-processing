@@ -1,11 +1,7 @@
 #!/bin/bash
 
-# Tests for stick_log.sh. Run it directly:
-#
-#   usb_tools/test_stick_log.sh
-#
-# No root and no hardware: the only thing here that touches a real device is
-# log_stick, and only to read /dev/sda's serial out of lsblk.
+# Tests for stick_log.sh. Run it directly. No root, no hardware - the only
+# thing touching a real device is log_stick, reading /dev/sda's serial.
 
 set -u
 
@@ -76,9 +72,7 @@ check "registry header" "$(head -1 "$USB_REGISTRY")" \
 check "festival" "$(tail -1 "$USB_REGISTRY" | cut -d, -f4)" 'GB26'
 check "result"   "$(tail -1 "$USB_REGISTRY" | cut -d, -f5)" 'ok'
 
-# A model containing a comma is the case the column order exists to survive:
-# everything before `result` has to stay comma-free or summarise_run misreads
-# the row.
+# A model containing a comma is what the column order exists to survive.
 cat > "$TMP/run.csv" <<'CSV'
 time,device,serial,size_bytes,result,files,model,detail
 2026-08-30T20:40:00+01:00,/dev/sdb,SCY0000000014481,15938355200,ok,63,USB Flash Disk 1100,

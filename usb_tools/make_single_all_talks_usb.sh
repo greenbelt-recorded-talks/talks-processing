@@ -2,20 +2,12 @@
 
 # Usage: make_single_all_talks_usb.sh /dev/sdc
 #
-# Write the staged talks to one stick, then read it back and check they are
-# there. Normally driven by make_all_talks_usbs.sh, one of these per stick,
-# twenty at a time.
+# Write the staged talks to one stick and read them back. Normally driven by
+# make_all_talks_usbs.sh, twenty of these at a time.
 #
-# The verification is the point of this script, not a flourish. In 2026 a
-# customer was sent two sticks carrying the 2025 talks, and nothing anywhere in
-# this toolchain would have noticed: the copy is rsync --delete, so a stick
-# that is written is correct by construction, and a stick that is *not* written
-# keeps last year's set and last year's GREENBELT label and looks identical to
-# a good one. The only defence is to open the stick afterwards and look.
-#
-# So the sequence is deliberately mount, copy, unmount, mount again, check.
-# Unmounting in the middle is what makes it a read-back: checking before it
-# would read the page cache and agree with itself.
+# Mount, copy, unmount, mount again, check. The unmount in the middle is what
+# makes it a read-back - checking before it reads the page cache. See the USB
+# Sticks section of CLAUDE.md for why it is here.
 
 set -u
 
@@ -45,8 +37,7 @@ serial=$(stick_serial "$device")
 label="$device ($serial)"
 
 # make_all_talks_usbs.sh stages the talks in RAM before fanning out. Say so
-# plainly if that has not happened: as a bare rsync error it is easy to lose
-# among nineteen other sticks' output.
+# plainly - as a bare rsync error it is easy to lose among nineteen others.
 
 if [[ ! -d $STAGED_DIR ]]; then
     echo "$label: $STAGED_DIR is missing - run make_all_talks_usbs.sh rather than this script on its own"
@@ -54,8 +45,7 @@ if [[ ! -d $STAGED_DIR ]]; then
     exit 1
 fi
 
-# What the stick should end up holding, by name and size. Read once, here,
-# into STAGED, which verify_stick compares against later.
+# What the stick should end up holding, read once into STAGED.
 
 staged_files "$STAGED_DIR"
 
@@ -65,8 +55,7 @@ if (( ${#STAGED[@]} == 0 )); then
     exit 1
 fi
 
-# The festival year the registry records this stick as carrying, taken from the
-# files about to go on it rather than from the clock.
+# The year comes from the files about to go on the stick, not the clock.
 
 if [[ -z ${USB_FESTIVAL_YEAR:-} ]]; then
     for name in "${!STAGED[@]}"; do
@@ -77,9 +66,7 @@ if [[ -z ${USB_FESTIVAL_YEAR:-} ]]; then
     done
 fi
 
-# The label carries that year, so refusing here is better than writing a stick
-# whose label cannot say which festival is on it - which is the thing the label
-# now exists to settle.
+# The label carries that year, so an unlabellable stick is not worth writing.
 
 if ! fs_label=$(volume_label "${USB_FESTIVAL_YEAR:-}"); then
     echo "$label: cannot tell which festival $STAGED_DIR holds - not writing an unlabellable stick"
@@ -87,8 +74,8 @@ if ! fs_label=$(volume_label "${USB_FESTIVAL_YEAR:-}"); then
     exit 1
 fi
 
-# Past here the stick may be mounted, so every failure has to unmount before it
-# gives up. A stick left mounted gets pulled out of the hub still mounted.
+# Past here the stick may be mounted, so every failure unmounts before giving
+# up - otherwise it gets pulled out of the hub still mounted.
 
 give_up() {
     local result=$1 message=$2
@@ -111,8 +98,7 @@ if ! rsync --size-only --delete -a "$STAGED_DIR/" "$mountpoint"; then
     give_up copy-failed "copy failed"
 fi
 
-# Unmount to flush, then mount again read-only to read back what actually
-# landed. Read-only because nothing from here on should be writing to it.
+# Unmount to flush, then mount read-only to read back what landed.
 
 if ! umount "$mountpoint"; then
     give_up unmount-failed "unmount after copy failed - do not unplug it yet"
@@ -131,8 +117,8 @@ if ! umount "$mountpoint"; then
     give_up unmount-failed "unmount after verification failed - do not unplug it yet"
 fi
 
-# Name a few examples of each kind rather than all of them - twenty sticks
-# reporting sixty filenames each buries the summary that follows them.
+# One example of each, not all of them - twenty sticks naming sixty files each
+# buries the summary.
 
 name_some() {
     local heading=$1; shift
@@ -152,8 +138,7 @@ if (( verdict != 0 )); then
     exit 1
 fi
 
-# The label goes on last, and only once the stick has been read back, so a
-# stick still carrying the previous label is one that did not pass.
+# Label last, and only on a stick that passed, so the old label means failure.
 
 if ! fatlabel "$partition" "$fs_label"; then
     echo "$label: copied and verified, but labelling failed"
