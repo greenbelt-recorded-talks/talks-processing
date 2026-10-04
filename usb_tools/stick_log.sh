@@ -56,6 +56,23 @@ stick_size() {
     echo "${size:-0}"
 }
 
+# The volume label a stick for a given festival should carry.
+#
+# FAT allows eleven characters, and "GREENBELT" plus a two-digit year is
+# exactly eleven. The year is on it so that a stick from a previous festival is
+# obvious in a file manager, rather than only to somebody who plugs it into
+# this machine and reads the filenames. Up to GB26 every year was labelled
+# plain GREENBELT, which is how two sticks holding the GB25 talks could sit in
+# the GB26 stock looking exactly like the rest of it.
+#
+# Refuses anything that is not a two-digit year rather than quietly writing
+# "GREENBELT" and losing the distinction again.
+
+volume_label() {
+    [[ $1 =~ ^[0-9]{2}$ ]] || return 1
+    echo "GREENBELT$1"
+}
+
 # Minimal RFC 4180 quoting. Model strings hold spaces, and the detail field
 # holds whatever went wrong, which is the one field most likely to contain a
 # comma just when somebody is trying to read the log.

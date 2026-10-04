@@ -6,11 +6,15 @@
 #   check_usbs.sh --year 25    check against a particular festival
 #
 # This exists because of GB26, where two sticks carrying the 2025 talks went
-# out to a customer. Nothing about a stick's outside says which festival is on
-# it: both years' sticks are labelled GREENBELT, and the 2025 mail-order batch
-# is a different model and capacity from the on-site one, so even "ours look
-# like this" does not hold. The only way to know is to open it and look, which
-# is what this does.
+# out to a customer. Sticks now carry the festival year in their volume label,
+# but that only helps from the first run that writes one - everything written
+# before says plain GREENBELT - and a label is a claim about a stick rather
+# than a fact about it. This goes on the contents, and says so when the label
+# disagrees with them.
+#
+# Do not fall back on judging a stick by its model either: the 2025 mail-order
+# batch is a different make and capacity from the on-site one, so "ours look
+# like this" has already been wrong once.
 #
 # Use it on stock before a run, and on anything that comes back afterwards.
 # Every stick checked is recorded in the registry by serial number, so a stick
@@ -38,6 +42,11 @@ while (( $# )); do
     shift
 done
 
+if ! expected_label=$(volume_label "$year"); then
+    echo "--year wants a two-digit festival year, e.g. --year 25"
+    exit 1
+fi
+
 if (( $EUID != 0 )); then
     echo "Please run as root"
     exit 1
@@ -52,13 +61,14 @@ fi
 
 export USB_FESTIVAL_YEAR="$year"
 
-echo "Checking ${#devices[@]} stick(s) against GB$year."
+echo "Checking ${#devices[@]} stick(s) against GB$year, expecting label $expected_label."
 echo
 
 ok=0
 stale=0
 blank=0
 unreadable=0
+mislabelled=0
 
 for device in "${devices[@]}"; do
     partition="${device}1"
@@ -118,6 +128,16 @@ for device in "${devices[@]}"; do
         echo "    OK - ${talks[$year]} GB$year talks,${indexes:- no index}"
         (( ok++ ))
         log_stick "$device" audit-ok "${talks[$year]}" "$summary"
+
+        # Contents are right, so this one is safe to send - but the label is
+        # what somebody sorting a box of sticks will go on. Sticks written
+        # before the label carried the year all say plain GREENBELT.
+
+        if [[ $fslabel != "$expected_label" ]]; then
+            echo "    note: labelled '${fslabel:-<none>}', should be '$expected_label'"
+            echo "          contents are right; re-run make_all_talks_usbs.sh to relabel"
+            (( mislabelled++ ))
+        fi
     else
         echo "    WRONG FESTIVAL - holds $summary,${indexes:- no index}"
         echo "    Do not send this out. Re-run make_all_talks_usbs.sh with it connected."
@@ -131,6 +151,10 @@ done
 
 echo "=============================================================="
 echo "GB$year and correct: $ok    wrong festival: $stale    blank: $blank    unreadable: $unreadable"
+
+if (( mislabelled )); then
+    echo "$mislabelled of the correct ones carry the wrong label."
+fi
 echo
 echo "Recorded by serial number in $USB_REGISTRY"
 

@@ -77,6 +77,16 @@ if [[ -z ${USB_FESTIVAL_YEAR:-} ]]; then
     done
 fi
 
+# The label carries that year, so refusing here is better than writing a stick
+# whose label cannot say which festival is on it - which is the thing the label
+# now exists to settle.
+
+if ! fs_label=$(volume_label "${USB_FESTIVAL_YEAR:-}"); then
+    echo "$label: cannot tell which festival $STAGED_DIR holds - not writing an unlabellable stick"
+    log_stick "$device" year-unknown 0 "no GB<yy>_ talks in the staging dir"
+    exit 1
+fi
+
 # Past here the stick may be mounted, so every failure has to unmount before it
 # gives up. A stick left mounted gets pulled out of the hub still mounted.
 
@@ -142,15 +152,14 @@ if (( verdict != 0 )); then
     exit 1
 fi
 
-# The label goes on last, and only once the stick has been read back. An
-# unlabelled stick is then a visible sign that something went wrong with this
-# one, which a stick carrying a previous year's GREENBELT label never is.
+# The label goes on last, and only once the stick has been read back, so a
+# stick still carrying the previous label is one that did not pass.
 
-if ! fatlabel "$partition" "GREENBELT"; then
+if ! fatlabel "$partition" "$fs_label"; then
     echo "$label: copied and verified, but labelling failed"
-    log_stick "$device" label-failed "${#STAGED[@]}" "fatlabel failed"
+    log_stick "$device" label-failed "${#STAGED[@]}" "fatlabel $fs_label failed"
     exit 1
 fi
 
-echo "$label: done, ${#STAGED[@]} files verified"
+echo "$label: done, ${#STAGED[@]} files verified, labelled $fs_label"
 log_stick "$device" ok "${#STAGED[@]}" ""

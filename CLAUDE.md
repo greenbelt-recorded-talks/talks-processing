@@ -449,8 +449,8 @@ Three stages, each with its own script:
 failed.** This is not belt and braces, it is the whole point. The copy is
 `rsync --delete`, so a stick that *is* written is correct by construction - the
 only failure mode left is a stick that is not written at all, which keeps last
-year's talks and last year's `GREENBELT` label and is indistinguishable from a
-good one. At GB26 two sticks carrying the GB25 set reached a customer, and
+year's talks and, before the label carried a year, looked exactly like a good
+one. At GB26 two sticks carrying the GB25 set reached a customer, and
 nothing in the toolchain had been in a position to notice: `xargs -P20`
 collapses twenty exit codes into one, and a single `copy failed` line among
 sixty scrolls past unread.
@@ -460,8 +460,25 @@ still-mounted filesystem reads the page cache and agrees with itself. It
 compares **names and sizes only** - see `stick_verify.sh` for why checksums
 would be the reason somebody stopped running it.
 
-`fatlabel` runs last, and only on a stick that passed, so an unlabelled stick
-is a visible sign that this one went wrong.
+#### The volume label
+
+Sticks are labelled **`GREENBELT<yy>`** — `GREENBELT26`, which is exactly the
+eleven characters FAT allows. `volume_label` in `stick_log.sh` is the one place
+that builds it, and it refuses anything that is not a two-digit year rather
+than falling back to a bare `GREENBELT` and losing the distinction again.
+
+Up to GB26 every year was labelled plain `GREENBELT`. That is precisely how two
+sticks holding the GB25 talks sat in the GB26 stock looking like the rest of
+it: a wrong stick was only identifiable by plugging it into this machine and
+reading the filenames. With the year on the label it is identifiable in a file
+manager, or in a box, by anyone.
+
+**This is not retroactive.** Every stick written before this change says
+`GREENBELT`, including all of GB26's. Re-running `make_all_talks_usbs.sh` over
+stock still in hand relabels it; sticks already posted cannot be.
+
+`fatlabel` runs last, and only on a stick that passed verification, so a stick
+still carrying the old label is one that did not pass.
 
 #### Tracking sticks by serial number
 
@@ -484,10 +501,17 @@ that cannot contain a comma, because `summarise_run` parses rows with a plain
 
 `check_usbs.sh` mounts every connected stick **read-only** and reports which
 festival's talks are on it, recording each one in the registry. Run it on stock
-before a run and on anything that comes back. Nothing about a stick's outside
-says which year it holds: both years are labelled `GREENBELT`, and the 2025
-mail-order batch is a different model and capacity from the on-site one, so not
-even "ours look like this" holds.
+before a run and on anything that comes back.
+
+It goes on the contents, not the label, and says so when the two disagree — a
+stick with the right talks and a stale label is safe to send but worth
+relabelling, and until the GB26 stock has been through a run again that will be
+all of it.
+
+Do not fall back on judging a stick by its model: the 2025 mail-order batch is
+a different make and capacity (8.05 GB `VendorCo ProductCode`) from the on-site
+one (15.9 GB `USB Flash Disk 1100`), so "ours look like this" has already been
+wrong once.
 
 #### Tests
 

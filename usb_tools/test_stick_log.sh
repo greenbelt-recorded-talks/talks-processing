@@ -40,6 +40,19 @@ check "quote doubled"     "$(csv_row 'he said "hi"')" '"he said ""hi"""'
 check "empty field kept"  "$(csv_row a '' c)"         'a,,c'
 
 echo
+echo "volume_label:"
+check "this year"    "$(volume_label 26)"  'GREENBELT26'
+check "last year"    "$(volume_label 25)"  'GREENBELT25'
+label26=$(volume_label 26)
+check "fits FAT's 11 characters" "${#label26}" '11'
+volume_label '' > /dev/null 2>&1   && r=accepted || r=refused
+check "refuses an empty year" "$r" 'refused'
+volume_label 2026 > /dev/null 2>&1 && r=accepted || r=refused
+check "refuses a four-digit year" "$r" 'refused'
+volume_label ab > /dev/null 2>&1   && r=accepted || r=refused
+check "refuses letters" "$r" 'refused'
+
+echo
 echo "log_append writes the header once:"
 log_append "$TMP/t.csv" 'h1,h2' one two
 log_append "$TMP/t.csv" 'h1,h2' three four
